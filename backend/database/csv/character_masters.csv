@@ -1,0 +1,5 @@
+code,name,sprite,hp,mp,str,mag,def,spd,know,spirit,default_weapon,default_armor
+pc1,イルミ,PC1,100,45,14,14,9,12,10,10,staff_basic,robe_basic
+pc2,ヨウ,PC2,95,50,13,13,10,11,10,10,rod_fire,armor_leather
+pc3,ユメノスケ,PC3,90,55,16,16,8,13,10,10,wand_ice,armor_chain
+pc4,ヒルユキ,PC4,110,40,12,12,14,10,10,10,tome_wind,armor_plate

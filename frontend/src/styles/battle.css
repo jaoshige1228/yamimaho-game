@@ -1,0 +1,156 @@
+:root {
+  --battle-bg-top: linear-gradient(180deg, #1a1030 0%, #2d1b4e 45%, #3d2858 100%);
+  --battle-bg-bottom: linear-gradient(0deg, #12091f 0%, #1e1230 100%);
+  --accent: #9d7cff;
+  --hp: #ff5c7a;
+  --mp: #5cb8ff;
+  --text: #f5f0ff;
+  --panel: rgba(12, 8, 24, 0.88);
+}
+
+@keyframes unitPulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.03);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  75% {
+    transform: translateX(6px);
+  }
+}
+
+@keyframes floatDamage {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-48px) scale(1.2);
+  }
+}
+
+@keyframes bannerPop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.05);
+  }
+  75% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.95);
+  }
+}
+
+@keyframes flashWater {
+  0% {
+    background: rgba(80, 160, 255, 0.55);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@keyframes flashFire {
+  0% {
+    background: rgba(255, 90, 60, 0.55);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@keyframes flashWood {
+  0% {
+    background: rgba(80, 200, 100, 0.5);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@keyframes flashEarth {
+  0% {
+    background: rgba(180, 130, 70, 0.5);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@keyframes flashHit {
+  0% {
+    background: rgba(255, 80, 80, 0.45);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes enemyLunge {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(12px) scale(1.08);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 立ち絵 1200×600px（縦×横）= 全身。枠内は上半身〜バストアップ */
+.unit-sprite-frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.22);
+}
+.unit-sprite-frame.party {
+  height: 280px;
+  border-radius: 6px 6px 2px 2px;
+}
+.unit-sprite-frame.enemy {
+  height: 64px;
+  border-radius: 6px;
+}
+.unit-sprite-bust {
+  width: 100%;
+  height: 200%;
+  display: block;
+  object-fit: cover;
+  object-position: top center;
+  pointer-events: none;
+}
+.unit-sprite-frame.party .unit-sprite-bust {
+  height: 320%;
+  transform: scale(0.9);
+  transform-origin: top center;
+}

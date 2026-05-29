@@ -1,0 +1,6 @@
+# 非推奨: スタック別 tfvars を使ってください。
+#   environments/janken-card.tfvars.example
+#   environments/yamimaho.tfvars.example
+#
+# コマンド例:
+#   ./scripts/tf-stack.sh yamimaho plan

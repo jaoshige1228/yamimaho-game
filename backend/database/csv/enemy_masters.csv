@@ -1,0 +1,4 @@
+code,name,sprite,hp,mp,str,mag,def,spd,know,spirit,exp_reward
+kappa,カッパ,kappa,55,0,20,11,6,8,5,5,13
+kappa2,カッパLV2,kappa,100,0,30,11,6,8,5,5,26
+sha,大佐,sha,160,0,40,11,20,20,5,5,120

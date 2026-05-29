@@ -1,0 +1,108 @@
+/* ヘッダー + HUD 下〜パーティ欄・フッター上（ダンジョン画像と同じ帯） */
+.story-sequence {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.story-sequence__viewport {
+  position: relative;
+  width: min(430px, 100vw);
+  height: 100%;
+  pointer-events: none;
+}
+
+.story-sequence__scene {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(3.25rem + env(safe-area-inset-top, 0px) + 2.35rem);
+  bottom: calc(min(42dvh, 480px) + 3.5rem + env(safe-area-inset-bottom, 0px));
+  overflow: visible;
+  pointer-events: none;
+}
+
+.story-text-window {
+  box-sizing: border-box;
+  padding: 0.75rem 1rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-family: 'Hiragino Sans', system-ui, sans-serif;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+/* ダンジョン画像の中央やや上 */
+.story-text-window--narration {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 2rem);
+  max-width: 360px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.story-text-window--dialogue {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  top: 54%;
+  bottom: auto;
+  transform: translateY(-50%);
+  font-size: 0.92rem;
+  z-index: 1;
+}
+
+.story-text-window__name {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.story-text-window__body {
+  margin: 0;
+}
+
+/* 立ち絵 1200×600 の上75%（枠は 600×900 = 2:3）+ 最下部のみフェード */
+.story-character-sprite {
+  position: absolute;
+  left: -2.75rem;
+  top: 6%;
+  width: min(54%, 250px);
+  aspect-ratio: 600 / 900;
+  max-height: 62%;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 82%,
+    rgba(0, 0, 0, 0.55) 93%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 82%,
+    rgba(0, 0, 0, 0.55) 93%,
+    transparent 100%
+  );
+}
+
+.story-character-sprite__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 600 / 1200;
+  object-fit: cover;
+  object-position: top center;
+  pointer-events: none;
+}

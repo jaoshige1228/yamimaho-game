@@ -1,0 +1,15 @@
+code,label,description,mp_cost,target_type,effect,element,coefficient,power,buff_key
+pc1_water_single,アクアボルト,水属性の単体攻撃魔法。,6,enemy_single,damage,water,2.0,,
+pc1_heal_single,ヒール,味方単体の HP を回復する。,8,ally_single,heal,,,35,
+pc1_evasion_single_large,風のヴェール,味方単体の回避率を大きく上げる。,10,ally_single,buff,,,,evasion_up_large
+pc1_evasion_all_small,ミストガード,味方全体の回避率を少し上げる。,12,ally_all,buff,,,,evasion_up_small
+pc2_wood_single,ウィップラッシュ,木属性の単体攻撃魔法。,6,enemy_single,damage,wood,2.0,,
+pc2_debuff_all_small,枯れ葉の呪い,敵全体の能力を少し下げる。,10,enemy_all,debuff,,,,ability_down_small
+pc2_debuff_single_large,縛り根,敵単体の能力を大きく下げる。,9,enemy_single,debuff,,,,ability_down_large
+pc2_cure_status_all,浄化の光,味方全体の状態異常を回復する。,11,ally_all,cure_status,,,,
+pc3_fire_single,ファイアボール,火属性の単体攻撃魔法。,6,enemy_single,damage,fire,2.0,,
+pc3_fire_all,フレイムストーム,火属性の全体攻撃魔法。,14,enemy_all,damage,fire,1.5,,
+pc3_fire_heavy,メテオフレイム,火属性の強力な単体攻撃魔法。,18,enemy_single,damage,fire,2.5,,
+pc4_earth_single,ストーンショット,土属性の単体攻撃魔法。,6,enemy_single,damage,earth,2.0,,
+pc4_def_single_large,岩石の盾,味方単体の防御力を大きく上げる。,10,ally_single,buff,,,,def_up_large
+pc4_def_all_small,大地の加護,味方全体の防御力を少し上げる。,12,ally_all,buff,,,,def_up_small
