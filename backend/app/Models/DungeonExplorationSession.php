@@ -2,23 +2,32 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class UserDungeonProgress extends Model
+class DungeonExplorationSession extends Model
 {
+    use HasUuids;
+
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
     /** @var list<string> */
     protected $fillable = [
         'user_id',
-        'step',
-        'skip_battle_encounters',
+        'event_code',
+        'current_node_key',
+        'context',
+        'step_at_start',
     ];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
-            'skip_battle_encounters' => 'boolean',
+            'context' => 'array',
         ];
     }
 

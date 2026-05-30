@@ -15,48 +15,18 @@ return [
   ],
 
   /**
-   * ダンジョン「進む」累計 step → イベント。
-   * battle.enemies は battle.demo_enemies と同形式の配列。
+   * ダンジョン探索の抽選（合計100想定。CSVにはしない）
    */
-  'dungeon_steps' => [
-    1 => [
-      'type' => 'message',
-      'text' => '何も起きなかった',
-    ],
-    2 => [
-      'type' => 'battle',
-      'boss' => false,
-      'enemies' => [
-        ['slot' => 'enemy_1', 'master_code' => 'kappa', 'name' => 'カッパA'],
-        ['slot' => 'enemy_2', 'master_code' => 'kappa', 'name' => 'カッパB'],
-      ],
-    ],
-    3 => [
-      'type' => 'story',
-      'lines' => [
-        ['type' => 'narration', 'text' => 'この先から変な匂いが漂ってくる……'],
-        ['type' => 'dialogue', 'character' => 'pc1', 'text' => 'な、なんか変な匂いがするよ！？'],
-      ],
-    ],
-    4 => [
-      'type' => 'battle',
-      'boss' => false,
-      'enemies' => [
-        ['slot' => 'enemy_1', 'master_code' => 'kappa', 'name' => 'カッパA'],
-        ['slot' => 'enemy_2', 'master_code' => 'kappa', 'name' => 'カッパB'],
-        ['slot' => 'enemy_3', 'master_code' => 'kappa', 'name' => 'カッパC'],
-      ],
-    ],
-    5 => [
-      'type' => 'message',
-      'text' => '何も起きなかった',
-    ],
-    6 => [
-      'type' => 'battle',
-      'boss' => true,
-      'enemies' => [
-        ['slot' => 'enemy_1', 'master_code' => 'sha', 'name' => '大佐'],
-      ],
-    ],
+  'dungeon' => [
+    'battle_encounter_rate' => 20,
+    'exploration_event_rate' => 80,
+    /** テスト用: null | battle | exploration */
+    'test_force' => env('DUNGEON_TEST_FORCE'),
+    /** テスト用: trap_arrow | treasure_chest など */
+    'test_event_code' => env('DUNGEON_TEST_EVENT_CODE'),
+    /** テスト用: 1-100 の固定ロール（null で通常乱数） */
+    'test_roll' => env('DUNGEON_TEST_ROLL'),
+    /** テスト用: true/false で判定結果を固定（null で通常） */
+    'test_stat_success' => env('DUNGEON_TEST_STAT_SUCCESS'),
   ],
 ];

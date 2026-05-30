@@ -1,0 +1,3 @@
+code,name,weight,event_type,start_node_key
+trap_arrow,矢のトラップ,50,stat_check_random_target,intro
+treasure_chest,宝箱,50,party_choice_stat_check,found

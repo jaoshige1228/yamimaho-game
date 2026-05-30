@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AdminDungeonSettingsRequest;
 use App\Http\Requests\AdminGrantExpRequest;
 use App\Services\Admin\AdminPartyService;
+use App\Services\Dungeon\DungeonProgressService;
 use App\Services\Player\UserCharacterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +15,7 @@ class AdminController extends Controller
     public function __construct(
         private readonly AdminPartyService $adminParty,
         private readonly UserCharacterService $characters,
+        private readonly DungeonProgressService $dungeonProgress,
     ) {}
 
     public function status(): JsonResponse
@@ -46,6 +49,27 @@ class AdminController extends Controller
                     'spd' => $character->spd,
                 ];
             })->values(),
+        ]);
+    }
+
+    public function dungeonSettings(AdminDungeonSettingsRequest $request): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        $validated = $request->validated();
+        $this->dungeonProgress->setSkipBattles($user, (bool) $validated['skip_battles']);
+
+        if ($validated['reset_progress']) {
+            $this->dungeonProgress->reset($user);
+        }
+
+        return response()->json([
+            'message' => 'ダンジョン設定を反映しました。',
+            'skip_battles' => (bool) $validated['skip_battles'],
+            'step' => $this->dungeonProgress->getStep($user),
         ]);
     }
 

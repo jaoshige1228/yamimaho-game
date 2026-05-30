@@ -54,6 +54,12 @@ php artisan battle:simulate --runs=100
 
 ---
 
+## ダンジョン探索
+
+待機画面からダンジョンへ入り、「進む」で深さを進めます。戦闘（20%）と探索イベント（80%）の抽選、矢トラップ・宝箱のセリフ／判定／選択の詳細は [`docs/ダンジョン探索.md`](docs/ダンジョン探索.md) を参照してください。
+
+---
+
 ## 前提条件
 
 | 用途 | 必要なもの |
@@ -171,7 +177,13 @@ cp infra/terraform/environments/yamimaho.tfvars.example infra/terraform/environm
 1. `environments/<スタック名>.tfvars` を用意
 2. `./scripts/tf-stack.sh <スタック名> apply`
 3. `./scripts/deploy-frontend.sh <スタック名>`
-4. Lightsail で Docker 起動（`.env` は `infra/terraform/generated/<スタック名>/app.env` → 各 `app_opt_dir`）
+4. Lightsail で Docker 起動（`.env` は `infra/terraform/generated/<スタック名>/app.env` → 各 `app_opt_dir`）。初回起動時に `migrate` + `db:seed` が走る（本番イメージは Faker なしのため Factory は使わない）
+
+**既にコンテナを起動済みのとき**（マスタ未投入で API が 404 のとき）:
+
+```bash
+docker exec -it <コンテナ名> php artisan db:seed --force
+```
 
 ### デプロイ後チェック（重要）
 

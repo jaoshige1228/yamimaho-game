@@ -50,4 +50,11 @@ body,
   justify-content: center;
   overflow: hidden;
 }
+
+/* 探索画面のパーティ帯・ストーリー配置の共通寸法 */
+:root {
+  --hub-party-band-height: clamp(140px, 31dvh, 220px);
+  --app-chrome-top: calc(3.25rem + env(safe-area-inset-top, 0px) + 2.35rem);
+  --app-chrome-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+}
 </style>

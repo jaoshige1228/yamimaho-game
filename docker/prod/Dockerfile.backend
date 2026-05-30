@@ -28,4 +28,4 @@ RUN chown -R www-data:www-data /var/www/backend/storage /var/www/backend/bootstr
 
 EXPOSE 80
 
-ENTRYPOINT ["/bin/sh", "-c", "set -e; cd /var/www/backend && php artisan migrate --force && exec /usr/bin/supervisord -c /etc/supervisord.conf"]
+ENTRYPOINT ["/bin/sh", "-c", "set -e; cd /var/www/backend && php artisan migrate --force && php artisan db:seed --force && exec /usr/bin/supervisord -c /etc/supervisord.conf"]

@@ -10,6 +10,9 @@ const message = ref('');
 const expInput = ref(50);
 const party = ref([]);
 const lastResults = ref([]);
+const skipBattles = ref(false);
+const resetProgress = ref(false);
+const dungeonStep = ref(0);
 
 async function loadParty() {
   const data = await api('/admins/party', { method: 'GET' });
@@ -58,6 +61,28 @@ async function grantExp() {
   }
 }
 
+async function applyDungeonSettings() {
+  submitting.value = true;
+  error.value = '';
+  message.value = '';
+  try {
+    const data = await api('/admins/dungeon-settings', {
+      method: 'POST',
+      body: JSON.stringify({
+        skip_battles: skipBattles.value,
+        reset_progress: resetProgress.value,
+      }),
+    });
+    message.value = data.message ?? 'ダンジョン設定を反映しました';
+    dungeonStep.value = data.step ?? 0;
+    resetProgress.value = false;
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    submitting.value = false;
+  }
+}
+
 onMounted(() => init());
 </script>
 
@@ -86,6 +111,27 @@ onMounted(() => init());
         </form>
         <p v-if="message" class="success">{{ message }}</p>
         <p v-if="error" class="error">{{ error }}</p>
+      </section>
+
+      <section class="admin-panel">
+        <h2>ダンジョン設定</h2>
+        <p class="desc">
+          デモユーザーの探索進行を調整します。敵無しモードは永続、探索リセットは「適用」時のみ深さを 0 に戻します。
+        </p>
+        <form class="dungeon-form" @submit.prevent="applyDungeonSettings">
+          <label class="check">
+            <input v-model="skipBattles" type="checkbox" />
+            <span>ダンジョン敵無しモード（戦闘抽選をスキップ）</span>
+          </label>
+          <label class="check">
+            <input v-model="resetProgress" type="checkbox" />
+            <span>ダンジョン探索リセット（適用時に深さ 0）</span>
+          </label>
+          <p v-if="dungeonStep !== null" class="muted">現在の深さ: {{ dungeonStep }}</p>
+          <button type="submit" class="btn-primary" :disabled="submitting">
+            {{ submitting ? '処理中…' : '適用' }}
+          </button>
+        </form>
       </section>
 
       <section v-if="lastResults.length" class="admin-panel">
@@ -145,11 +191,27 @@ onMounted(() => init());
   color: #c8b8e8;
   line-height: 1.5;
 }
-.exp-form {
+.exp-form,
+.dungeon-form {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.75rem;
+}
+.dungeon-form {
+  flex-direction: column;
+  align-items: stretch;
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.check input {
+  margin-top: 0.2rem;
 }
 .field {
   display: flex;

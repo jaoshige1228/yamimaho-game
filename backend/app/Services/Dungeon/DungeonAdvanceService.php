@@ -6,6 +6,7 @@ use App\Models\BattleState;
 use App\Models\User;
 use App\Services\Battle\BattleFactory;
 use App\Services\Battle\BattleOrchestrator;
+use App\Services\Dungeon\Exploration\DungeonExplorationService;
 
 class DungeonAdvanceService
 {
@@ -13,6 +14,8 @@ class DungeonAdvanceService
         private readonly DungeonProgressService $progress = new DungeonProgressService,
         private readonly BattleFactory $factory = new BattleFactory,
         private readonly BattleOrchestrator $orchestrator = new BattleOrchestrator,
+        private readonly DungeonEncounterCatalog $encounters = new DungeonEncounterCatalog,
+        private readonly DungeonExplorationService $exploration = new DungeonExplorationService,
     ) {}
 
     /**
@@ -20,59 +23,53 @@ class DungeonAdvanceService
      */
     public function advance(User $user): array
     {
+        if ($this->exploration->hasActiveSession($user)) {
+            throw new \RuntimeException('探索イベントの途中です。');
+        }
+
         $nextStep = $this->progress->increment($user);
-        $maxStep = $this->progress->maxStep();
 
-        if ($nextStep > $maxStep) {
-            $this->progress->reset($user);
+        $forced = config('game.dungeon.test_force');
+        if ($forced === 'exploration') {
+            $eventCode = config('game.dungeon.test_event_code');
 
-            return [
-                'event' => 'message',
-                'text' => 'この先はまだ何もない…',
-                'step' => 0,
-            ];
+            return $this->exploration->startEvent(
+                $user,
+                $nextStep,
+                is_string($eventCode) && $eventCode !== '' ? $eventCode : null,
+            );
         }
 
-        $stepConfig = config("game.dungeon_steps.{$nextStep}");
-        if (! is_array($stepConfig)) {
-            throw new \InvalidArgumentException("Unknown dungeon step: {$nextStep}");
+        if ($forced === 'battle' || $this->rollBattle($user)) {
+            return $this->startBattle($user, $nextStep);
         }
 
-        if (($stepConfig['type'] ?? '') === 'message') {
-            return [
-                'event' => 'message',
-                'text' => (string) ($stepConfig['text'] ?? ''),
-                'step' => $nextStep,
-            ];
+        return $this->exploration->startEvent($user, $nextStep);
+    }
+
+    private function rollBattle(User $user): bool
+    {
+        if ($this->progress->shouldSkipBattles($user)) {
+            return false;
         }
 
-        if (($stepConfig['type'] ?? '') === 'story') {
-            return [
-                'event' => 'story',
-                'step' => $nextStep,
-                'lines' => $stepConfig['lines'] ?? [],
-            ];
-        }
+        $battleRate = (int) config('game.dungeon.battle_encounter_rate', 20);
 
-        if (($stepConfig['type'] ?? '') === 'battle') {
-            return $this->startBattle($user, $nextStep, $stepConfig);
-        }
-
-        throw new \InvalidArgumentException("Invalid dungeon step type at step {$nextStep}");
+        return random_int(1, 100) <= $battleRate;
     }
 
     /**
-     * @param  array<string, mixed>  $stepConfig
      * @return array<string, mixed>
      */
-    private function startBattle(User $user, int $step, array $stepConfig): array
+    private function startBattle(User $user, int $step): array
     {
+        $encounter = $this->encounters->pickRandomEncounter();
         /** @var list<array<string, string>> $enemies */
-        $enemies = $stepConfig['enemies'] ?? [];
+        $enemies = $encounter['enemies'];
         $meta = [
             'source' => 'dungeon',
             'step' => $step,
-            'boss' => (bool) ($stepConfig['boss'] ?? false),
+            'boss' => $encounter['boss'],
         ];
 
         $battleId = $this->factory->newBattleId();

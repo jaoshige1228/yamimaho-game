@@ -1,8 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useBattleAudio } from '../../composables/useBattleAudio.js';
 import StoryCharacterSprite from './StoryCharacterSprite.vue';
 import StoryTextWindow from './StoryTextWindow.vue';
 import '../../styles/story-window.css';
+
+const { playAttackSe, unlock, unlocked } = useBattleAudio();
 
 const props = defineProps({
   lines: { type: Array, required: true },
@@ -12,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['complete']);
 
 const index = ref(0);
+const sfxPlayedAtIndex = ref(-1);
 
 const currentLine = computed(() => props.lines[index.value] ?? null);
 
@@ -35,7 +39,33 @@ const characterInfo = computed(() => {
   };
 });
 
+function playSfxForLineAtIndex(lineIndex) {
+  if (!unlocked.value || lineIndex === sfxPlayedAtIndex.value) {
+    return;
+  }
+  const line = props.lines[lineIndex];
+  if (!line?.sfx || line.sfx !== 'attack') {
+    return;
+  }
+  sfxPlayedAtIndex.value = lineIndex;
+  playAttackSe({ requireBgm: false });
+}
+
+watch(
+  () => props.lines,
+  () => {
+    index.value = 0;
+    sfxPlayedAtIndex.value = -1;
+  },
+);
+
+watch(index, (lineIndex) => {
+  playSfxForLineAtIndex(lineIndex);
+}, { immediate: true });
+
 function onTap() {
+  unlock();
+  playSfxForLineAtIndex(index.value);
   if (index.value >= props.lines.length - 1) {
     emit('complete');
     return;
@@ -48,16 +78,22 @@ function onTap() {
   <div class="story-sequence" role="button" tabindex="0" @click="onTap" @keydown.enter="onTap">
     <div class="story-sequence__viewport">
       <div class="story-sequence__scene">
-        <StoryCharacterSprite
-          v-if="currentMode === 'dialogue'"
-          :sprite="characterInfo.sprite"
-          :alt="characterInfo.name"
-        />
+        <div v-if="currentMode === 'dialogue' && currentLine" class="story-dialogue-stage">
+          <StoryCharacterSprite
+            variant="dialogue"
+            :sprite="characterInfo.sprite"
+            :alt="characterInfo.name"
+          />
+          <StoryTextWindow
+            mode="dialogue"
+            :text="currentLine.text"
+            :character-name="characterInfo.name"
+          />
+        </div>
         <StoryTextWindow
-          v-if="currentLine"
-          :mode="currentMode"
+          v-else-if="currentLine"
+          mode="narration"
           :text="currentLine.text"
-          :character-name="currentMode === 'dialogue' ? characterInfo.name : ''"
         />
       </div>
     </div>

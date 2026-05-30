@@ -32,63 +32,29 @@ class DungeonApiTest extends TestCase
 
         $this->getJson('/api/dungeon')
             ->assertOk()
-            ->assertJson(['step' => 4]);
+            ->assertJson(['step' => 4])
+            ->assertJsonMissing(['max_step']);
     }
 
-    public function test_advance_steps_follow_message_and_battle_pattern(): void
+    public function test_advance_can_start_battle_from_encounter_table(): void
     {
+        config(['game.dungeon.test_force' => 'battle']);
+
         $this->postJson('/api/dungeon/enter')->assertOk();
 
-        $step1 = $this->postJson('/api/dungeon/advance')->assertOk();
-        $step1->assertJson([
-            'event' => 'message',
-            'text' => '何も起きなかった',
-            'step' => 1,
-        ]);
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('step', 1);
 
-        $step2 = $this->postJson('/api/dungeon/advance')->assertOk();
-        $step2->assertJsonPath('event', 'battle');
-        $step2->assertJsonPath('step', 2);
-        $enemies = collect($step2->json('state.units'))->where('side', 'enemy')->values();
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
         $this->assertCount(2, $enemies);
         $this->assertTrue($enemies->every(fn (array $u) => $u['master_code'] === 'kappa'));
-
-        $step3 = $this->postJson('/api/dungeon/advance')->assertOk();
-        $step3->assertJson([
-            'event' => 'story',
-            'step' => 3,
-        ]);
-        $step3->assertJsonPath('lines.0.type', 'narration');
-        $step3->assertJsonPath('lines.0.text', 'この先から変な匂いが漂ってくる……');
-        $step3->assertJsonPath('lines.1.type', 'dialogue');
-        $step3->assertJsonPath('lines.1.character', 'pc1');
-        $step3->assertJsonPath('lines.1.text', 'な、なんか変な匂いがするよ！？');
-
-        $step4 = $this->postJson('/api/dungeon/advance')->assertOk();
-        $step4->assertJsonPath('event', 'battle');
-        $step4->assertJsonPath('step', 4);
-        $this->assertCount(
-            3,
-            collect($step4->json('state.units'))->where('side', 'enemy'),
-        );
-
-        $step5 = $this->postJson('/api/dungeon/advance')->assertOk();
-        $step5->assertJson([
-            'event' => 'message',
-            'text' => '何も起きなかった',
-            'step' => 5,
-        ]);
-
-        $step6 = $this->postJson('/api/dungeon/advance')->assertOk();
-        $step6->assertJsonPath('event', 'battle');
-        $step6->assertJsonPath('step', 6);
-        $boss = collect($step6->json('state.units'))->firstWhere('side', 'enemy');
-        $this->assertSame('sha', $boss['master_code'] ?? null);
-        $this->assertSame('大佐', $boss['name'] ?? null);
     }
 
     public function test_player_party_includes_sprite_and_max_stats(): void
     {
+        $this->postJson('/api/battles/demo')->assertOk();
+
         $response = $this->getJson('/api/player/party')->assertOk();
 
         $response->assertJsonStructure([
@@ -121,8 +87,9 @@ class DungeonApiTest extends TestCase
             ->where('user_id', $user->id)
             ->update(['hp' => 1, 'mp' => 1]);
 
+        config(['game.dungeon.test_force' => 'battle']);
+
         $this->postJson('/api/dungeon/enter')->assertOk();
-        $this->postJson('/api/dungeon/advance')->assertOk();
         $start = $this->postJson('/api/dungeon/advance')->assertOk();
         $battleId = $start->json('battle_id');
         $state = $start->json('state');
@@ -153,25 +120,23 @@ class DungeonApiTest extends TestCase
         }
     }
 
-    public function test_boss_victory_resets_dungeon_progress(): void
+    public function test_battle_victory_keeps_dungeon_step(): void
     {
         $user = $this->demoUser();
 
-        $this->postJson('/api/admins/grant-exp', ['exp' => 4000])->assertOk();
+        config(['game.dungeon.test_force' => 'battle']);
 
         $this->postJson('/api/dungeon/enter')->assertOk();
         UserDungeonProgress::query()->updateOrCreate(
             ['user_id' => $user->id],
-            ['step' => 5],
+            ['step' => 3],
         );
 
         $start = $this->postJson('/api/dungeon/advance')->assertOk();
-        $this->assertSame('battle', $start->json('event'));
         $battleId = $start->json('battle_id');
         $state = $start->json('state');
-        $cleared = false;
 
-        $maxTurns = 800;
+        $maxTurns = 400;
         while (($state['status'] ?? '') === 'active' && $maxTurns-- > 0) {
             $enemy = collect($state['units'])
                 ->where('side', 'enemy')
@@ -188,21 +153,21 @@ class DungeonApiTest extends TestCase
                 'target_id' => $enemy['id'],
             ]);
             $response->assertOk();
-
-            $eventTypes = array_column($response->json('events'), 'type');
-            if (in_array('dungeon_cleared', $eventTypes, true)) {
-                $cleared = true;
-            }
-
             $state = $response->json('state');
         }
 
         $this->assertSame('victory', $state['status']);
-        $this->assertTrue($cleared);
 
         $progress = UserDungeonProgress::query()->where('user_id', $user->id)->first();
         $this->assertNotNull($progress);
-        $this->assertSame(0, (int) $progress->step);
+        $this->assertSame(4, (int) $progress->step);
+    }
+
+    public function test_master_seeder_loads_dungeon_events(): void
+    {
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'trap_arrow']);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'treasure_chest']);
+        $this->assertDatabaseHas('dungeon_encounter_masters', ['code' => 'kappa_group_2']);
     }
 
     private function demoUser(): User
@@ -212,5 +177,12 @@ class DungeonApiTest extends TestCase
         return User::query()
             ->where('email', config('game.demo_user_email'))
             ->firstOrFail();
+    }
+
+    protected function tearDown(): void
+    {
+        config(['game.dungeon.test_force' => null]);
+
+        parent::tearDown();
     }
 }

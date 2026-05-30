@@ -22,24 +22,29 @@ class DungeonProgressService
     public function increment(User $user): int
     {
         $record = $this->findOrCreate($user);
-        $record->step = min(255, (int) $record->step + 1);
+        $record->step = min(65535, (int) $record->step + 1);
         $record->save();
 
         return (int) $record->step;
     }
 
-    public function maxStep(): int
+    public function shouldSkipBattles(User $user): bool
     {
-        $steps = config('game.dungeon_steps', []);
+        return (bool) $this->findOrCreate($user)->skip_battle_encounters;
+    }
 
-        return empty($steps) ? 0 : max(array_map('intval', array_keys($steps)));
+    public function setSkipBattles(User $user, bool $skip): void
+    {
+        $record = $this->findOrCreate($user);
+        $record->skip_battle_encounters = $skip;
+        $record->save();
     }
 
     private function findOrCreate(User $user): UserDungeonProgress
     {
         return UserDungeonProgress::query()->firstOrCreate(
             ['user_id' => $user->id],
-            ['step' => 0],
+            ['step' => 0, 'skip_battle_encounters' => false],
         );
     }
 }

@@ -1,0 +1,2 @@
+code,weight,boss,enemies_json
+kappa_group_2,100,0,"[{""slot"":""enemy_1"",""master_code"":""kappa"",""name"":""カッパA""},{""slot"":""enemy_2"",""master_code"":""kappa"",""name"":""カッパB""}]"

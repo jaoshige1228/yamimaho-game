@@ -132,9 +132,10 @@ function setBgmVolume(volume) {
   applyVolumes();
 }
 
-function playAttackSe() {
+function playAttackSe({ requireBgm = true } = {}) {
   ensureAudio();
-  if (!unlocked.value || !settings.value.bgmEnabled || !se) return;
+  if (!unlocked.value || !se) return;
+  if (requireBgm && !settings.value.bgmEnabled) return;
   const clip = se.cloneNode();
   clip.volume = effectiveSeVolume();
   clip.play().catch(() => {});

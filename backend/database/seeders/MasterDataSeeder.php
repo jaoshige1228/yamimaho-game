@@ -4,6 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\ArmorMaster;
 use App\Models\CharacterMaster;
+use App\Models\DungeonEncounterMaster;
+use App\Models\DungeonEventMaster;
+use App\Models\DungeonEventNode;
 use App\Models\EnemyMaster;
 use App\Models\LevelMaster;
 use App\Models\SpellMaster;
@@ -126,6 +129,59 @@ class MasterDataSeeder extends Seeder
                     'hp_growth' => (float) $row['hp_growth'],
                     'mp_growth' => (float) $row['mp_growth'],
                     'stat_growth' => (float) $row['stat_growth'],
+                ],
+            );
+        }
+
+        foreach (CsvMasterReader::read('dungeon_events.csv') as $row) {
+            DungeonEventMaster::query()->updateOrCreate(
+                ['code' => $row['code']],
+                [
+                    'name' => $row['name'],
+                    'weight' => (int) $row['weight'],
+                    'event_type' => $row['event_type'],
+                    'start_node_key' => $row['start_node_key'],
+                ],
+            );
+        }
+
+        foreach (CsvMasterReader::read('dungeon_event_nodes.csv') as $row) {
+            DungeonEventNode::query()->updateOrCreate(
+                [
+                    'event_code' => $row['event_code'],
+                    'node_key' => $row['node_key'],
+                ],
+                [
+                    'node_type' => $row['node_type'],
+                    'text' => $row['text'] !== '' ? $row['text'] : null,
+                    'speaker_role' => $row['speaker_role'] !== '' ? $row['speaker_role'] : null,
+                    'dialogue_pc1' => $row['dialogue_pc1'] !== '' ? $row['dialogue_pc1'] : null,
+                    'dialogue_pc2' => $row['dialogue_pc2'] !== '' ? $row['dialogue_pc2'] : null,
+                    'dialogue_pc3' => $row['dialogue_pc3'] !== '' ? $row['dialogue_pc3'] : null,
+                    'dialogue_pc4' => $row['dialogue_pc4'] !== '' ? $row['dialogue_pc4'] : null,
+                    'stat_attr' => $row['stat_attr'] !== '' ? $row['stat_attr'] : null,
+                    'stat_multiplier' => $row['stat_multiplier'] !== '' ? (int) $row['stat_multiplier'] : null,
+                    'fixed_damage' => $row['fixed_damage'] !== '' ? (int) $row['fixed_damage'] : null,
+                    'sfx' => $row['sfx'] !== '' ? $row['sfx'] : null,
+                    'next_on_success' => $row['next_on_success'] !== '' ? $row['next_on_success'] : null,
+                    'next_on_fail' => $row['next_on_fail'] !== '' ? $row['next_on_fail'] : null,
+                    'next_default' => $row['next_default'] !== '' ? $row['next_default'] : null,
+                ],
+            );
+        }
+
+        foreach (CsvMasterReader::read('dungeon_encounters.csv') as $row) {
+            $enemies = json_decode((string) $row['enemies_json'], true);
+            if (! is_array($enemies)) {
+                continue;
+            }
+
+            DungeonEncounterMaster::query()->updateOrCreate(
+                ['code' => $row['code']],
+                [
+                    'weight' => (int) $row['weight'],
+                    'boss' => (bool) ((int) ($row['boss'] ?? 0)),
+                    'enemies' => $enemies,
                 ],
             );
         }

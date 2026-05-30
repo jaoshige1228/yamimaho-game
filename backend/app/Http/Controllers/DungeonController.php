@@ -23,7 +23,6 @@ class DungeonController extends Controller
 
         return response()->json([
             'step' => $this->progress->getStep($user),
-            'max_step' => $this->progress->maxStep(),
         ]);
     }
 
@@ -47,6 +46,10 @@ class DungeonController extends Controller
             return response()->json(['message' => '未ログイン'], 401);
         }
 
-        return response()->json($this->advance->advance($user));
+        try {
+            return response()->json($this->advance->advance($user));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
     }
 }
