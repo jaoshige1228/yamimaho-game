@@ -36,7 +36,7 @@ class BattleApiTest extends TestCase
         $this->assertSame(3, $units->where('side', 'enemy')->count());
         $this->assertTrue($units->where('side', 'ally')->every(fn (array $u) => isset($u['user_character_id'])));
         $this->assertSame('active', $response->json('state.status'));
-        $this->assertSame('kappa', $units->firstWhere('id', 'enemy_1')['master_code']);
+        $this->assertSame('bat', $units->firstWhere('id', 'enemy_1')['master_code']);
     }
 
     public function test_demo_battle_allies_use_equipment_bonuses(): void
@@ -47,8 +47,8 @@ class BattleApiTest extends TestCase
         $this->assertNotNull($pc1);
         $this->assertSame('staff_basic', $pc1['weapon']['code'] ?? null);
         $this->assertSame('robe_basic', $pc1['armor']['code'] ?? null);
-        $this->assertSame(16, $pc1['mag']);
-        $this->assertSame(11, $pc1['def']);
+        $this->assertSame(15, $pc1['mag']);
+        $this->assertSame(10, $pc1['def']);
     }
 
     public function test_kappa2_demo_battle_uses_kappa2_enemies(): void
@@ -59,7 +59,7 @@ class BattleApiTest extends TestCase
         $enemies = $units->where('side', 'enemy')->values();
 
         $this->assertSame(3, $enemies->count());
-        $this->assertTrue($enemies->every(fn (array $u) => $u['master_code'] === 'kappa2'));
+        $this->assertTrue($enemies->every(fn (array $u) => in_array($u['master_code'], ['snake', 'beetle'], true)));
         $this->assertSame(100, $enemies->first()['max_hp']);
     }
 

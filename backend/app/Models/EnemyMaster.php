@@ -9,6 +9,7 @@ class EnemyMaster extends Model
     /** @var list<string> */
     protected $fillable = [
         'code',
+        'floor',
         'name',
         'sprite',
         'hp',

@@ -12,6 +12,7 @@ class WeaponMaster extends Model
         'code',
         'name',
         'mag_bonus',
+        'description',
     ];
 
     /** @return HasMany<UserCharacter, $this> */

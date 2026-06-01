@@ -30,7 +30,10 @@ async function enterDungeon() {
   entering.value = true;
   error.value = '';
   try {
-    await api('/dungeon/enter', { method: 'POST' });
+    await api('/dungeon/enter', {
+      method: 'POST',
+      body: JSON.stringify({ floor: 1 }),
+    });
     router.push({ name: 'dungeon' });
   } catch (e) {
     error.value = e.message;
@@ -53,7 +56,7 @@ onMounted(() => loadParty());
           :disabled="entering"
           @click="enterDungeon"
         >
-          {{ entering ? '入場中…' : 'ダンジョンに潜る' }}
+          {{ entering ? '入場中…' : '1層に潜る' }}
         </button>
         <p v-if="error" class="scene-error">{{ error }}</p>
       </ScenePanel>

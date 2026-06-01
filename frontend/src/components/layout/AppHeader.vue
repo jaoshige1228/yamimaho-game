@@ -16,6 +16,9 @@ const {
 const title = computed(() => route.meta?.title ?? 'やみまほ');
 
 const showBack = computed(() => {
+  if (route.name === 'battle' && route.query.boss === '1') {
+    return false;
+  }
   if (route.meta?.showBack === false) {
     return false;
   }

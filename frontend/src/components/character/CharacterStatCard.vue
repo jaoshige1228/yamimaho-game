@@ -54,11 +54,17 @@ const showEquipment = computed(
       <dl v-if="showEquipment" class="equipment-list equipment-list-wide">
         <div v-if="unit.weapon" class="equipment-row">
           <dt>武器</dt>
-          <dd>{{ unit.weapon.name }} (+{{ unit.weapon.mag_bonus }} 魔力)</dd>
+          <dd>
+            <span class="equipment-name">{{ unit.weapon.name }} (+{{ unit.weapon.mag_bonus }} 魔力)</span>
+            <span v-if="unit.weapon.description" class="equipment-desc">{{ unit.weapon.description }}</span>
+          </dd>
         </div>
         <div v-if="unit.armor" class="equipment-row">
           <dt>防具</dt>
-          <dd>{{ unit.armor.name }} (+{{ unit.armor.def_bonus }} 防御)</dd>
+          <dd>
+            <span class="equipment-name">{{ unit.armor.name }} (+{{ unit.armor.def_bonus }} 防御)</span>
+            <span v-if="unit.armor.description" class="equipment-desc">{{ unit.armor.description }}</span>
+          </dd>
         </div>
       </dl>
 
@@ -74,11 +80,17 @@ const showEquipment = computed(
       <dl v-if="showEquipment" class="equipment-list">
         <div v-if="unit.weapon" class="equipment-row">
           <dt>武器</dt>
-          <dd>{{ unit.weapon.name }} (+{{ unit.weapon.mag_bonus }} 魔力)</dd>
+          <dd>
+            <span class="equipment-name">{{ unit.weapon.name }} (+{{ unit.weapon.mag_bonus }} 魔力)</span>
+            <span v-if="unit.weapon.description" class="equipment-desc">{{ unit.weapon.description }}</span>
+          </dd>
         </div>
         <div v-if="unit.armor" class="equipment-row">
           <dt>防具</dt>
-          <dd>{{ unit.armor.name }} (+{{ unit.armor.def_bonus }} 防御)</dd>
+          <dd>
+            <span class="equipment-name">{{ unit.armor.name }} (+{{ unit.armor.def_bonus }} 防御)</span>
+            <span v-if="unit.armor.description" class="equipment-desc">{{ unit.armor.description }}</span>
+          </dd>
         </div>
       </dl>
 
@@ -246,6 +258,20 @@ const showEquipment = computed(
 .equipment-row dd {
   margin: 0;
   color: #e8dcff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.equipment-desc {
+  display: block;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: #a898c8;
+  font-weight: 400;
+}
+.equipment-list-wide .equipment-desc {
+  font-size: 0.55rem;
 }
 .stat-grid {
   display: grid;

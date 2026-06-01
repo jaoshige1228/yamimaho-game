@@ -32,8 +32,8 @@ class PlayerPartyApiTest extends TestCase
                     'sprite',
                     'mag',
                     'def',
-                    'weapon' => ['code', 'name', 'mag_bonus'],
-                    'armor' => ['code', 'name', 'def_bonus'],
+                    'weapon' => ['code', 'name', 'mag_bonus', 'description'],
+                    'armor' => ['code', 'name', 'def_bonus', 'description'],
                 ],
             ],
         ]);
@@ -46,6 +46,8 @@ class PlayerPartyApiTest extends TestCase
         $this->assertSame('robe_basic', $pc1['armor']['code']);
         $this->assertSame(14 + $weapon->mag_bonus, $pc1['mag']);
         $this->assertSame(9 + $armor->def_bonus, $pc1['def']);
+        $this->assertSame('学校から支給されたシンプルな杖。', $pc1['weapon']['description']);
+        $this->assertStringContainsString('イケてる', $pc1['armor']['description']);
     }
 
     public function test_player_stats_endpoint_matches_party(): void

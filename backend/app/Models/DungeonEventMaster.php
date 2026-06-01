@@ -9,6 +9,7 @@ class DungeonEventMaster extends Model
 {
     /** @var list<string> */
     protected $fillable = [
+        'floor',
         'code',
         'name',
         'weight',

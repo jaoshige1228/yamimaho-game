@@ -26,17 +26,16 @@ class DungeonApiTest extends TestCase
             'step' => 4,
         ]);
 
-        $this->postJson('/api/dungeon/enter')
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])
             ->assertOk()
-            ->assertJson(['step' => 4]);
+            ->assertJson(['step' => 4, 'floor' => 1]);
 
         $this->getJson('/api/dungeon')
             ->assertOk()
-            ->assertJson(['step' => 4])
-            ->assertJsonMissing(['max_step']);
+            ->assertJson(['step' => 4, 'floor' => 1]);
     }
 
-    public function test_advance_can_start_battle_from_encounter_table(): void
+    public function test_advance_starts_battle_with_step_based_enemies(): void
     {
         config(['game.dungeon.test_force' => 'battle']);
 
@@ -47,8 +46,9 @@ class DungeonApiTest extends TestCase
         $response->assertJsonPath('step', 1);
 
         $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
-        $this->assertCount(2, $enemies);
-        $this->assertTrue($enemies->every(fn (array $u) => $u['master_code'] === 'kappa'));
+        $this->assertGreaterThanOrEqual(2, $enemies->count());
+        $this->assertLessThanOrEqual(3, $enemies->count());
+        $this->assertTrue($enemies->every(fn (array $u) => $u['master_code'] === 'bat'));
     }
 
     public function test_player_party_includes_sprite_and_max_stats(): void
@@ -167,7 +167,12 @@ class DungeonApiTest extends TestCase
     {
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'trap_arrow']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'treasure_chest']);
-        $this->assertDatabaseHas('dungeon_encounter_masters', ['code' => 'kappa_group_2']);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'healing_spring']);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'suspicious_spring']);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'mysterious_presence']);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'rainbow_spring', 'weight' => 5]);
+        $this->assertDatabaseHas('enemy_masters', ['code' => 'bat', 'floor' => 1]);
+        $this->assertDatabaseHas('enemy_masters', ['code' => 'inu_moe', 'floor' => 1]);
     }
 
     private function demoUser(): User

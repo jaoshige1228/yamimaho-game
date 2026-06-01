@@ -27,7 +27,16 @@ class DungeonAdvanceService
             throw new \RuntimeException('探索イベントの途中です。');
         }
 
+        $floor = $this->progress->getFloor($user);
+        if (! $this->progress->isFloorPlayable($user, $floor)) {
+            throw new \RuntimeException('この層には挑戦できません。');
+        }
+
         $nextStep = $this->progress->increment($user);
+
+        if (DungeonFloorConfig::isBossStep($floor, $nextStep)) {
+            return $this->startBattle($user, $floor, $nextStep);
+        }
 
         $forced = config('game.dungeon.test_force');
         if ($forced === 'exploration') {
@@ -35,16 +44,17 @@ class DungeonAdvanceService
 
             return $this->exploration->startEvent(
                 $user,
+                $floor,
                 $nextStep,
                 is_string($eventCode) && $eventCode !== '' ? $eventCode : null,
             );
         }
 
         if ($forced === 'battle' || $this->rollBattle($user)) {
-            return $this->startBattle($user, $nextStep);
+            return $this->startBattle($user, $floor, $nextStep);
         }
 
-        return $this->exploration->startEvent($user, $nextStep);
+        return $this->exploration->startEvent($user, $floor, $nextStep);
     }
 
     private function rollBattle(User $user): bool
@@ -53,7 +63,7 @@ class DungeonAdvanceService
             return false;
         }
 
-        $battleRate = (int) config('game.dungeon.battle_encounter_rate', 20);
+        $battleRate = (int) config('game.dungeon.battle_encounter_rate', 30);
 
         return random_int(1, 100) <= $battleRate;
     }
@@ -61,15 +71,18 @@ class DungeonAdvanceService
     /**
      * @return array<string, mixed>
      */
-    private function startBattle(User $user, int $step): array
+    private function startBattle(User $user, int $floor, int $step): array
     {
-        $encounter = $this->encounters->pickRandomEncounter();
+        $encounter = $this->encounters->buildEncounter($floor, $step);
         /** @var list<array<string, string>> $enemies */
         $enemies = $encounter['enemies'];
+        $isBoss = (bool) $encounter['boss'];
         $meta = [
             'source' => 'dungeon',
+            'floor' => $floor,
             'step' => $step,
-            'boss' => $encounter['boss'],
+            'boss' => $isBoss,
+            'can_flee' => ! $isBoss,
         ];
 
         $battleId = $this->factory->newBattleId();
@@ -81,7 +94,7 @@ class DungeonAdvanceService
             'status' => $result['state']['status'],
         ]);
 
-        return [
+        $payload = [
             'event' => 'battle',
             'battle_id' => $battleId,
             'state' => $this->orchestrator->engine()->publicState($result['state']),
@@ -89,7 +102,14 @@ class DungeonAdvanceService
                 [['type' => 'battle_started', 'battle_id' => $battleId]],
                 $result['events'],
             ),
+            'floor' => $floor,
             'step' => $step,
         ];
+
+        if ($isBoss) {
+            $payload['boss_encounter'] = true;
+        }
+
+        return array_merge($payload, $this->progress->statusPayload($user));
     }
 }

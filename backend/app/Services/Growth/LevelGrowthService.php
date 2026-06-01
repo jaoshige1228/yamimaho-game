@@ -8,6 +8,20 @@ use App\Services\MasterData\LevelTableProvider;
 
 class LevelGrowthService
 {
+    private const HP_MULTIPLIER = 1.1;
+
+    private const MP_PER_LEVEL = 5;
+
+    private const MAG_DEF_MULTIPLIER = 1.2;
+
+    private const FLAT_STAT_PER_LEVEL = 2;
+
+    /** @var list<string> */
+    private const FLAT_STATS = ['str', 'spd', 'know', 'spirit'];
+
+    /** @var list<string> */
+    private const MULTIPLY_STATS = ['mag', 'def'];
+
     public function __construct(
         private readonly LevelTableProvider $levels = new LevelTableProvider,
     ) {}
@@ -36,16 +50,27 @@ class LevelGrowthService
         ];
 
         for ($current = 1; $current < $level; $current++) {
-            $row = $this->levels->findLevel($current);
-            $stats['hp'] = (int) ceil($stats['hp'] * (1 + (float) $row['hp_growth']));
-            $stats['mp'] = (int) ceil($stats['mp'] * (1 + (float) $row['mp_growth']));
-            $statMultiplier = 1 + (float) $row['stat_growth'];
-            foreach (['str', 'mag', 'def', 'spd', 'know', 'spirit'] as $key) {
-                $stats[$key] = (int) ceil($stats[$key] * $statMultiplier);
-            }
+            $this->applyOneLevelGrowth($stats);
         }
 
         return $stats;
+    }
+
+    /**
+     * @param  array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int}  $stats
+     */
+    private function applyOneLevelGrowth(array &$stats): void
+    {
+        $stats['hp'] = (int) ceil($stats['hp'] * self::HP_MULTIPLIER);
+        $stats['mp'] += self::MP_PER_LEVEL;
+
+        foreach (self::MULTIPLY_STATS as $key) {
+            $stats[$key] = (int) ceil($stats[$key] * self::MAG_DEF_MULTIPLIER);
+        }
+
+        foreach (self::FLAT_STATS as $key) {
+            $stats[$key] += self::FLAT_STAT_PER_LEVEL;
+        }
     }
 
     /**

@@ -2,39 +2,23 @@
 
 namespace App\Services\Dungeon;
 
-use App\Models\DungeonEncounterMaster;
-
 class DungeonEncounterCatalog
 {
+    public function __construct(
+        private readonly DungeonStepEncounterBuilder $builder = new DungeonStepEncounterBuilder,
+    ) {}
+
     /**
      * @return array{enemies: list<array<string, string>>, boss: bool}
      */
-    public function pickRandomEncounter(): array
+    public function buildEncounter(int $floor, int $step): array
     {
-        $rows = DungeonEncounterMaster::query()->get();
-        if ($rows->isEmpty()) {
-            throw new \RuntimeException('No dungeon encounters configured.');
-        }
-
-        $total = $rows->sum('weight');
-        $roll = random_int(1, max(1, $total));
-        $cursor = 0;
-
-        foreach ($rows as $row) {
-            $cursor += (int) $row->weight;
-            if ($roll <= $cursor) {
-                return [
-                    'enemies' => $row->enemies,
-                    'boss' => (bool) $row->boss,
-                ];
-            }
-        }
-
-        $last = $rows->last();
+        $boss = DungeonFloorConfig::isBossStep($floor, $step);
+        $enemies = $this->builder->build($floor, $step);
 
         return [
-            'enemies' => $last->enemies,
-            'boss' => (bool) $last->boss,
+            'enemies' => $enemies,
+            'boss' => $boss,
         ];
     }
 }

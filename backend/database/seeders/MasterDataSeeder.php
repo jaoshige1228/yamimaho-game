@@ -24,6 +24,7 @@ class MasterDataSeeder extends Seeder
                 [
                     'name' => $row['name'],
                     'mag_bonus' => (int) $row['mag_bonus'],
+                    'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
                 ],
             );
         }
@@ -34,6 +35,7 @@ class MasterDataSeeder extends Seeder
                 [
                     'name' => $row['name'],
                     'def_bonus' => (int) $row['def_bonus'],
+                    'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
                 ],
             );
         }
@@ -62,6 +64,7 @@ class MasterDataSeeder extends Seeder
             EnemyMaster::query()->updateOrCreate(
                 ['code' => $row['code']],
                 [
+                    'floor' => (int) ($row['floor'] ?? 1),
                     'name' => $row['name'],
                     'sprite' => $row['sprite'],
                     'hp' => (int) $row['hp'],
@@ -137,6 +140,7 @@ class MasterDataSeeder extends Seeder
             DungeonEventMaster::query()->updateOrCreate(
                 ['code' => $row['code']],
                 [
+                    'floor' => (int) $row['floor'],
                     'name' => $row['name'],
                     'weight' => (int) $row['weight'],
                     'event_type' => $row['event_type'],
@@ -179,6 +183,7 @@ class MasterDataSeeder extends Seeder
             DungeonEncounterMaster::query()->updateOrCreate(
                 ['code' => $row['code']],
                 [
+                    'floor' => (int) $row['floor'],
                     'weight' => (int) $row['weight'],
                     'boss' => (bool) ((int) ($row['boss'] ?? 0)),
                     'enemies' => $enemies,

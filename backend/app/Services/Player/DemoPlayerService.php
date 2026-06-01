@@ -3,12 +3,14 @@
 namespace App\Services\Player;
 
 use App\Models\User;
+use App\Services\Dungeon\DungeonProgressService;
 use Illuminate\Support\Facades\Hash;
 
 class DemoPlayerService
 {
   public function __construct(
     private readonly UserCharacterService $characters = new UserCharacterService,
+    private readonly DungeonProgressService $dungeonProgress = new DungeonProgressService,
   ) {}
 
   public function resolveOrCreateUser(): User
@@ -29,5 +31,6 @@ class DemoPlayerService
   public function resetProgress(User $user): void
   {
     $this->characters->resetParty($user);
+    $this->dungeonProgress->resetAll($user);
   }
 }

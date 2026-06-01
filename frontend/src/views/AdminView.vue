@@ -12,7 +12,13 @@ const party = ref([]);
 const lastResults = ref([]);
 const skipBattles = ref(false);
 const resetProgress = ref(false);
-const dungeonStep = ref(0);
+const dungeonStatus = ref({
+  floor: 1,
+  step: 0,
+  unlocked_floor: 1,
+  max_floor: 3,
+  playable_floor: 1,
+});
 
 async function loadParty() {
   const data = await api('/admins/party', { method: 'GET' });
@@ -74,7 +80,13 @@ async function applyDungeonSettings() {
       }),
     });
     message.value = data.message ?? 'ダンジョン設定を反映しました';
-    dungeonStep.value = data.step ?? 0;
+    dungeonStatus.value = {
+      floor: data.floor ?? 1,
+      step: data.step ?? 0,
+      unlocked_floor: data.unlocked_floor ?? 1,
+      max_floor: data.max_floor ?? 3,
+      playable_floor: data.playable_floor ?? 1,
+    };
     resetProgress.value = false;
   } catch (e) {
     error.value = e.message;
@@ -127,7 +139,11 @@ onMounted(() => init());
             <input v-model="resetProgress" type="checkbox" />
             <span>ダンジョン探索リセット（適用時に深さ 0）</span>
           </label>
-          <p v-if="dungeonStep !== null" class="muted">現在の深さ: {{ dungeonStep }}</p>
+          <p class="muted">
+            現在: {{ dungeonStatus.floor }}層 / 深さ {{ dungeonStatus.step }} /
+            解放 {{ dungeonStatus.unlocked_floor }}層まで /
+            挑戦可能 {{ dungeonStatus.playable_floor }}層まで
+          </p>
           <button type="submit" class="btn-primary" :disabled="submitting">
             {{ submitting ? '処理中…' : '適用' }}
           </button>

@@ -242,8 +242,11 @@ async function playEvents(events) {
       showActionBanner(`${ev.name}が Lv${ev.level} に上がった！`);
       await delay(900);
     }
-    if (ev.type === 'dungeon_cleared') {
+    if (ev.type === 'dungeon_floor_cleared') {
       dungeonCleared.value = true;
+      if (ev.text) {
+        victoryRewards.value.push(ev.text);
+      }
       await delay(400);
     }
     if (ev.type === 'battle_end') {

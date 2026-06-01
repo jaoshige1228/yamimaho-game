@@ -34,6 +34,7 @@ class DungeonAdminSettingsTest extends TestCase
             ->assertJson([
                 'skip_battles' => true,
                 'step' => 0,
+                'floor' => 1,
             ]);
 
         $progress = UserDungeonProgress::query()->where('user_id', $user->id)->first();

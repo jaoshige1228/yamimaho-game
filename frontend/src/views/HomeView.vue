@@ -42,7 +42,7 @@ async function startDemoKappa2() {
 }
 
 async function resetProgress() {
-  if (!window.confirm('戦闘の記録とキャラの成長をすべて消します。よろしいですか？')) {
+  if (!window.confirm('戦闘の記録・キャラの成長・ダンジョンの探索状況をすべて消します。よろしいですか？')) {
     return;
   }
 
@@ -92,7 +92,7 @@ async function resetProgress() {
     >
       {{ resetting ? 'リセット中…' : 'リセット' }}
     </button>
-    <p class="reset-hint">成長・戦闘記録をすべて消して最初からやり直します</p>
+    <p class="reset-hint">成長・戦闘記録・ダンジョン探索をすべて消して最初からやり直します</p>
     <p v-if="error" class="error">{{ error }}</p>
   </div>
 </template>

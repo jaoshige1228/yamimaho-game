@@ -21,6 +21,7 @@ class DungeonExplorationSession extends Model
         'current_node_key',
         'context',
         'step_at_start',
+        'floor_at_start',
     ];
 
     /** @return array<string, string> */

@@ -88,6 +88,11 @@ class BattleOrchestrator
         if (($state['status'] ?? '') === 'victory') {
             $events = $this->rewards->applyVictoryRewards($state, $user);
 
+            if ($isDungeon && ($meta['boss'] ?? false)) {
+                $floor = (int) ($meta['floor'] ?? 1);
+                $events[] = $this->dungeonProgress->onBossVictory($user, $floor);
+            }
+
             return $events;
         }
 

@@ -12,6 +12,7 @@ class ArmorMaster extends Model
         'code',
         'name',
         'def_bonus',
+        'description',
     ];
 
     /** @return HasMany<UserCharacter, $this> */

@@ -47,8 +47,8 @@ class EquipmentServiceTest extends TestCase
 
         $stats = (new EquipmentService)->effectiveCombatStats($character);
 
-        $this->assertSame(16, $stats['mag']);
-        $this->assertSame(11, $stats['def']);
+        $this->assertSame(15, $stats['mag']);
+        $this->assertSame(10, $stats['def']);
         $this->assertSame('staff_basic', $stats['weapon']['code']);
         $this->assertSame('robe_basic', $stats['armor']['code']);
     }

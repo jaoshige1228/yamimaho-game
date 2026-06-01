@@ -15,11 +15,11 @@ class EnemyMasterDataTest extends TestCase
     {
         $provider = new MasterDataProvider;
 
-        $kappa = $provider->findEnemy('kappa');
-        $kappa2 = $provider->findEnemy('kappa2');
+        $bat = $provider->findEnemy('bat');
+        $snake = $provider->findEnemy('snake');
 
-        $this->assertSame(13, $kappa['exp_reward']);
-        $this->assertSame(26, $kappa2['exp_reward']);
+        $this->assertSame(13, $bat['exp_reward']);
+        $this->assertSame(26, $snake['exp_reward']);
     }
 
     public function test_enemy_masters_load_exp_reward_from_db(): void
@@ -27,9 +27,10 @@ class EnemyMasterDataTest extends TestCase
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
 
         $provider = new MasterDataProvider;
-        $kappa = $provider->findEnemy('kappa');
+        $bat = $provider->findEnemy('bat');
 
-        $this->assertSame(13, $kappa['exp_reward']);
-        $this->assertSame(13, EnemyMaster::query()->where('code', 'kappa')->value('exp_reward'));
+        $this->assertSame(13, $bat['exp_reward']);
+        $this->assertSame(13, EnemyMaster::query()->where('code', 'bat')->value('exp_reward'));
+        $this->assertSame(1, EnemyMaster::query()->where('code', 'bat')->value('floor'));
     }
 }

@@ -7,11 +7,11 @@ use App\Models\DungeonEventNode;
 
 class DungeonEventCatalog
 {
-    public function pickRandomEventCode(): string
+    public function pickRandomEventCode(int $floor): string
     {
-        $events = DungeonEventMaster::query()->get();
+        $events = DungeonEventMaster::query()->where('floor', $floor)->get();
         if ($events->isEmpty()) {
-            throw new \RuntimeException('No dungeon events configured.');
+            throw new \RuntimeException("No dungeon events configured for floor {$floor}.");
         }
 
         $total = $events->sum('weight');

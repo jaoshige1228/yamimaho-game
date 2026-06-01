@@ -2,6 +2,7 @@
 
 namespace App\Services\Dungeon;
 
+use App\Models\DungeonExplorationSession;
 use App\Models\User;
 use App\Models\UserDungeonProgress;
 
@@ -12,7 +13,79 @@ class DungeonProgressService
         return (int) ($this->findOrCreate($user)->step ?? 0);
     }
 
+    public function getFloor(User $user): int
+    {
+        return (int) ($this->findOrCreate($user)->floor ?? 1);
+    }
+
+    public function getUnlockedFloor(User $user): int
+    {
+        return (int) ($this->findOrCreate($user)->unlocked_floor ?? 1);
+    }
+
+    public function isFloorPlayable(User $user, int $floor): bool
+    {
+        if ($floor < 1 || $floor > DungeonFloorConfig::maxFloor()) {
+            return false;
+        }
+
+        if ($floor > DungeonFloorConfig::playableFloor()) {
+            return false;
+        }
+
+        return $floor <= $this->getUnlockedFloor($user);
+    }
+
+    /**
+     * @return array<string, int|bool>
+     */
+    public function statusPayload(User $user): array
+    {
+        $record = $this->findOrCreate($user);
+
+        return [
+            'floor' => (int) $record->floor,
+            'step' => (int) $record->step,
+            'unlocked_floor' => (int) $record->unlocked_floor,
+            'max_floor' => DungeonFloorConfig::maxFloor(),
+            'playable_floor' => DungeonFloorConfig::playableFloor(),
+            'boss_step' => DungeonFloorConfig::bossStep((int) $record->floor),
+        ];
+    }
+
+    public function enterFloor(User $user, int $floor): void
+    {
+        if (! $this->isFloorPlayable($user, $floor)) {
+            throw new \InvalidArgumentException('この層にはまだ挑戦できません。');
+        }
+
+        $record = $this->findOrCreate($user);
+        $record->floor = $floor;
+        $record->save();
+    }
+
     public function reset(User $user): void
+    {
+        $record = $this->findOrCreate($user);
+        $record->step = 0;
+        $record->floor = 1;
+        $record->save();
+    }
+
+    /** ホーム画面リセット用: 層・深さ・解放層・探索セッションを初期化 */
+    public function resetAll(User $user): void
+    {
+        $record = $this->findOrCreate($user);
+        $record->floor = 1;
+        $record->step = 0;
+        $record->unlocked_floor = 1;
+        $record->skip_battle_encounters = false;
+        $record->save();
+
+        DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
+    }
+
+    public function resetStep(User $user): void
     {
         $record = $this->findOrCreate($user);
         $record->step = 0;
@@ -40,11 +113,47 @@ class DungeonProgressService
         $record->save();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function onBossVictory(User $user, int $floor): array
+    {
+        $record = $this->findOrCreate($user);
+        $maxFloor = DungeonFloorConfig::maxFloor();
+
+        if ($floor < $maxFloor) {
+            $record->unlocked_floor = max((int) $record->unlocked_floor, $floor + 1);
+        }
+
+        $record->step = 0;
+        $record->save();
+
+        $nextFloor = $floor + 1;
+        $nextPlayable = $nextFloor <= DungeonFloorConfig::playableFloor()
+            && $nextFloor <= (int) $record->unlocked_floor;
+
+        return [
+            'type' => 'dungeon_floor_cleared',
+            'floor' => $floor,
+            'unlocked_floor' => (int) $record->unlocked_floor,
+            'next_floor' => $nextFloor <= $maxFloor ? $nextFloor : null,
+            'next_floor_playable' => $nextPlayable,
+            'text' => $nextPlayable
+                ? "{$floor}層を踏破した！"
+                : "{$floor}層を踏破した！　だが、さらに深い層はまだ準備が整っていない……",
+        ];
+    }
+
     private function findOrCreate(User $user): UserDungeonProgress
     {
         return UserDungeonProgress::query()->firstOrCreate(
             ['user_id' => $user->id],
-            ['step' => 0, 'skip_battle_encounters' => false],
+            [
+                'floor' => 1,
+                'unlocked_floor' => 1,
+                'step' => 0,
+                'skip_battle_encounters' => false,
+            ],
         );
     }
 }

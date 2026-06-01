@@ -29,16 +29,16 @@ return [
 
     /** デモ戦闘の敵スロット */
     'demo_enemies' => [
-        ['slot' => 'enemy_1', 'master_code' => 'kappa', 'name' => 'カッパA'],
-        ['slot' => 'enemy_2', 'master_code' => 'kappa', 'name' => 'カッパB'],
-        ['slot' => 'enemy_3', 'master_code' => 'kappa', 'name' => 'カッパC'],
+        ['slot' => 'enemy_1', 'master_code' => 'bat', 'name' => 'コーモリA'],
+        ['slot' => 'enemy_2', 'master_code' => 'bat', 'name' => 'コーモリB'],
+        ['slot' => 'enemy_3', 'master_code' => 'bat', 'name' => 'コーモリC'],
     ],
 
-    /** カッパLV2 ×3 のデモ戦闘 */
+    /** 強めの敵混成デモ戦闘 */
     'demo_enemies_kappa2' => [
-        ['slot' => 'enemy_1', 'master_code' => 'kappa2', 'name' => 'カッパA'],
-        ['slot' => 'enemy_2', 'master_code' => 'kappa2', 'name' => 'カッパB'],
-        ['slot' => 'enemy_3', 'master_code' => 'kappa2', 'name' => 'カッパC'],
+        ['slot' => 'enemy_1', 'master_code' => 'snake', 'name' => 'ヘビビA'],
+        ['slot' => 'enemy_2', 'master_code' => 'snake', 'name' => 'ヘビビB'],
+        ['slot' => 'enemy_3', 'master_code' => 'beetle', 'name' => 'ムシプリンス'],
     ],
 
     'buffs' => [

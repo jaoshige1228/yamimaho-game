@@ -10,6 +10,8 @@ class UserDungeonProgress extends Model
     /** @var list<string> */
     protected $fillable = [
         'user_id',
+        'floor',
+        'unlocked_floor',
         'step',
         'skip_battle_encounters',
     ];

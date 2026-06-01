@@ -12,7 +12,7 @@ const props = defineProps({
   party: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['complete']);
+const emit = defineEmits(['complete', 'sync-party']);
 
 const index = ref(0);
 const sfxPlayedAtIndex = ref(-1);
@@ -59,8 +59,16 @@ watch(
   },
 );
 
+function emitSyncPartyIfNeeded(lineIndex) {
+  const line = props.lines[lineIndex];
+  if (line?.sync_party) {
+    emit('sync-party');
+  }
+}
+
 watch(index, (lineIndex) => {
   playSfxForLineAtIndex(lineIndex);
+  emitSyncPartyIfNeeded(lineIndex);
 }, { immediate: true });
 
 function onTap() {

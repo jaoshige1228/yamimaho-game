@@ -66,11 +66,13 @@ class AdminController extends Controller
             $this->dungeonProgress->reset($user);
         }
 
-        return response()->json([
-            'message' => 'ダンジョン設定を反映しました。',
-            'skip_battles' => (bool) $validated['skip_battles'],
-            'step' => $this->dungeonProgress->getStep($user),
-        ]);
+        return response()->json(array_merge(
+            [
+                'message' => 'ダンジョン設定を反映しました。',
+                'skip_battles' => (bool) $validated['skip_battles'],
+            ],
+            $this->dungeonProgress->statusPayload($user),
+        ));
     }
 
     public function grantExp(AdminGrantExpRequest $request): JsonResponse

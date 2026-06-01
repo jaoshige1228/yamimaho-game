@@ -17,6 +17,11 @@ const advancing = ref(false);
 const explorationBusy = ref(false);
 const error = ref('');
 const step = ref(0);
+const floor = ref(1);
+const unlockedFloor = ref(1);
+const maxFloor = ref(3);
+const playableFloor = ref(1);
+const bossStep = ref(null);
 const party = ref([]);
 const storyActive = ref(false);
 const storyLines = ref([]);
@@ -25,11 +30,39 @@ const choiceActive = ref(false);
 const choicePrompt = ref('');
 const choiceOptions = ref([]);
 const pendingChoice = ref(null);
+const pendingCommittedParty = ref(null);
 
 function applyParty(data) {
   if (Array.isArray(data?.party)) {
     party.value = data.party;
   }
+}
+
+function applyExplorationParty(data) {
+  if (Array.isArray(data?.party_snapshot)) {
+    party.value = data.party_snapshot;
+    pendingCommittedParty.value = Array.isArray(data?.party) ? data.party : null;
+    return;
+  }
+
+  pendingCommittedParty.value = null;
+  applyParty(data);
+}
+
+function onStorySyncParty() {
+  if (pendingCommittedParty.value) {
+    party.value = pendingCommittedParty.value;
+    pendingCommittedParty.value = null;
+  }
+}
+
+function applyDungeonStatus(data) {
+  if (data.step != null) step.value = data.step;
+  if (data.floor != null) floor.value = data.floor;
+  if (data.unlocked_floor != null) unlockedFloor.value = data.unlocked_floor;
+  if (data.max_floor != null) maxFloor.value = data.max_floor;
+  if (data.playable_floor != null) playableFloor.value = data.playable_floor;
+  if (data.boss_step !== undefined) bossStep.value = data.boss_step;
 }
 
 function showStorySegment(segment) {
@@ -49,8 +82,8 @@ function showChoiceSegment(segment) {
 }
 
 async function handleExplorationPayload(data) {
-  step.value = data.step ?? step.value;
-  applyParty(data);
+  applyDungeonStatus(data);
+  applyExplorationParty(data);
 
   const segment = data.segment;
   if (!segment) {
@@ -64,6 +97,31 @@ async function handleExplorationPayload(data) {
     explorationSessionId.value = '';
     choiceActive.value = false;
     await loadParty();
+    return;
+  }
+
+  if (segment.kind === 'battle' && data.battle_id) {
+    explorationSessionId.value = '';
+    choiceActive.value = false;
+    battle.battleId = data.battle_id;
+    battle.state = data.state;
+    battle.pendingEvents = data.events ?? [];
+    router.push({
+      name: 'battle',
+      params: { id: data.battle_id },
+      query: {
+        from: 'dungeon',
+        ...(data.boss_encounter ? { boss: '1' } : {}),
+      },
+    });
+    return;
+  }
+
+  if (segment.kind === 'game_over') {
+    explorationSessionId.value = '';
+    choiceActive.value = false;
+    await loadParty();
+    router.push('/hub');
     return;
   }
 
@@ -159,7 +217,7 @@ async function loadStatus() {
   error.value = '';
   try {
     const data = await api('/dungeon', { method: 'GET' });
-    step.value = data.step ?? 0;
+    applyDungeonStatus(data);
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -183,7 +241,10 @@ async function advance() {
       router.push({
         name: 'battle',
         params: { id: data.battle_id },
-        query: { from: 'dungeon' },
+        query: {
+          from: 'dungeon',
+          ...(data.boss_encounter ? { boss: '1' } : {}),
+        },
       });
       return;
     }
@@ -210,7 +271,10 @@ onMounted(async () => {
   <div class="hub-screen">
     <div class="exploration-body">
       <ScenePanel image-src="/assets/bg/dungeon1.jpg" :loading="loading">
-        <p class="scene-overlay-depth">深さ {{ step }}</p>
+        <p class="scene-overlay-depth">
+          {{ floor }}層　深さ {{ step }}
+          <template v-if="bossStep">（ボス: 深さ {{ bossStep }}）</template>
+        </p>
 
         <button
           v-if="!loading && !storyActive && !choiceActive && !explorationSessionId"
@@ -235,6 +299,7 @@ onMounted(async () => {
       :lines="storyLines"
       :party="party"
       @complete="onStoryComplete"
+      @sync-party="onStorySyncParty"
     />
     <ExplorationChoiceOverlay
       v-if="choiceActive"

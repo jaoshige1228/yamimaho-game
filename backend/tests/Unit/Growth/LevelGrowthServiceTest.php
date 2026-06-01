@@ -36,7 +36,8 @@ class LevelGrowthServiceTest extends TestCase
 
         $lv2 = $growth->statsForLevel($master, 2);
 
-        $this->assertSame(16, $lv2['mag']);
+        $this->assertSame(17, $lv2['mag']);
+        $this->assertSame(50, $lv2['mp']);
     }
 
     public function test_stats_multiply_from_previous_level(): void
@@ -49,8 +50,10 @@ class LevelGrowthServiceTest extends TestCase
         $lv2 = $growth->statsForLevel($master, 2);
         $lv3 = $growth->statsForLevel($master, 3);
 
-        $this->assertSame(16, $lv2['mag']);
-        $this->assertSame(20, $lv3['mag']);
+        $this->assertSame(17, $lv2['mag']);
+        $this->assertSame(21, $lv3['mag']);
+        $this->assertSame(11, $lv2['def']);
+        $this->assertSame(14, $lv3['def']);
     }
 
     public function test_stats_scale_with_level(): void
@@ -64,8 +67,12 @@ class LevelGrowthServiceTest extends TestCase
         $lv3 = $growth->statsForLevel($master, 3);
 
         $this->assertSame($master->hp, $lv1['hp']);
-        $this->assertSame(144, $lv3['hp']);
-        $this->assertSame(20, $lv3['str']);
+        $this->assertSame(
+            (int) ceil((int) ceil($master->hp * 1.1) * 1.1),
+            $lv3['hp'],
+        );
+        $this->assertSame($master->str + 4, $lv3['str']);
+        $this->assertSame($master->spd + 4, $lv3['spd']);
     }
 
     public function test_grant_exp_levels_up_character(): void

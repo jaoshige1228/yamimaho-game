@@ -13,8 +13,8 @@ class EquipmentService
      * @return array{
      *   mag: int,
      *   def: int,
-     *   weapon: array{code: string, name: string, mag_bonus: int}|null,
-     *   armor: array{code: string, name: string, def_bonus: int}|null
+     *   weapon: array{code: string, name: string, mag_bonus: int, description: string|null}|null,
+     *   armor: array{code: string, name: string, def_bonus: int, description: string|null}|null
      * }
      */
     public function effectiveCombatStats(UserCharacter $character): array
@@ -58,7 +58,7 @@ class EquipmentService
     }
 
     /**
-     * @return array{code: string, name: string, mag_bonus: int}
+     * @return array{code: string, name: string, mag_bonus: int, description: string|null}
      */
     public function weaponPayload(WeaponMaster $weapon): array
     {
@@ -66,11 +66,12 @@ class EquipmentService
             'code' => $weapon->code,
             'name' => $weapon->name,
             'mag_bonus' => $weapon->mag_bonus,
+            'description' => $weapon->description,
         ];
     }
 
     /**
-     * @return array{code: string, name: string, def_bonus: int}
+     * @return array{code: string, name: string, def_bonus: int, description: string|null}
      */
     public function armorPayload(ArmorMaster $armor): array
     {
@@ -78,6 +79,7 @@ class EquipmentService
             'code' => $armor->code,
             'name' => $armor->name,
             'def_bonus' => $armor->def_bonus,
+            'description' => $armor->description,
         ];
     }
 }

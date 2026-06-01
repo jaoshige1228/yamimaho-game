@@ -8,6 +8,7 @@ class DungeonEncounterMaster extends Model
 {
     /** @var list<string> */
     protected $fillable = [
+        'floor',
         'code',
         'weight',
         'enemies',

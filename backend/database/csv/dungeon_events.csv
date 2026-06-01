@@ -1,3 +1,7 @@
-code,name,weight,event_type,start_node_key
-trap_arrow,矢のトラップ,50,stat_check_random_target,intro
-treasure_chest,宝箱,50,party_choice_stat_check,found
+floor,code,name,weight,event_type,start_node_key
+1,trap_arrow,矢のトラップ,24,stat_check_random_target,intro
+1,treasure_chest,宝箱,24,party_choice_stat_check,found
+1,healing_spring,回復の泉,19,restore_party,intro
+1,suspicious_spring,あやしい回復の泉,19,taster_choice,intro
+1,mysterious_presence,謎の気配,9,hidden_boss_rift,intro
+1,rainbow_spring,虹色の回復の泉,5,restore_party,intro

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\Dungeon\DungeonAdvanceService;
 use App\Services\Dungeon\DungeonProgressService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class DungeonController extends Controller
@@ -21,22 +22,33 @@ class DungeonController extends Controller
             return response()->json(['message' => '未ログイン'], 401);
         }
 
-        return response()->json([
-            'step' => $this->progress->getStep($user),
-        ]);
+        return response()->json($this->progress->statusPayload($user));
     }
 
-    public function enter(): JsonResponse
+    public function enter(Request $request): JsonResponse
     {
         $user = Auth::user();
         if ($user === null) {
             return response()->json(['message' => '未ログイン'], 401);
         }
 
-        return response()->json([
-            'message' => 'ダンジョンに入った。',
-            'step' => $this->progress->getStep($user),
-        ]);
+        $floor = (int) $request->input('floor', $this->progress->getFloor($user));
+        if ($floor < 1) {
+            return response()->json(['message' => '無効な層です'], 422);
+        }
+
+        try {
+            $this->progress->enterFloor($user, $floor);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        return response()->json(array_merge(
+            [
+                'message' => "{$floor}層に入った。",
+            ],
+            $this->progress->statusPayload($user),
+        ));
     }
 
     public function advance(): JsonResponse
