@@ -1,10 +1,18 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router';
+import { computed } from 'vue';
+import { usePlayerStore } from '../../stores/player';
 
 const router = useRouter();
 const route = useRoute();
+const player = usePlayerStore();
+
+const homeDisabled = computed(
+  () => player.inDungeon || Boolean(player.activeBattleId),
+);
 
 function goHub() {
+  if (homeDisabled.value) return;
   if (route.name !== 'hub') {
     router.push({ name: 'hub' });
   }
@@ -19,7 +27,14 @@ function goStatus() {
 
 <template>
   <footer class="app-footer">
-    <button type="button" class="footer-btn" aria-label="待機画面へ" @click="goHub">
+    <button
+      type="button"
+      class="footer-btn"
+      :class="{ disabled: homeDisabled }"
+      aria-label="待機画面へ"
+      :disabled="homeDisabled"
+      @click="goHub"
+    >
       <span class="icon" aria-hidden="true">⌂</span>
       <span class="label">ホーム</span>
     </button>
@@ -66,6 +81,11 @@ function goStatus() {
 .footer-btn:hover:not(:disabled) {
   background: rgba(157, 124, 255, 0.12);
   color: #f8f4ff;
+}
+.footer-btn.disabled,
+.footer-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .footer-btn.placeholder {
   opacity: 0.45;

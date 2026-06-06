@@ -15,7 +15,7 @@ class BattleActionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'action' => ['required', Rule::in(['punch', 'defend', 'spell'])],
+            'action' => ['required', Rule::in(['punch', 'kick', 'spell', 'flee'])],
             'spell_id' => ['nullable', 'string', 'required_if:action,spell'],
             'target_id' => ['nullable', 'string'],
         ];

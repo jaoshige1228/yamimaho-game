@@ -9,6 +9,7 @@ use App\Models\UserCharacter;
 use App\Services\Dungeon\DungeonEventCatalog;
 use App\Services\Dungeon\DungeonProgressService;
 use App\Services\Dungeon\PartyExplorationDamageService;
+use App\Services\Growth\LevelGrowthService;
 use App\Services\Player\UserCharacterService;
 
 class DungeonExplorationEngine
@@ -20,6 +21,7 @@ class DungeonExplorationEngine
         private readonly PartyExplorationDamageService $damage = new PartyExplorationDamageService,
         private readonly UserCharacterService $characters = new UserCharacterService,
         private readonly DungeonProgressService $progress = new DungeonProgressService,
+        private readonly LevelGrowthService $growth = new LevelGrowthService,
     ) {}
 
     /**
@@ -33,6 +35,7 @@ class DungeonExplorationEngine
             'target_slot' => $target,
             'chosen_slot' => null,
             'last_success_rate' => null,
+            'last_stat_check_label' => null,
         ];
     }
 
@@ -52,7 +55,13 @@ class DungeonExplorationEngine
 
             if (in_array($node->node_type, ['party_choice', 'party_choice_skip'], true)) {
                 $session->current_node_key = $nodeKey;
-                $segment = $this->choiceSegment($user, $node, $context, includeSkip: $node->node_type === 'party_choice_skip');
+                $segment = $this->choiceSegment(
+                    $user,
+                    $node,
+                    $context,
+                    includeSkip: $node->node_type === 'party_choice_skip',
+                    eventCode: $session->event_code,
+                );
                 if ($lines !== []) {
                     $segment['lines'] = $lines;
                 }
@@ -136,8 +145,14 @@ class DungeonExplorationEngine
                 return $this->resolveEndNode($session, $nodeKey, $lines, $context);
             }
 
-            if ($node->node_type === 'narration' && str_contains((string) $node->text, '{success_rate}')) {
-                $context['last_success_rate'] = $this->successRateForUpcomingCheck(
+            if (
+                $node->node_type === 'narration'
+                && (
+                    str_contains((string) $node->text, '{success_rate}')
+                    || str_contains((string) $node->text, '{stat_check_label}')
+                )
+            ) {
+                $context = $this->applyUpcomingStatCheckPreviewContext(
                     $session->event_code,
                     (string) $node->next_default,
                     $user,
@@ -207,15 +222,23 @@ class DungeonExplorationEngine
             $session->current_node_key = $result['next_node'];
             $session->save();
 
+            $rollSuccess = $result['success'] ?? null;
+
             $run = $this->runUntilSegment($session, $user);
             if ($run['complete']) {
-                return ['segment' => $run['segment'], 'complete' => true];
+                return [
+                    'segment' => $this->segmentWithStatCheckResult($run['segment'], $rollSuccess),
+                    'complete' => true,
+                ];
             }
 
             $session->current_node_key = $run['next_node'];
             $session->save();
 
-            return ['segment' => $run['segment'], 'complete' => false];
+            return [
+                'segment' => $this->segmentWithStatCheckResult($run['segment'], $rollSuccess),
+                'complete' => false,
+            ];
         }
 
         if ($this->isDeferredEffectNode($node->node_type)) {
@@ -513,12 +536,11 @@ class DungeonExplorationEngine
     ): array {
         $attr = (string) $node->stat_attr;
         $multiplier = (int) ($node->stat_multiplier ?? 2);
-        $slot = $attr === 'str'
-            ? (string) ($context['chosen_slot'] ?? $context['target_slot'] ?? '')
-            : (string) ($context['target_slot'] ?? '');
+        $slot = $this->slotForStatCheck($attr, $context);
 
         $rate = $this->successRateForSlot($user, $slot, $attr, $multiplier);
         $context['last_success_rate'] = $rate;
+        $context['last_stat_check_label'] = $this->statCheckLabel($attr);
 
         if (! $performRoll) {
             return [
@@ -546,6 +568,7 @@ class DungeonExplorationEngine
             'preview_line' => null,
             'next_node' => $next,
             'context' => $context,
+            'success' => $success,
         ];
     }
 
@@ -587,51 +610,130 @@ class DungeonExplorationEngine
             'preview_line' => null,
             'next_node' => $next,
             'context' => $context,
+            'success' => $success,
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  $segment
+     * @return array<string, mixed>
      */
-    private function successRateForUpcomingCheck(
-        string $eventCode,
-        string $nextNodeKey,
-        User $user,
-        array $context,
-    ): int {
-        if ($nextNodeKey === '') {
-            return $this->successRateForContext($user, $context, 'spd', 2);
+    private function segmentWithStatCheckResult(array $segment, ?bool $success): array
+    {
+        if ($success === null) {
+            return $segment;
         }
 
-        try {
-            $nextNode = $this->catalog->findNode($eventCode, $nextNodeKey);
-        } catch (\InvalidArgumentException) {
-            return $this->successRateForContext($user, $context, 'spd', 2);
-        }
+        $segment['stat_check_result'] = $success ? 'success' : 'fail';
 
-        if ($nextNode->node_type !== 'stat_check') {
-            return $this->successRateForContext($user, $context, 'spd', 2);
-        }
-
-        $attr = (string) $nextNode->stat_attr;
-        $multiplier = (int) ($nextNode->stat_multiplier ?? 2);
-        $slot = $attr === 'str'
-            ? (string) ($context['chosen_slot'] ?? $context['target_slot'] ?? '')
-            : (string) ($context['target_slot'] ?? '');
-
-        return $this->successRateForSlot($user, $slot, $attr, $multiplier);
+        return $segment;
     }
 
     /**
      * @param  array<string, mixed>  $context
      */
-    private function successRateForContext(User $user, array $context, string $attr, int $multiplier): int
+    private function findUpcomingStatCheckNode(string $eventCode, string $nodeKey, int $maxDepth = 8): ?DungeonEventNode
     {
-        $slot = $attr === 'str'
-            ? (string) ($context['chosen_slot'] ?? $context['target_slot'] ?? '')
-            : (string) ($context['target_slot'] ?? '');
+        if ($nodeKey === '' || $maxDepth <= 0) {
+            return null;
+        }
 
-        return $this->successRateForSlot($user, $slot, $attr, $multiplier);
+        try {
+            $node = $this->catalog->findNode($eventCode, $nodeKey);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+
+        if ($node->node_type === 'stat_check') {
+            return $node;
+        }
+
+        $next = (string) ($node->next_default ?? '');
+        if ($next !== '') {
+            return $this->findUpcomingStatCheckNode($eventCode, $next, $maxDepth - 1);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function applyUpcomingStatCheckPreviewContext(
+        string $eventCode,
+        string $startNodeKey,
+        User $user,
+        array $context,
+    ): array {
+        $statNode = $this->findUpcomingStatCheckNode($eventCode, $startNodeKey);
+        if ($statNode === null) {
+            return $context;
+        }
+
+        $attr = (string) $statNode->stat_attr;
+        $multiplier = (int) ($statNode->stat_multiplier ?? 2);
+        $slot = $this->slotForStatCheck($attr, $context);
+
+        $context['last_success_rate'] = $this->successRateForSlot($user, $slot, $attr, $multiplier);
+        $context['last_stat_check_label'] = $this->statCheckLabel($attr);
+
+        return $context;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function slotForStatCheck(string $attr, array $context): string
+    {
+        if ($attr === 'str') {
+            return (string) ($context['chosen_slot'] ?? $context['target_slot'] ?? '');
+        }
+
+        return (string) ($context['target_slot'] ?? '');
+    }
+
+    private function statCheckLabel(string $attr): string
+    {
+        return match ($attr) {
+            'str' => '筋力判定',
+            'spd' => '素早さ判定',
+            'know' => '知力判定',
+            'mag' => '魔力判定',
+            'def' => '防御判定',
+            'spirit' => '精神判定',
+            'vit' => '体力判定',
+            default => '能力判定',
+        };
+    }
+
+    private function statValueForCharacter(UserCharacter $character, string $attr): int
+    {
+        return match ($attr) {
+            'str' => (int) $character->str,
+            'spd' => (int) $character->spd,
+            'know' => (int) $character->know,
+            'mag' => (int) $character->mag,
+            'def' => (int) $character->def,
+            'spirit' => (int) $character->spirit,
+            'vit' => (int) $character->vit,
+            default => 0,
+        };
+    }
+
+    private function hpRatioForCharacter(UserCharacter $character): float
+    {
+        $master = $character->characterMaster;
+        if ($master === null) {
+            return 0.0;
+        }
+
+        $maxHp = (int) $this->growth->statsForLevel($master, $character->level)['hp'];
+        if ($maxHp <= 0) {
+            return 0.0;
+        }
+
+        return min(1.0, max(0.0, (int) $character->hp / $maxHp));
     }
 
     private function successRateForSlot(User $user, string $slotId, string $attr, int $multiplier): int
@@ -647,13 +749,11 @@ class DungeonExplorationEngine
             return 0;
         }
 
-        $value = match ($attr) {
-            'str' => (int) $character->str,
-            'spd' => (int) $character->spd,
-            default => 0,
-        };
+        $character->loadMissing('characterMaster');
+        $value = $this->statValueForCharacter($character, $attr);
+        $hpRatio = $this->hpRatioForCharacter($character);
 
-        return min(100, $value * $multiplier);
+        return min(100, (int) ceil($value * $multiplier * $hpRatio));
     }
 
     /**
@@ -716,6 +816,7 @@ class DungeonExplorationEngine
             '{chosen_name}' => $chosenName,
             '{name}' => $chosenSlot !== '' ? $chosenName : $targetName,
             '{success_rate}' => (string) ($context['last_success_rate'] ?? 0),
+            '{stat_check_label}' => (string) ($context['last_stat_check_label'] ?? ''),
         ];
 
         $text = str_replace(array_keys($replacements), array_values($replacements), $text);
@@ -797,22 +898,46 @@ class DungeonExplorationEngine
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function choiceSegment(User $user, DungeonEventNode $node, array $context, bool $includeSkip = false): array
-    {
+    private function choiceSegment(
+        User $user,
+        DungeonEventNode $node,
+        array $context,
+        bool $includeSkip = false,
+        string $eventCode = '',
+    ): array {
         $options = [];
         $party = $this->characters->partyInSlotOrder($user);
+
+        $statNode = null;
+        if ($node->node_type === 'party_choice' && $eventCode !== '') {
+            $startKey = (string) ($node->next_on_success ?: $node->next_default ?: '');
+            $statNode = $this->findUpcomingStatCheckNode($eventCode, $startKey);
+        }
+
+        $statAttr = $statNode !== null ? (string) $statNode->stat_attr : '';
+        $statMultiplier = $statNode !== null ? (int) ($statNode->stat_multiplier ?? 2) : 0;
 
         foreach ($party as $slotId => $character) {
             if ($character->hp <= 0) {
                 continue;
             }
-            $label = $node->node_type === 'party_choice_skip'
-                ? $character->characterMaster->name
-                : $character->characterMaster->name.'（筋力'.(int) $character->str.'）';
+
+            if ($node->node_type === 'party_choice_skip') {
+                $label = $character->characterMaster->name;
+            } elseif ($statNode !== null) {
+                $rate = $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier);
+                $label = $character->characterMaster->name.'（成功率'.$rate.'%）';
+            } else {
+                $label = $character->characterMaster->name;
+            }
+
             $options[] = [
                 'slot_id' => $slotId,
                 'name' => $character->characterMaster->name,
                 'str' => (int) $character->str,
+                'success_rate' => $statNode !== null
+                    ? $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier)
+                    : null,
                 'label' => $label,
             ];
         }
@@ -823,15 +948,27 @@ class DungeonExplorationEngine
                 'slot_id' => 'skip',
                 'name' => $skipLabel !== '' ? $skipLabel : '毒見しない',
                 'str' => 0,
+                'success_rate' => null,
                 'label' => $skipLabel !== '' ? $skipLabel : '毒見しない',
             ];
         }
 
-        return [
+        $prompt = $this->interpolate((string) $node->text, $user, $context);
+        if ($statNode !== null) {
+            $prompt = $this->statCheckLabel($statAttr)."\n".$prompt;
+        }
+
+        $segment = [
             'kind' => 'choice',
-            'prompt' => $this->interpolate((string) $node->text, $user, $context),
+            'prompt' => $prompt,
             'options' => $options,
         ];
+
+        if ($statNode !== null) {
+            $segment['stat_check_label'] = $this->statCheckLabel($statAttr);
+        }
+
+        return $segment;
     }
 
     /**

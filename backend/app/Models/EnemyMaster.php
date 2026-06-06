@@ -10,6 +10,7 @@ class EnemyMaster extends Model
     protected $fillable = [
         'code',
         'floor',
+        'level',
         'name',
         'sprite',
         'hp',
@@ -20,6 +21,10 @@ class EnemyMaster extends Model
         'spd',
         'know',
         'spirit',
+        'vit',
         'exp_reward',
+        'gold_reward',
+        'evasion_rate',
+        'crit_rate',
     ];
 }

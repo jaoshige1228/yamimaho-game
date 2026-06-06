@@ -1,20 +1,36 @@
 <script setup>
+import BuffIcons from './BuffIcons.vue';
 import UnitBars from './UnitBars.vue';
 import { useLongPress } from '../../composables/useLongPress';
+import { enemySpriteAssetKey } from '../../utils/enemySprite';
+import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   units: { type: Array, required: true },
+  displayHp: { type: Object, default: () => ({}) },
+  buffIcons: { type: Object, default: () => ({}) },
   targetMode: { type: String, default: null },
   shakeTarget: { type: String, default: null },
+  supportEffectTarget: { type: Object, default: null },
   activeLunge: { type: String, default: null },
 });
+
+function supportEffectClass(unit) {
+  const effect = props.supportEffectTarget;
+  if (!effect || effect.id !== unit.id) return null;
+  return `support-${effect.kind}`;
+}
+
+function displayHpFor(unit) {
+  return props.displayHp[unit.id] ?? unit.hp;
+}
 
 const emit = defineEmits(['select', 'show-stats']);
 
 const longPress = useLongPress((unit) => emit('show-stats', unit));
 
 function spriteUrl(unit) {
-  return `/assets/enemies/${unit.sprite}.png`;
+  return publicAssetUrl(`/assets/enemies/${enemySpriteAssetKey(unit)}.png`);
 }
 
 function canSelect(unit) {
@@ -39,12 +55,15 @@ function onSlotClick(unit) {
       :key="unit.id"
       type="button"
       class="enemy-slot"
-      :class="{
-        dead: !unit.alive,
-        selectable: canSelect(unit),
-        shake: shakeTarget === unit.id,
-        lunge: activeLunge === unit.id,
-      }"
+      :class="[
+        {
+          dead: !unit.alive,
+          selectable: canSelect(unit),
+          shake: shakeTarget === unit.id,
+          lunge: activeLunge === unit.id,
+        },
+        supportEffectClass(unit),
+      ]"
       @click="onSlotClick(unit)"
       @pointerdown="longPress.onPressStart($event, unit)"
       @pointerup="longPress.onPressEnd"
@@ -52,9 +71,16 @@ function onSlotClick(unit) {
       @pointercancel="longPress.onPressCancel"
       @contextmenu.prevent
     >
-      <img :src="spriteUrl(unit)" :alt="unit.name" class="sprite" />
-      <UnitBars :hp="unit.hp" :max-hp="unit.max_hp" />
-      <span class="name">{{ unit.name }}</span>
+      <div class="enemy-sprite-wrap">
+        <img :src="spriteUrl(unit)" :alt="unit.name" class="sprite" />
+        <BuffIcons
+          :buffs="unit.buffs"
+          :buff-icons="buffIcons"
+          :damage-shield="unit.damage_shield"
+        />
+      </div>
+      <UnitBars :hp="displayHpFor(unit)" :max-hp="unit.max_hp" />
+      <span class="name">Lv{{ unit.level ?? 1 }} {{ unit.name }}</span>
     </button>
   </div>
 </template>
@@ -63,9 +89,9 @@ function onSlotClick(unit) {
 .enemy-row {
   display: flex;
   justify-content: center;
+  align-items: flex-end;
   gap: 0.5rem;
   width: 100%;
-  max-height: 150px;
   z-index: 1;
 }
 .enemy-slot {
@@ -74,12 +100,12 @@ function onSlotClick(unit) {
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 0.25rem;
+  padding: 0.2rem 0.25rem 0.35rem;
   color: var(--text);
   font-size: 0.7rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
@@ -99,22 +125,29 @@ function onSlotClick(unit) {
 .enemy-slot.lunge .sprite {
   animation: enemyLunge 0.5s ease;
 }
+.enemy-sprite-wrap {
+  position: relative;
+  width: 100%;
+}
 .sprite {
   width: 100%;
-  max-height: 100px;
+  max-height: 88px;
   object-fit: contain;
-  transform: scale(1.08);
+  transform: scale(1.05);
   transform-origin: bottom center;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
   pointer-events: none;
 }
 .name {
   display: block;
+  flex-shrink: 0;
   font-size: 0.62rem;
   font-weight: 600;
+  line-height: 1.35;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-bottom: 1px;
 }
 </style>

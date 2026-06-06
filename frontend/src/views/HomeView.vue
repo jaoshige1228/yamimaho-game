@@ -9,7 +9,7 @@ const router = useRouter();
 const battle = useBattleStore();
 const { unlock } = useAppAudio();
 const loading = ref(false);
-const loadingKappa2 = ref(false);
+const loadingBoss = ref(false);
 const resetting = ref(false);
 const error = ref('');
 
@@ -27,17 +27,21 @@ async function startDemo() {
   }
 }
 
-async function startDemoKappa2() {
+async function startDemoBoss() {
   unlock();
-  loadingKappa2.value = true;
+  loadingBoss.value = true;
   error.value = '';
   try {
-    await battle.startDemo('kappa2');
-    router.push({ name: 'battle', params: { id: battle.battleId } });
+    await battle.startDemoBoss();
+    router.push({
+      name: 'battle',
+      params: { id: battle.battleId },
+      query: { boss: '1' },
+    });
   } catch (e) {
     error.value = e.message;
   } finally {
-    loadingKappa2.value = false;
+    loadingBoss.value = false;
   }
 }
 
@@ -65,13 +69,13 @@ async function resetProgress() {
   <div class="home">
     <h1>やみまほ</h1>
     <p class="subtitle">魔法学園 RPG — 戦闘デモ</p>
-    <button type="button" class="btn-primary" :disabled="loading || loadingKappa2 || resetting" @click="startDemo">
+    <button type="button" class="btn-primary" :disabled="loading || loadingBoss || resetting" @click="startDemo">
       {{ loading ? '少々お待ちを…' : '戦闘を始める' }}
     </button>
     <button
       type="button"
       class="btn-hub"
-      :disabled="loading || loadingKappa2 || resetting"
+      :disabled="loading || loadingBoss || resetting"
       @click="router.push('/hub')"
     >
       待機画面へ
@@ -79,15 +83,15 @@ async function resetProgress() {
     <button
       type="button"
       class="btn-secondary"
-      :disabled="loading || loadingKappa2 || resetting"
-      @click="startDemoKappa2"
+      :disabled="loading || loadingBoss || resetting"
+      @click="startDemoBoss"
     >
-      {{ loadingKappa2 ? '少々お待ちを…' : 'カッパLV2戦' }}
+      {{ loadingBoss ? '少々お待ちを…' : '1層ボス戦（イフリーヌ）' }}
     </button>
     <button
       type="button"
       class="btn-reset"
-      :disabled="loading || loadingKappa2 || resetting"
+      :disabled="loading || loadingBoss || resetting"
       @click="resetProgress"
     >
       {{ resetting ? 'リセット中…' : 'リセット' }}

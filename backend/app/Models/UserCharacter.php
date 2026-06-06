@@ -21,6 +21,7 @@ class UserCharacter extends Model
         'spd',
         'know',
         'spirit',
+        'vit',
         'weapon_master_id',
         'armor_master_id',
     ];

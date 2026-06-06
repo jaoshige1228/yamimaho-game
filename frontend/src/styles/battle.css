@@ -102,7 +102,126 @@
   }
 }
 
+@keyframes flashHeal {
+  0% {
+    background: rgba(80, 220, 140, 0.28);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes flashBuff {
+  0% {
+    background: rgba(157, 124, 255, 0.3);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes flashDebuff {
+  0% {
+    background: rgba(220, 140, 60, 0.28);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes flashShield {
+  0% {
+    background: rgba(100, 170, 255, 0.28);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes flashRevive {
+  0% {
+    background: rgba(255, 230, 120, 0.3);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes supportGlow {
+  0% {
+    filter: drop-shadow(0 0 0 transparent);
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+    transform: scale(1);
+  }
+}
+
+.party-slot.support-heal .unit-sprite-frame {
+  animation: supportGlow 0.45s ease;
+  filter: drop-shadow(0 0 12px rgba(80, 220, 140, 0.85));
+}
+
+.party-slot.support-buff .unit-sprite-frame {
+  animation: supportGlow 0.45s ease;
+  filter: drop-shadow(0 0 12px rgba(157, 124, 255, 0.9));
+}
+
+.party-slot.support-debuff .unit-sprite-frame,
+.enemy-slot.support-debuff .sprite {
+  animation: supportGlow 0.45s ease;
+  filter: drop-shadow(0 0 12px rgba(220, 140, 60, 0.85));
+}
+
+.party-slot.support-shield .unit-sprite-frame {
+  animation: supportGlow 0.45s ease;
+  filter: drop-shadow(0 0 12px rgba(100, 170, 255, 0.9));
+}
+
+.party-slot.support-revive .unit-sprite-frame {
+  animation: supportGlow 0.45s ease;
+  filter: drop-shadow(0 0 14px rgba(255, 230, 120, 0.95));
+}
+
+.enemy-slot.support-heal .sprite,
+.enemy-slot.support-buff .sprite,
+.enemy-slot.support-shield .sprite,
+.enemy-slot.support-revive .sprite {
+  animation: supportGlow 0.45s ease;
+}
+
+.enemy-slot.support-heal .sprite {
+  filter: drop-shadow(0 0 12px rgba(80, 220, 140, 0.85));
+}
+
+.enemy-slot.support-buff .sprite {
+  filter: drop-shadow(0 0 12px rgba(157, 124, 255, 0.9));
+}
+
+.enemy-slot.support-shield .sprite {
+  filter: drop-shadow(0 0 12px rgba(100, 170, 255, 0.9));
+}
+
+.enemy-slot.support-revive .sprite {
+  filter: drop-shadow(0 0 14px rgba(255, 230, 120, 0.95));
+}
+
 @keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes partyDeploy {
   from {
     opacity: 0;
     transform: translateY(100%);

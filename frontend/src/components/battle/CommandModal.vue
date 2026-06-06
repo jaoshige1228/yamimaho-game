@@ -1,11 +1,21 @@
 <script setup>
+import { useAppAudio } from '../../composables/useAppAudio.js';
+
 defineProps({
   visible: { type: Boolean, default: false },
   commands: { type: Object, default: null },
   actorName: { type: String, default: '' },
 });
 
-const emit = defineEmits(['close', 'punch', 'defend', 'spell']);
+const emit = defineEmits(['close', 'punch', 'kick', 'spell']);
+
+const { playSe, unlock } = useAppAudio();
+
+function onChoose(event, payload) {
+  unlock();
+  playSe('cursor');
+  emit(event, payload);
+}
 </script>
 
 <template>
@@ -17,8 +27,8 @@ const emit = defineEmits(['close', 'punch', 'defend', 'spell']);
           <button type="button" class="close" aria-label="やめる" @click="emit('close')">×</button>
         </header>
         <div class="row basic">
-          <button type="button" class="cmd" @click="emit('punch')">こぶし</button>
-          <button type="button" class="cmd" @click="emit('defend')">防御</button>
+          <button type="button" class="cmd" @click="onChoose('punch')">こぶし</button>
+          <button type="button" class="cmd" @click="onChoose('kick')">キック</button>
         </div>
         <div class="spells">
           <button
@@ -26,8 +36,8 @@ const emit = defineEmits(['close', 'punch', 'defend', 'spell']);
             :key="spell.id"
             type="button"
             class="cmd spell"
-            :disabled="!spell.affordable"
-            @click="emit('spell', spell)"
+            :disabled="!spell.affordable || spell.usable === false"
+            @click="onChoose('spell', spell)"
           >
             <span class="label">{{ spell.label }}</span>
             <span class="mp">MP {{ spell.mp_cost }}</span>

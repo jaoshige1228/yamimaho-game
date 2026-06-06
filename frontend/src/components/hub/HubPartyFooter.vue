@@ -87,7 +87,7 @@ function closeStatsModal() {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
-  max-height: 58%;
+  max-height: 72%;
   border-radius: 4px 4px 2px 2px;
 }
 

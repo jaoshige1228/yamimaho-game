@@ -18,6 +18,7 @@ DIST_ID="$("$ROOT/scripts/tf-stack.sh" "$STACK" output -raw cloudfront_distribut
 
 cd "$ROOT/frontend"
 npm ci
+export VITE_PUBLIC_ASSET_VERSION="$(date +%s)"
 npm run build
 
 aws s3 sync dist/ "s3://${BUCKET}/" --delete

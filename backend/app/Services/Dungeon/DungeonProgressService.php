@@ -5,9 +5,13 @@ namespace App\Services\Dungeon;
 use App\Models\DungeonExplorationSession;
 use App\Models\User;
 use App\Models\UserDungeonProgress;
+use App\Services\Player\PartyGoldService;
 
 class DungeonProgressService
 {
+    public function __construct(
+        private readonly PartyGoldService $gold = new PartyGoldService,
+    ) {}
     public function getStep(User $user): int
     {
         return (int) ($this->findOrCreate($user)->step ?? 0);
@@ -36,6 +40,11 @@ class DungeonProgressService
         return $floor <= $this->getUnlockedFloor($user);
     }
 
+    public function isInDungeon(User $user): bool
+    {
+        return (bool) $this->findOrCreate($user)->in_dungeon;
+    }
+
     /**
      * @return array<string, int|bool>
      */
@@ -50,7 +59,34 @@ class DungeonProgressService
             'max_floor' => DungeonFloorConfig::maxFloor(),
             'playable_floor' => DungeonFloorConfig::playableFloor(),
             'boss_step' => DungeonFloorConfig::bossStep((int) $record->floor),
+            'gold' => $this->gold->getGold($user),
+            'in_dungeon' => (bool) $record->in_dungeon,
         ];
+    }
+
+    public function decreaseStep(User $user, int $amount, int $minimum = 1): int
+    {
+        $record = $this->findOrCreate($user);
+        $record->step = max($minimum, (int) $record->step - $amount);
+        $record->save();
+
+        return (int) $record->step;
+    }
+
+    /**
+     * @return array<string, int|bool>
+     */
+    public function retreat(User $user): array
+    {
+        DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
+        $user->refresh();
+        $this->gold->applyRetreatPenalty($user);
+        $record = $this->findOrCreate($user);
+        $record->in_dungeon = false;
+        $record->save();
+        $user->refresh();
+
+        return $this->statusPayload($user->fresh());
     }
 
     public function enterFloor(User $user, int $floor): void
@@ -61,6 +97,7 @@ class DungeonProgressService
 
         $record = $this->findOrCreate($user);
         $record->floor = $floor;
+        $record->in_dungeon = true;
         $record->save();
     }
 
@@ -69,6 +106,7 @@ class DungeonProgressService
         $record = $this->findOrCreate($user);
         $record->step = 0;
         $record->floor = 1;
+        $record->in_dungeon = false;
         $record->save();
     }
 
@@ -80,6 +118,7 @@ class DungeonProgressService
         $record->step = 0;
         $record->unlocked_floor = 1;
         $record->skip_battle_encounters = false;
+        $record->in_dungeon = false;
         $record->save();
 
         DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
@@ -153,6 +192,7 @@ class DungeonProgressService
                 'unlocked_floor' => 1,
                 'step' => 0,
                 'skip_battle_encounters' => false,
+                'in_dungeon' => false,
             ],
         );
     }

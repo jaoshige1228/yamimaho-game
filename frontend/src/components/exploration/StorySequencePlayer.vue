@@ -1,11 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { useBattleAudio } from '../../composables/useBattleAudio.js';
+import { useAppAudio } from '../../composables/useAppAudio.js';
 import StoryCharacterSprite from './StoryCharacterSprite.vue';
 import StoryTextWindow from './StoryTextWindow.vue';
 import '../../styles/story-window.css';
 
-const { playAttackSe, unlock, unlocked } = useBattleAudio();
+const { playSe, unlock } = useAppAudio();
 
 const props = defineProps({
   lines: { type: Array, required: true },
@@ -15,7 +15,6 @@ const props = defineProps({
 const emit = defineEmits(['complete', 'sync-party']);
 
 const index = ref(0);
-const sfxPlayedAtIndex = ref(-1);
 
 const currentLine = computed(() => props.lines[index.value] ?? null);
 
@@ -39,23 +38,10 @@ const characterInfo = computed(() => {
   };
 });
 
-function playSfxForLineAtIndex(lineIndex) {
-  if (!unlocked.value || lineIndex === sfxPlayedAtIndex.value) {
-    return;
-  }
-  const line = props.lines[lineIndex];
-  if (!line?.sfx || line.sfx !== 'attack') {
-    return;
-  }
-  sfxPlayedAtIndex.value = lineIndex;
-  playAttackSe({ requireBgm: false });
-}
-
 watch(
   () => props.lines,
   () => {
     index.value = 0;
-    sfxPlayedAtIndex.value = -1;
   },
 );
 
@@ -67,13 +53,15 @@ function emitSyncPartyIfNeeded(lineIndex) {
 }
 
 watch(index, (lineIndex) => {
-  playSfxForLineAtIndex(lineIndex);
   emitSyncPartyIfNeeded(lineIndex);
 }, { immediate: true });
 
-function onTap() {
+function onPointerDown() {
   unlock();
-  playSfxForLineAtIndex(index.value);
+  playSe('cursor');
+}
+
+function onTap() {
   if (index.value >= props.lines.length - 1) {
     emit('complete');
     return;
@@ -83,7 +71,13 @@ function onTap() {
 </script>
 
 <template>
-  <div class="story-sequence" role="button" tabindex="0" @click="onTap" @keydown.enter="onTap">
+  <button
+    type="button"
+    class="story-sequence"
+    aria-label="次へ"
+    @pointerdown="onPointerDown"
+    @click="onTap"
+  >
     <div class="story-sequence__viewport">
       <div class="story-sequence__scene">
         <div v-if="currentMode === 'dialogue' && currentLine" class="story-dialogue-stage">
@@ -105,5 +99,5 @@ function onTap() {
         />
       </div>
     </div>
-  </div>
+  </button>
 </template>

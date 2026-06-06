@@ -20,7 +20,7 @@ class AggressivePunchStrategy implements BattleActionStrategy
         $target = $enemies[0] ?? null;
 
         if ($target === null) {
-            return ['action' => 'defend'];
+            return ['action' => 'punch', 'target_id' => 'enemy_1'];
         }
 
         return [

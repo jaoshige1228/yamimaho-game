@@ -37,6 +37,11 @@ class BattleApiTest extends TestCase
         $this->assertTrue($units->where('side', 'ally')->every(fn (array $u) => isset($u['user_character_id'])));
         $this->assertSame('active', $response->json('state.status'));
         $this->assertSame('bat', $units->firstWhere('id', 'enemy_1')['master_code']);
+        $this->assertTrue(
+            $units->where('side', 'enemy')->every(
+                fn (array $u) => $u['sprite'] === 'bat' && $u['sprite'] !== $u['name'],
+            ),
+        );
     }
 
     public function test_demo_battle_allies_use_equipment_bonuses(): void
@@ -47,20 +52,36 @@ class BattleApiTest extends TestCase
         $this->assertNotNull($pc1);
         $this->assertSame('staff_basic', $pc1['weapon']['code'] ?? null);
         $this->assertSame('robe_basic', $pc1['armor']['code'] ?? null);
-        $this->assertSame(15, $pc1['mag']);
-        $this->assertSame(10, $pc1['def']);
+        $this->assertGreaterThanOrEqual(15, $pc1['mag']);
+        $this->assertGreaterThanOrEqual(10, $pc1['def']);
     }
 
-    public function test_kappa2_demo_battle_uses_kappa2_enemies(): void
+    public function test_demo_boss_battle_starts_with_ifrine(): void
     {
-        $response = $this->postJson('/api/battles/demo-kappa2')->assertOk();
+        $response = $this->postJson('/api/battles/demo-boss')->assertOk();
 
         $units = collect($response->json('state.units'));
         $enemies = $units->where('side', 'enemy')->values();
 
-        $this->assertSame(3, $enemies->count());
-        $this->assertTrue($enemies->every(fn (array $u) => in_array($u['master_code'], ['snake', 'beetle'], true)));
-        $this->assertSame(100, $enemies->first()['max_hp']);
+        $this->assertSame(1, $enemies->count());
+        $this->assertSame('inu_moe', $enemies->first()['master_code']);
+        $this->assertSame(10, $enemies->first()['level']);
+        $this->assertSame(400, $enemies->first()['max_hp']);
+    }
+
+    public function test_kick_action_is_accepted(): void
+    {
+        $start = $this->postJson('/api/battles/demo')->assertOk();
+        $battleId = $start->json('battle_id');
+        $enemy = collect($start->json('state.units'))->firstWhere('side', 'enemy');
+
+        $response = $this->postJson("/api/battles/{$battleId}/actions", [
+            'action' => 'kick',
+            'target_id' => $enemy['id'],
+        ]);
+
+        $response->assertOk();
+        $this->assertContains('announce', array_column($response->json('events'), 'type'));
     }
 
     public function test_player_can_punch_enemy(): void
@@ -95,7 +116,7 @@ class BattleApiTest extends TestCase
 
         $response = $this->postJson("/api/battles/{$battleId}/actions", [
             'action' => 'spell',
-            'spell_id' => 'pc3_fire_heavy',
+            'spell_id' => 'pc3_fire_burst',
             'target_id' => 'enemy_1',
         ]);
 

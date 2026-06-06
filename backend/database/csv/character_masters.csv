@@ -1,5 +1,5 @@
-code,name,sprite,hp,mp,str,mag,def,spd,know,spirit,default_weapon,default_armor
-pc1,イルミ,PC1,100,30,10,15,10,10,18,11,staff_basic,robe_basic
-pc2,ヨウ,PC2,110,45,6,15,8,18,16,15,staff_basic,robe_basic
-pc3,ユメノスケ,PC3,160,50,13,15,15,13,10,17,staff_basic,robe_basic
-pc4,ヒルユキ,PC4,130,55,9,15,13,9,14,18,staff_basic,robe_basic
+code,name,sprite,hp,mp,str,mag,def,spd,know,spirit,vit,default_weapon,default_armor
+pc1,イルミ,PC1,100,30,10,15,10,10,18,11,9,staff_basic,robe_basic
+pc2,ヨウ,PC2,110,45,6,15,8,18,16,15,7,staff_basic,robe_basic
+pc3,ユメノスケ,PC3,160,50,13,15,15,13,10,17,16,staff_basic,robe_basic
+pc4,ヒルユキ,PC4,130,55,9,15,13,9,14,18,14,staff_basic,robe_basic

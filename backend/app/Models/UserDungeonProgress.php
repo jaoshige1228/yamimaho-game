@@ -14,6 +14,7 @@ class UserDungeonProgress extends Model
         'unlocked_floor',
         'step',
         'skip_battle_encounters',
+        'in_dungeon',
     ];
 
     /** @return array<string, string> */
@@ -21,6 +22,7 @@ class UserDungeonProgress extends Model
     {
         return [
             'skip_battle_encounters' => 'boolean',
+            'in_dungeon' => 'boolean',
         ];
     }
 

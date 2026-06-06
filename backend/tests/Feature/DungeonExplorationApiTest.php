@@ -46,7 +46,7 @@ class DungeonExplorationApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('segment.kind', 'story');
         $afterRoll->assertJsonPath('segment.lines.0.text', fn ($text) => str_contains((string) $text, '避ける'));
-        $afterRoll->assertJsonPath('segment.lines.0.sfx', 'attack');
+        $afterRoll->assertJsonPath('segment.stat_check_result', 'success');
 
         $this->postJson('/api/dungeon/exploration/continue', ['session_id' => $sessionId])
             ->assertOk()
@@ -75,6 +75,7 @@ class DungeonExplorationApiTest extends TestCase
 
         $failStory = $service->continue($user, $start['session_id']);
         $this->assertSame('story', $failStory['segment']['kind']);
+        $this->assertSame('fail', $failStory['segment']['stat_check_result'] ?? null);
         $this->assertStringContainsString('突き刺さる', json_encode($failStory, JSON_UNESCAPED_UNICODE));
         $this->assertIsArray($failStory['party_snapshot'] ?? null);
         $failLines = $failStory['segment']['lines'] ?? [];
@@ -83,7 +84,7 @@ class DungeonExplorationApiTest extends TestCase
             '突き刺さる行付近に sync_party が付いていること'
         );
         $this->assertSame(
-            $beforeHp - 20,
+            $beforeHp - 30,
             (int) UserCharacter::query()->where('user_id', $user->id)->sum('hp'),
             '突き刺さる描写と同時に DB へダメージがコミットされていること'
         );
@@ -94,7 +95,7 @@ class DungeonExplorationApiTest extends TestCase
 
         $done = $service->continue($user, $start['session_id']);
         $this->assertSame('complete', $done['segment']['kind']);
-        $this->assertSame($beforeHp - 20, (int) UserCharacter::query()->where('user_id', $user->id)->sum('hp'));
+        $this->assertSame($beforeHp - 30, (int) UserCharacter::query()->where('user_id', $user->id)->sum('hp'));
     }
 
     public function test_treasure_chest_choice_and_open_success(): void
@@ -109,6 +110,10 @@ class DungeonExplorationApiTest extends TestCase
         $sessionId = $start->json('session_id');
         $start->assertJsonPath('segment.kind', 'choice');
         $start->assertJsonPath('segment.lines.0.type', 'narration');
+        $start->assertJsonPath('segment.stat_check_label', '筋力判定');
+        $start->assertJsonPath('segment.prompt', fn ($text) => str_contains((string) $text, '筋力判定'));
+        $start->assertJsonPath('segment.options.0.label', fn ($label) => str_contains((string) $label, '成功率')
+            && ! preg_match('/筋力\d+/u', (string) $label));
 
         $slotId = $start->json('segment.options.0.slot_id');
         $this->assertNotEmpty($slotId);
@@ -118,7 +123,9 @@ class DungeonExplorationApiTest extends TestCase
             'slot_id' => $slotId,
         ])->assertOk();
         $picked->assertJsonPath('segment.kind', 'story');
-        $picked->assertJsonPath('segment.lines.0.text', fn ($text) => str_contains((string) $text, 'こじ開ける'));
+        $picked->assertJsonPath('segment.lines.0.text', fn ($text) => str_contains((string) $text, 'こじ開ける')
+            && str_contains((string) $text, '筋力判定')
+            && str_contains((string) $text, '成功率'));
 
         $afterRoll = $this->postJson('/api/dungeon/exploration/continue', ['session_id' => $sessionId])
             ->assertOk();

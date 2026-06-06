@@ -21,9 +21,34 @@ class BattleController extends Controller
         return $this->startBattle('demo_enemies');
     }
 
-    public function demoKappa2(): JsonResponse
+    public function demoBoss(): JsonResponse
     {
-        return $this->startBattle('demo_enemies_kappa2');
+        $user = Auth::user();
+        $id = $this->factory->newBattleId();
+        $enemyList = config('battle.demo_boss', []);
+        $result = $this->orchestrator->createBattleForUser(
+            $user,
+            $enemyList,
+            ['boss' => true, 'source' => 'demo'],
+        );
+
+        $record = BattleState::query()->create([
+            'id' => $id,
+            'user_id' => $user?->id,
+            'state' => $result['state'],
+            'status' => $result['state']['status'],
+        ]);
+
+        $events = array_merge(
+            [['type' => 'battle_started', 'battle_id' => $id]],
+            $result['events'],
+        );
+
+        return response()->json([
+            'battle_id' => $id,
+            'state' => $this->orchestrator->engine()->publicState($record->state),
+            'events' => $events,
+        ]);
     }
 
     private function startBattle(string $enemyConfigKey): JsonResponse
@@ -34,6 +59,7 @@ class BattleController extends Controller
 
         $record = BattleState::query()->create([
             'id' => $id,
+            'user_id' => $user?->id,
             'state' => $result['state'],
             'status' => $result['state']['status'],
         ]);

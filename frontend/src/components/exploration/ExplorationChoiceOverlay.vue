@@ -1,4 +1,6 @@
 <script setup>
+import { useAppAudio } from '../../composables/useAppAudio.js';
+
 defineProps({
   prompt: { type: String, default: '' },
   options: { type: Array, default: () => [] },
@@ -6,6 +8,14 @@ defineProps({
 });
 
 const emit = defineEmits(['choose']);
+
+const { playSe, unlock } = useAppAudio();
+
+function onChoose(slotId) {
+  unlock();
+  playSe('cursor');
+  emit('choose', slotId);
+}
 </script>
 
 <template>
@@ -18,7 +28,7 @@ const emit = defineEmits(['choose']);
             type="button"
             class="exploration-choice__btn"
             :disabled="disabled"
-            @click="emit('choose', opt.slot_id)"
+            @click="onChoose(opt.slot_id)"
           >
             {{ opt.label }}
           </button>

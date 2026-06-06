@@ -1,5 +1,7 @@
-code,name,mag_bonus,description
-staff_basic,基本の杖,1,学校から支給されたシンプルな杖。
-rod_fire,炎のロッド,4,
-wand_ice,氷のワンド,4,
-tome_wind,風の魔導書,3,
+code,name,mag_bonus,description,price
+staff_basic,基本の杖,1,学校から支給されたシンプルな杖。,
+rod_fire,炎のロッド,4,,
+wand_ice,氷のワンド,4,,
+tome_wind,風の魔導書,3,,
+staff_advanced,応用の杖,50,ある程度の経験者が使える杖。,800
+staff_master,熟練の杖,200,熟練者にしか使いこなせない強力な杖,3000

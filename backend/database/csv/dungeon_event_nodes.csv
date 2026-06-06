@@ -1,12 +1,12 @@
 event_code,node_key,node_type,text,speaker_role,dialogue_pc1,dialogue_pc2,dialogue_pc3,dialogue_pc4,stat_attr,stat_multiplier,fixed_damage,sfx,next_on_success,next_on_fail,next_default
 trap_arrow,intro,narration,トラップが作動した！{target_name}めがけて矢が飛来する！,,,,,,,,,,,,intro_react
 trap_arrow,intro_react,dialogue,！？,target,,,,,,,,,,,dodge_preview
-trap_arrow,dodge_preview,narration,{target_name}は身をよじった！\n成功率：{success_rate}%,,,,,,,,,,,,roll
-trap_arrow,roll,stat_check,,,,,,,spd,2,,,success_narr,fail_narr,
+trap_arrow,dodge_preview,narration,{target_name}は身をよじった！\n{stat_check_label}\n成功率：{success_rate}%,,,,,,,,,,,,roll
+trap_arrow,roll,stat_check,,,,,,,spd,3,,,success_narr,fail_narr,
 trap_arrow,success_narr,narration,{target_name}は矢を避けることができた！,,,,,,,,,attack,,,success_dialogue
 trap_arrow,success_dialogue,dialogue,,target,危ないところだったわ……,危ないところだった……,危ないところだったな,危なかった……,,,,,,,end
 trap_arrow,fail_narr,narration,{target_name}に矢が突き刺さる！,,,,,,,,,attack,,,fail_damage
-trap_arrow,fail_damage,apply_damage,,,,,,,,,20,,,,fail_ally_dialogue
+trap_arrow,fail_damage,apply_damage,,,,,,,,,30,,,,fail_ally_dialogue
 trap_arrow,fail_ally_dialogue,dialogue,,random_ally_except_target,大丈夫！？,大丈夫か！？,大丈夫か！？,大丈夫……？,,,,,,,fail_target_dialogue
 trap_arrow,fail_target_dialogue,dialogue,,target,うっ……こ、これくらい平気よ……！,ダメだ、死ぬかもしれない！,あぁ、なんとか。先へ進もう,いたた……う、うん……平気……,,,,,,,end
 trap_arrow,end,end,,,,,,,,,,,,,
@@ -14,7 +14,7 @@ treasure_chest,found,narration,宝箱を発見した！,,,,,,,,,,,,found_rust
 treasure_chest,found_rust,narration,しかし蓋が錆びついているようだ。中々開かない。,,,,,,,,,,,,ally_comment
 treasure_chest,ally_comment,dialogue,,random_ally,トラップはなさそうね。力ずくでこじ開けましょう！,トラップはなさそうだ。力ずくでこじ開けるぞ,トラップはなさそうだな。よし、力ずくで開けてみるか,トラップは……なさそう。頑張れば……開くかも……？,,,,,,,choose
 treasure_chest,choose,party_choice,誰が宝箱をこじ開ける？,,,,,,,,,,force_open,,
-treasure_chest,force_open,narration,{chosen_name}は力の限りで宝箱をこじ開ける！\n成功率：{success_rate}%,,,,,,,,,,,,str_roll
+treasure_chest,force_open,narration,{chosen_name}は力の限りで宝箱をこじ開ける！\n{stat_check_label}\n成功率：{success_rate}%,,,,,,,,,,,,str_roll
 treasure_chest,str_roll,stat_check,,,,,,,str,2,,,open_success,open_fail,
 treasure_chest,open_success,narration,宝箱は勢いよく開いた！,,,,,,,,,attack,,,herb
 treasure_chest,herb,narration,薬草を手に入れた！,,,,,,,,,,,,end

@@ -1,27 +1,52 @@
 <script setup>
+import BuffIcons from './BuffIcons.vue';
 import UnitBars from './UnitBars.vue';
 import { useLongPress } from '../../composables/useLongPress';
+import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   units: { type: Array, required: true },
+  displayHp: { type: Object, default: () => ({}) },
+  buffIcons: { type: Object, default: () => ({}) },
   currentActor: { type: String, default: null },
   targetMode: { type: String, default: null },
+  spellEffect: { type: String, default: null },
   shakeTarget: { type: String, default: null },
+  supportEffectTarget: { type: Object, default: null },
   canOpenCommands: { type: Boolean, default: false },
 });
+
+function supportEffectClass(unit) {
+  const effect = props.supportEffectTarget;
+  if (!effect || effect.id !== unit.id) return null;
+  return `support-${effect.kind}`;
+}
+
+function displayHpFor(unit) {
+  return props.displayHp[unit.id] ?? unit.hp;
+}
 
 const emit = defineEmits(['select', 'open-commands', 'show-stats']);
 
 const longPress = useLongPress((unit) => emit('show-stats', unit));
 
 function spriteUrl(unit) {
-  return `/assets/characters/${unit.sprite}.png`;
+  return publicAssetUrl(`/assets/characters/${unit.sprite}.png`);
 }
 
 function canSelect(unit) {
   if (!props.targetMode?.startsWith('ally')) return false;
-  if (!unit.alive) return false;
-  return props.targetMode === 'ally_single';
+  if (props.targetMode !== 'ally_single') return false;
+
+  const effect = props.spellEffect;
+  if (effect === 'revive_chance') {
+    return !unit.alive || unit.hp <= 0;
+  }
+  if (effect === 'heal_mag' || effect === 'heal') {
+    return unit.alive && unit.hp < unit.max_hp;
+  }
+
+  return unit.alive;
 }
 
 function canOpenCommands(unit) {
@@ -48,19 +73,22 @@ function onSlotClick(unit) {
 </script>
 
 <template>
-  <div class="party-row" :class="{ 'highlight-actor': !!currentActor }">
+  <div class="party-row">
     <button
       v-for="unit in units"
       :key="unit.id"
       type="button"
       class="party-slot"
-      :class="{
-        active: currentActor === unit.id,
-        dead: !unit.alive,
-        selectable: canSelect(unit),
-        commandable: canOpenCommands(unit),
-        shake: shakeTarget === unit.id,
-      }"
+      :class="[
+        {
+          active: currentActor === unit.id,
+          dead: !unit.alive,
+          selectable: canSelect(unit),
+          commandable: canOpenCommands(unit),
+          shake: shakeTarget === unit.id,
+        },
+        supportEffectClass(unit),
+      ]"
       @click="onSlotClick(unit)"
       @pointerdown="longPress.onPressStart($event, unit)"
       @pointerup="longPress.onPressEnd"
@@ -70,10 +98,20 @@ function onSlotClick(unit) {
     >
       <div class="unit-sprite-frame party">
         <img :src="spriteUrl(unit)" :alt="unit.name" class="unit-sprite-bust" />
+        <BuffIcons
+          :buffs="unit.buffs"
+          :buff-icons="buffIcons"
+          :damage-shield="unit.damage_shield"
+        />
       </div>
       <div class="unit-meta">
-        <UnitBars :hp="unit.hp" :max-hp="unit.max_hp" :mp="unit.mp" :max-mp="unit.max_mp" />
-        <span class="name">{{ unit.name }}</span>
+        <UnitBars
+          :hp="displayHpFor(unit)"
+          :max-hp="unit.max_hp"
+          :mp="unit.mp"
+          :max-mp="unit.max_mp"
+        />
+        <span class="name">Lv{{ unit.level ?? 1 }} {{ unit.name }}</span>
         <span v-if="canOpenCommands(unit)" class="tap-hint">タップして選ぶ</span>
       </div>
     </button>
@@ -117,9 +155,6 @@ function onSlotClick(unit) {
 .party-slot.active .unit-sprite-frame {
   filter: drop-shadow(0 0 10px rgba(157, 124, 255, 0.75));
   animation: unitPulse 1.2s ease-in-out infinite;
-}
-.party-row.highlight-actor .party-slot:not(.active):not(.dead) .unit-sprite-bust {
-  filter: saturate(0.55) brightness(0.85);
 }
 .party-slot.dead {
   opacity: 0.35;

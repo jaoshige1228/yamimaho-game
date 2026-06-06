@@ -64,4 +64,17 @@ class DungeonController extends Controller
             return response()->json(['message' => $e->getMessage()], 409);
         }
     }
+
+    public function retreat(): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        return response()->json(array_merge(
+            ['message' => 'ダンジョンから撤退した。'],
+            $this->progress->retreat($user),
+        ));
+    }
 }

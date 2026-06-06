@@ -15,6 +15,8 @@ class UserCharacterService
     public function __construct(
         private readonly LevelGrowthService $growth = new LevelGrowthService,
         private readonly EquipmentService $equipment = new EquipmentService,
+        private readonly EquipmentOwnershipService $ownership = new EquipmentOwnershipService,
+        private readonly ItemInventoryService $items = new ItemInventoryService,
     ) {}
 
     /**
@@ -28,10 +30,18 @@ class UserCharacterService
             ->get()
             ->keyBy(fn (UserCharacter $c) => $c->characterMaster->code);
 
+        $isFirstParty = $party->isEmpty();
+
         foreach (config('game.party_slots', []) as $masterCode) {
             if ($party->has($masterCode)) {
                 $existing = $party->get($masterCode);
                 $this->equipment->assignDefaultsIfMissing($existing, $existing->characterMaster);
+                $this->ownership->ensureDefaultOwnership($existing, $existing->characterMaster);
+                $expected = $this->growth->statsForLevel($existing->characterMaster, $existing->level);
+                if ((int) $existing->vit !== (int) $expected['vit']) {
+                    $existing->vit = $expected['vit'];
+                    $existing->save();
+                }
 
                 continue;
             }
@@ -65,12 +75,18 @@ class UserCharacterService
                 'spd' => $stats['spd'],
                 'know' => $stats['know'],
                 'spirit' => $stats['spirit'],
+                'vit' => $stats['vit'],
                 'weapon_master_id' => $weaponId,
                 'armor_master_id' => $armorId,
             ]);
 
             $created->load(['characterMaster', 'weapon', 'armor']);
+            $this->ownership->ensureDefaultOwnership($created, $master);
             $party->put($masterCode, $created);
+        }
+
+        if ($isFirstParty) {
+            $this->items->grantStarterItems($user);
         }
 
         return $this->partyInSlotOrder($user);
@@ -120,6 +136,7 @@ class UserCharacterService
             $character->spd = $stats['spd'];
             $character->know = $stats['know'];
             $character->spirit = $stats['spirit'];
+            $character->vit = $stats['vit'];
             $character->save();
         }
     }
@@ -152,6 +169,7 @@ class UserCharacterService
             'spd' => $character->spd,
             'know' => $character->know,
             'spirit' => $character->spirit,
+            'vit' => $character->vit,
             'weapon' => $combat['weapon'],
             'armor' => $combat['armor'],
         ];

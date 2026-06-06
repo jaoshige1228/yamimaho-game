@@ -5,8 +5,52 @@
   z-index: 2000;
   display: flex;
   justify-content: center;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
   touch-action: manipulation;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  background: transparent;
+}
+
+.story-sequence:active,
+.story-sequence:hover,
+.story-sequence:focus:not(:focus-visible) {
+  background: transparent;
+}
+
+.story-sequence:focus {
+  outline: none;
+}
+
+.story-sequence:focus-visible {
+  outline: 2px solid rgba(157, 124, 255, 0.4);
+  outline-offset: -6px;
+}
+
+.story-sequence,
+.story-sequence * {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.story-sequence ::selection {
+  background: transparent;
 }
 
 .story-sequence__viewport {
@@ -37,15 +81,17 @@
   pointer-events: none;
 }
 
-/* 描写: シーン中央やや上 */
+/* 描写: シーン中央やや上（枠は中央、本文は左揃え） */
 .story-text-window--narration {
   position: absolute;
   left: 50%;
-  top: 38%;
+  top: 60%;
   transform: translate(-50%, -50%);
-  width: calc(100% - 2rem);
+  width: calc(100% - 2.5rem);
   max-width: 360px;
-  text-align: center;
+  min-height: 9em;
+  padding: 0.9rem 1.25rem 1rem;
+  text-align: left;
   font-size: clamp(0.85rem, 2.8vw, 0.95rem);
 }
 
@@ -53,10 +99,27 @@
   margin: 0 0 0.35rem;
   font-size: 0.88rem;
   font-weight: 800;
+  text-align: left;
 }
 
 .story-text-window__body {
   margin: 0;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.story-text-window__cursor {
+  display: inline-block;
+  margin-left: 0.05em;
+  font-weight: 400;
+  opacity: 0.85;
+  animation: story-text-cursor-blink 0.55s step-end infinite;
+}
+
+@keyframes story-text-cursor-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 /*
@@ -67,7 +130,7 @@
   position: absolute;
   left: 0.65rem;
   right: 0.65rem;
-  bottom: 8%;
+  top: 30%;
   height: min(42%, 13.5rem);
   min-height: 7.25rem;
   pointer-events: none;
@@ -80,19 +143,20 @@
   bottom: 0;
   z-index: 1;
   width: 100%;
-  min-height: 4.75rem;
-  padding: 0.65rem 0.85rem 0.75rem;
+  min-height: 6em;
+  padding: 0.7rem 1.1rem 0.8rem 1.25rem;
+  text-align: left;
   font-size: clamp(0.82rem, 2.6vw, 0.92rem);
   border-radius: 10px;
 }
 
 .story-dialogue-stage .story-character-sprite {
   position: absolute;
-  left: 0;
+  left: -5%;
   bottom: 0;
   z-index: 0;
   width: clamp(9rem, 48%, 12.5rem);
-  height: calc(100% + 2.75rem);
+  height: calc(100% + 0.5rem);
   overflow: hidden;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(
@@ -124,7 +188,7 @@
 @media (max-width: 390px) {
   .story-dialogue-stage {
     height: min(40%, 12.5rem);
-    bottom: 7%;
+    top: 30%;
   }
 
   .story-dialogue-stage .story-character-sprite {

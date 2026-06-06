@@ -1,0 +1,8 @@
+code,name,description,effect,power
+potion_hp_s,HP回復薬,味方1体のHPを30回復する。,heal_hp,30
+potion_mp_s,MP回復薬,味方1体のMPを10回復する。,heal_mp,10
+potion_hp_m,HP回復薬（中）,味方1体のHPを200回復する。,heal_hp,200
+potion_mp_m,MP回復薬（中）,味方1体のMPを50回復する。,heal_mp,50
+potion_hp_l,HP回復薬（強）,味方1体のHPを500回復する。,heal_hp,500
+potion_mp_l,MP回復薬（強）,味方1体のMPを120回復する。,heal_mp,120
+world_tree_leaf,宇宙樹の葉,戦闘不能の味方をHP50%の状態で復活させる。,revive,50

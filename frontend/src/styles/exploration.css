@@ -32,6 +32,29 @@
   pointer-events: auto;
 }
 
+.scene-overlay-retreat {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.65rem;
+  min-height: 40px;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(12, 8, 24, 0.72);
+  color: #f8f4ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: 'Hiragino Sans', system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.scene-overlay-retreat:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .scene-overlay-depth {
   position: absolute;
   top: 0.5rem;

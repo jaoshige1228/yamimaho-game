@@ -12,6 +12,7 @@ class BattleState extends Model
 
     protected $fillable = [
         'id',
+        'user_id',
         'state',
         'status',
     ];

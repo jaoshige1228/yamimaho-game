@@ -4,9 +4,18 @@ import PartyRow from "./PartyRow.vue";
 
 defineProps({
   units: { type: Array, required: true },
+  displayHp: { type: Object, default: () => ({}) },
+  buffIcons: { type: Object, default: () => ({}) },
+  partyPhase: {
+    type: String,
+    default: 'ready',
+    validator: (v) => ['hidden', 'entering', 'ready'].includes(v),
+  },
   currentActor: { type: String, default: null },
   targetMode: { type: String, default: null },
+  spellEffect: { type: String, default: null },
   shakeTarget: { type: String, default: null },
+  supportEffectTarget: { type: Object, default: null },
   activeEnemyLunge: { type: String, default: null },
   canOpenCommands: { type: Boolean, default: false },
 });
@@ -20,24 +29,37 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
       <div class="sky-glow" />
       <EnemyRow
         :units="units.filter((u) => u.side === 'enemy')"
+        :display-hp="displayHp"
+        :buff-icons="buffIcons"
         :target-mode="targetMode"
         :shake-target="shakeTarget"
+        :support-effect-target="supportEffectTarget"
         :active-lunge="activeEnemyLunge"
         @select="emit('select-target', $event)"
         @show-stats="emit('show-stats', $event)"
       />
     </section>
     <section class="field-bottom">
-      <PartyRow
-        :units="units.filter((u) => u.side === 'ally')"
-        :current-actor="currentActor"
-        :target-mode="targetMode"
+      <div
+        v-if="partyPhase !== 'hidden'"
+        class="party-entrance-wrap"
+        :class="{ entering: partyPhase === 'entering' }"
+      >
+        <PartyRow
+          :units="units.filter((u) => u.side === 'ally')"
+          :display-hp="displayHp"
+          :buff-icons="buffIcons"
+          :current-actor="currentActor"
+          :target-mode="targetMode"
+          :spell-effect="spellEffect"
         :shake-target="shakeTarget"
+        :support-effect-target="supportEffectTarget"
         :can-open-commands="canOpenCommands"
         @select="emit('select-target', $event)"
-        @open-commands="emit('open-commands', $event)"
-        @show-stats="emit('show-stats', $event)"
-      />
+          @open-commands="emit('open-commands', $event)"
+          @show-stats="emit('show-stats', $event)"
+        />
+      </div>
     </section>
   </div>
 </template>
@@ -59,7 +81,7 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0.35rem 0.25rem 0.5rem;
+  padding: 0.35rem 0.25rem 0.75rem;
   overflow: hidden;
 }
 .sky-glow {
@@ -81,5 +103,12 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
   justify-content: center;
   padding: 0.3rem 0.2rem;
   border-top: 2px solid rgba(157, 124, 255, 0.25);
+  overflow: hidden;
+}
+.party-entrance-wrap {
+  width: 100%;
+}
+.party-entrance-wrap.entering {
+  animation: partyDeploy 0.45s ease-out both;
 }
 </style>

@@ -5,8 +5,10 @@ import AppFooter from './components/layout/AppFooter.vue';
 import AppHeader from './components/layout/AppHeader.vue';
 import GameHudBar from './components/layout/GameHudBar.vue';
 import { APP_AUDIO_KEY, createAppAudio } from './composables/useAppAudio';
+import { useRouteBgm } from './composables/useRouteBgm';
 
 const route = useRoute();
+useRouteBgm();
 const showFooter = computed(() => route.name !== 'battle');
 const showGameHud = computed(() => route.name === 'hub' || route.name === 'dungeon');
 
@@ -53,7 +55,7 @@ body,
 
 /* 探索画面のパーティ帯・ストーリー配置の共通寸法 */
 :root {
-  --hub-party-band-height: clamp(140px, 31dvh, 220px);
+  --hub-party-band-height: clamp(140px, 33dvh, 240px);
   --app-chrome-top: calc(3.25rem + env(safe-area-inset-top, 0px) + 2.35rem);
   --app-chrome-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
 }

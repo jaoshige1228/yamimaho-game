@@ -21,6 +21,9 @@ class MasterDataProvider
     /** @var array<string, list<string>>|null */
     private ?array $characterSpellCache = null;
 
+    /** @var array<string, list<array<string, mixed>>>|null */
+    private ?array $enemySkillCache = null;
+
     /**
      * @return array<string, mixed>
      */
@@ -46,7 +49,7 @@ class MasterDataProvider
             throw new \InvalidArgumentException("Enemy master not found: {$code}");
         }
 
-        return $all[$code];
+        return [...$all[$code]];
     }
 
     /**
@@ -71,6 +74,44 @@ class MasterDataProvider
         $map = $this->characterSpellMap();
 
         return $map[$characterCode] ?? [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function enemySkillsFor(string $enemyCode): array
+    {
+        $all = $this->enemySkills();
+
+        return $all[$enemyCode] ?? [];
+    }
+
+    /**
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public function enemySkills(): array
+    {
+        if ($this->enemySkillCache !== null) {
+            return $this->enemySkillCache;
+        }
+
+        $grouped = [];
+        foreach (CsvMasterReader::read('enemy_skills.csv') as $row) {
+            $enemyCode = (string) $row['enemy_code'];
+            $grouped[$enemyCode] ??= [];
+            $grouped[$enemyCode][] = [
+                'skill_code' => (string) $row['skill_code'],
+                'label' => (string) $row['label'],
+                'weight' => (int) $row['weight'],
+                'action_type' => (string) $row['action_type'],
+                'target_type' => (string) $row['target_type'],
+                'coefficient' => (float) $row['coefficient'],
+            ];
+        }
+
+        $this->enemySkillCache = $grouped;
+
+        return $this->enemySkillCache;
     }
 
     /**
@@ -266,7 +307,11 @@ class MasterDataProvider
     {
         return [
             ...$this->normalizeMaster($row),
+            'level' => (int) ($row['level'] ?? 1),
             'exp_reward' => (int) ($row['exp_reward'] ?? 0),
+            'gold_reward' => (int) ($row['gold_reward'] ?? 0),
+            'evasion_rate' => (int) ($row['evasion_rate'] ?? 1),
+            'crit_rate' => (int) ($row['crit_rate'] ?? 1),
         ];
     }
 
@@ -288,6 +333,7 @@ class MasterDataProvider
             'spd' => (int) $row['spd'],
             'know' => (int) $row['know'],
             'spirit' => (int) $row['spirit'],
+            'vit' => (int) ($row['vit'] ?? 10),
         ];
     }
 

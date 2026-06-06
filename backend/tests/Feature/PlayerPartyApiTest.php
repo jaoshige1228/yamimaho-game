@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ArmorMaster;
 use App\Models\User;
+use App\Models\UserCharacter;
 use App\Models\WeaponMaster;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,6 +26,8 @@ class PlayerPartyApiTest extends TestCase
         $response = $this->getJson('/api/player/party')->assertOk();
 
         $response->assertJsonStructure([
+            'gold',
+            'items',
             'characters' => [
                 '*' => [
                     'id',
@@ -32,6 +35,7 @@ class PlayerPartyApiTest extends TestCase
                     'sprite',
                     'mag',
                     'def',
+                    'vit',
                     'weapon' => ['code', 'name', 'mag_bonus', 'description'],
                     'armor' => ['code', 'name', 'def_bonus', 'description'],
                 ],
@@ -41,11 +45,16 @@ class PlayerPartyApiTest extends TestCase
         $pc1 = collect($response->json('characters'))->firstWhere('id', 'pc1');
         $weapon = WeaponMaster::query()->where('code', 'staff_basic')->firstOrFail();
         $armor = ArmorMaster::query()->where('code', 'robe_basic')->firstOrFail();
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $character = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))
+            ->firstOrFail();
 
         $this->assertSame('staff_basic', $pc1['weapon']['code']);
         $this->assertSame('robe_basic', $pc1['armor']['code']);
-        $this->assertSame(14 + $weapon->mag_bonus, $pc1['mag']);
-        $this->assertSame(9 + $armor->def_bonus, $pc1['def']);
+        $this->assertSame($character->mag + $weapon->mag_bonus, $pc1['mag']);
+        $this->assertSame($character->def + $armor->def_bonus, $pc1['def']);
         $this->assertSame('学校から支給されたシンプルな杖。', $pc1['weapon']['description']);
         $this->assertStringContainsString('イケてる', $pc1['armor']['description']);
     }

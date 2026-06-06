@@ -1,7 +1,6 @@
 <script setup>
 defineProps({
   visible: { type: Boolean, default: false },
-  message: { type: String, default: '' },
   skill: { type: Object, default: null },
   showExecute: { type: Boolean, default: false },
 });
@@ -18,7 +17,6 @@ const emit = defineEmits(['cancel', 'confirm-all']);
           <p v-if="skill.description" class="skill-desc">{{ skill.description }}</p>
           <p v-if="skill.mp_cost != null" class="skill-mp">消費 MP: {{ skill.mp_cost }}</p>
         </div>
-        <p class="message">{{ message }}</p>
         <div class="actions">
           <button type="button" class="btn" @click="emit('cancel')">やめる</button>
           <button v-if="showExecute" type="button" class="btn primary" @click="emit('confirm-all')">
@@ -70,16 +68,17 @@ const emit = defineEmits(['cancel', 'confirm-all']);
   font-size: 0.75rem;
   color: var(--mp, #5cb8ff);
 }
-.message {
-  margin: 0;
-  font-size: 0.85rem;
-  text-align: center;
-}
 .actions {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
   margin-top: 0.65rem;
+}
+.skill-info + .actions {
+  margin-top: 0;
+}
+.actions:only-child {
+  margin-top: 0;
 }
 .btn {
   min-height: 44px;

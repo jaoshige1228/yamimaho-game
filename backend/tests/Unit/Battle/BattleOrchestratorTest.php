@@ -54,7 +54,7 @@ class BattleOrchestratorTest extends TestCase
             $this->assertSame($allyId, $state['current_actor']);
             $state = $orch->submitPlayerAction(
                 $state,
-                $index === 1 ? 'defend' : 'punch',
+                $index === 1 ? 'kick' : 'punch',
                 null,
                 'enemy_1',
             )['state'];
@@ -86,15 +86,20 @@ class BattleOrchestratorTest extends TestCase
         $this->assertSame($allies[0], $roundEnd['state']['current_actor']);
     }
 
-    public function test_defend_sets_guard_flag_until_next_turn(): void
+    public function test_kick_emits_announce_event(): void
     {
         $orch = $this->orchestrator();
         $state = $orch->createBattle()['state'];
         $firstAlly = $this->allyTurnOrder($state)[0];
 
-        $result = $orch->submitPlayerAction($state, 'defend');
+        $result = $orch->submitPlayerAction($state, 'kick', null, 'enemy_1');
 
-        $this->assertTrue($result['state']['units'][$firstAlly]['defending']);
-        $this->assertContains('defend', array_column($result['events'], 'type'));
+        $announces = array_values(array_filter(
+            $result['events'],
+            fn (array $e): bool => ($e['type'] ?? '') === 'announce',
+        ));
+
+        $this->assertNotEmpty($announces);
+        $this->assertStringContainsString('キック', $announces[0]['text'] ?? '');
     }
 }

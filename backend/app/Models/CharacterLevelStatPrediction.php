@@ -19,6 +19,7 @@ class CharacterLevelStatPrediction extends Model
         'spd',
         'know',
         'spirit',
+        'vit',
     ];
 
     /** @return BelongsTo<CharacterMaster, $this> */

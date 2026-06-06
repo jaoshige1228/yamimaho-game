@@ -29,6 +29,7 @@ class ExplorationBattleLauncher
             'slot' => 'enemy_1',
             'master_code' => $master->code,
             'name' => $master->name,
+            'sprite' => $master->sprite,
         ]];
 
         $meta = [
@@ -44,6 +45,7 @@ class ExplorationBattleLauncher
 
         BattleState::query()->create([
             'id' => $battleId,
+            'user_id' => $user->id,
             'state' => $result['state'],
             'status' => $result['state']['status'],
         ]);

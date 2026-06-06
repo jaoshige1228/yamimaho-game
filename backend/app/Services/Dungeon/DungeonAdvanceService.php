@@ -90,6 +90,7 @@ class DungeonAdvanceService
 
         BattleState::query()->create([
             'id' => $battleId,
+            'user_id' => $user->id,
             'state' => $result['state'],
             'status' => $result['state']['status'],
         ]);

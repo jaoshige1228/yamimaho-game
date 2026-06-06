@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue';
 import UnitBars from '../battle/UnitBars.vue';
+import { enemySpriteAssetKey } from '../../utils/enemySprite';
+import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   unit: { type: Object, required: true },
@@ -15,11 +17,16 @@ const statRows = [
   { key: 'spd', label: '素早' },
   { key: 'know', label: '知力' },
   { key: 'spirit', label: '精神' },
+  { key: 'vit', label: '体力' },
 ];
 
 const spriteUrl = computed(() => {
   const folder = props.unit.side === 'enemy' ? 'enemies' : 'characters';
-  return `/assets/${folder}/${props.unit.sprite}.png`;
+  const key =
+    props.unit.side === 'enemy'
+      ? enemySpriteAssetKey(props.unit)
+      : props.unit.sprite;
+  return publicAssetUrl(`/assets/${folder}/${key}.png`);
 });
 
 const showEquipment = computed(

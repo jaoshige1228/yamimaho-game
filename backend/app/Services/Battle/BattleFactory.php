@@ -113,8 +113,16 @@ class BattleFactory
     {
         foreach ($enemyList as $meta) {
             $master = $this->masters->findEnemy($meta['master_code']);
-            $master['name'] = $meta['name'];
-            $units[$meta['slot']] = $this->makeUnit($meta['slot'], 'enemy', $master);
+            $sprite = (string) ($meta['sprite'] ?? $master['sprite'] ?? $master['code']);
+            if (! preg_match('/^[a-z][a-z0-9_]*$/i', $sprite)) {
+                $sprite = (string) $master['code'];
+            }
+
+            $units[$meta['slot']] = $this->makeUnit($meta['slot'], 'enemy', [
+                ...$master,
+                'name' => $meta['name'],
+                'sprite' => $sprite,
+            ]);
         }
     }
 
@@ -192,10 +200,13 @@ class BattleFactory
             'spd' => $character->spd,
             'know' => $character->know,
             'spirit' => $character->spirit,
+            'vit' => $character->vit,
             'weapon' => $combat['weapon'],
             'armor' => $combat['armor'],
             'alive' => $character->hp > 0,
-            'defending' => false,
+            'evasion_rate' => (int) config('battle.ally_defaults.evasion_rate', 5),
+            'crit_rate' => (int) config('battle.ally_defaults.crit_rate', 5),
+            'damage_shield' => false,
             'buffs' => [],
             'statuses' => [],
             'spells' => $spells,
@@ -209,6 +220,9 @@ class BattleFactory
      */
     private function makeUnit(string $id, string $side, array $master, array $spells = []): array
     {
+        $isEnemy = $side === 'enemy';
+        $allyDefaults = config('battle.ally_defaults', []);
+
         return [
             'id' => $id,
             'side' => $side,
@@ -216,7 +230,7 @@ class BattleFactory
             'sprite' => $master['sprite'],
             'master_code' => $master['code'],
             'user_character_id' => null,
-            'level' => 1,
+            'level' => $isEnemy ? (int) ($master['level'] ?? 1) : 1,
             'exp' => 0,
             'hp' => $master['hp'],
             'max_hp' => $master['hp'],
@@ -228,8 +242,16 @@ class BattleFactory
             'spd' => $master['spd'],
             'know' => $master['know'],
             'spirit' => $master['spirit'],
+            'vit' => $master['vit'] ?? 10,
+            'gold_reward' => $isEnemy ? (int) ($master['gold_reward'] ?? 0) : 0,
             'alive' => true,
-            'defending' => false,
+            'evasion_rate' => $isEnemy
+                ? (int) ($master['evasion_rate'] ?? 1)
+                : (int) ($allyDefaults['evasion_rate'] ?? 5),
+            'crit_rate' => $isEnemy
+                ? (int) ($master['crit_rate'] ?? 1)
+                : (int) ($allyDefaults['crit_rate'] ?? 5),
+            'damage_shield' => false,
             'buffs' => [],
             'statuses' => [],
             'spells' => $spells,

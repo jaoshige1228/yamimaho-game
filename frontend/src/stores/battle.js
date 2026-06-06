@@ -8,9 +8,16 @@ export const useBattleStore = defineStore('battle', () => {
   const pendingEvents = ref([]);
   const error = ref('');
 
-  async function startDemo(enemyConfig = 'demo') {
-    const path = enemyConfig === 'kappa2' ? '/battles/demo-kappa2' : '/battles/demo';
-    const data = await api(path, { method: 'POST' });
+  async function startDemo() {
+    const data = await api('/battles/demo', { method: 'POST' });
+    battleId.value = data.battle_id;
+    state.value = data.state;
+    pendingEvents.value = data.events || [];
+    error.value = '';
+  }
+
+  async function startDemoBoss() {
+    const data = await api('/battles/demo-boss', { method: 'POST' });
     battleId.value = data.battle_id;
     state.value = data.state;
     pendingEvents.value = data.events || [];
@@ -48,6 +55,7 @@ export const useBattleStore = defineStore('battle', () => {
     pendingEvents,
     error,
     startDemo,
+    startDemoBoss,
     load,
     submitAction,
     dequeueEvents,

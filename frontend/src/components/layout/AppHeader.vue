@@ -1,11 +1,10 @@
 <script setup>
 import { computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import AudioControls from '../battle/AudioControls.vue';
 import { useAppAudio } from '../../composables/useAppAudio';
 
 const route = useRoute();
-const router = useRouter();
 const {
   settings: audioSettings,
   setBgmEnabled,
@@ -15,27 +14,6 @@ const {
 
 const title = computed(() => route.meta?.title ?? 'やみまほ');
 
-const showBack = computed(() => {
-  if (route.name === 'battle' && route.query.boss === '1') {
-    return false;
-  }
-  if (route.meta?.showBack === false) {
-    return false;
-  }
-  if (route.meta?.showBack === true) {
-    return true;
-  }
-  return route.name !== 'home';
-});
-
-function goBack() {
-  if (window.history.length > 1) {
-    router.back();
-    return;
-  }
-  router.push('/');
-}
-
 function onAudioInteraction() {
   unlock();
 }
@@ -44,18 +22,6 @@ function onAudioInteraction() {
 <template>
   <header class="app-header" @click="onAudioInteraction">
     <div class="app-header-inner">
-      <div class="app-header-start">
-        <button
-          v-if="showBack"
-          type="button"
-          class="app-header-back"
-          aria-label="戻る"
-          @click="goBack"
-        >
-          ←
-        </button>
-      </div>
-
       <h1 class="app-header-title">{{ title }}</h1>
 
       <div class="app-header-end">
@@ -80,7 +46,7 @@ function onAudioInteraction() {
 }
 .app-header-inner {
   display: grid;
-  grid-template-columns: 52px 1fr 52px;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.25rem;
   width: min(430px, 100vw);
@@ -90,23 +56,10 @@ function onAudioInteraction() {
   padding-top: calc(0.35rem + env(safe-area-inset-top));
   box-sizing: border-box;
 }
-.app-header-start,
 .app-header-end {
   display: flex;
   align-items: center;
-  justify-content: center;
-}
-.app-header-end {
   justify-content: flex-end;
-}
-.app-header-back {
-  border: none;
-  background: transparent;
-  color: #f8f4ff;
-  font-size: 1.25rem;
-  cursor: pointer;
-  min-width: 44px;
-  min-height: 44px;
 }
 .app-header-title {
   margin: 0;

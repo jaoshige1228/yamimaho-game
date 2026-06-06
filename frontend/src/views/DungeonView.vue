@@ -1,17 +1,26 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api';
 import ExplorationChoiceOverlay from '../components/exploration/ExplorationChoiceOverlay.vue';
 import ScenePanel from '../components/exploration/ScenePanel.vue';
 import StorySequencePlayer from '../components/exploration/StorySequencePlayer.vue';
+import RetreatConfirmModal from '../components/exploration/RetreatConfirmModal.vue';
+import DungeonHealModal from '../components/exploration/DungeonHealModal.vue';
 import HubPartyFooter from '../components/hub/HubPartyFooter.vue';
 import { useBattleStore } from '../stores/battle';
+import { usePlayerStore } from '../stores/player';
 import '../styles/hub-screen.css';
 import '../styles/exploration.css';
+import { publicAssetUrl } from '../utils/publicAssetUrl.js';
+import { useAppAudio } from '../composables/useAppAudio.js';
+
+const dungeonBgSrc = publicAssetUrl('/assets/bg/dungeon1.jpg');
 
 const router = useRouter();
+const { playSe, unlock } = useAppAudio();
 const battle = useBattleStore();
+const player = usePlayerStore();
 const loading = ref(true);
 const advancing = ref(false);
 const explorationBusy = ref(false);
@@ -21,8 +30,9 @@ const floor = ref(1);
 const unlockedFloor = ref(1);
 const maxFloor = ref(3);
 const playableFloor = ref(1);
-const bossStep = ref(null);
 const party = ref([]);
+const retreatModalOpen = ref(false);
+const retreating = ref(false);
 const storyActive = ref(false);
 const storyLines = ref([]);
 const explorationSessionId = ref('');
@@ -31,6 +41,7 @@ const choicePrompt = ref('');
 const choiceOptions = ref([]);
 const pendingChoice = ref(null);
 const pendingCommittedParty = ref(null);
+const healModalOpen = ref(false);
 
 function applyParty(data) {
   if (Array.isArray(data?.party)) {
@@ -62,7 +73,28 @@ function applyDungeonStatus(data) {
   if (data.unlocked_floor != null) unlockedFloor.value = data.unlocked_floor;
   if (data.max_floor != null) maxFloor.value = data.max_floor;
   if (data.playable_floor != null) playableFloor.value = data.playable_floor;
-  if (data.boss_step !== undefined) bossStep.value = data.boss_step;
+  if (data.gold != null) player.setGold(data.gold);
+}
+
+const canHeal = computed(
+  () =>
+    !loading.value &&
+    !storyActive.value &&
+    !choiceActive.value &&
+    !explorationSessionId.value &&
+    !advancing.value &&
+    !explorationBusy.value,
+);
+
+const canRetreat = computed(() => canHeal.value);
+
+function onHealUpdated(data) {
+  if (Array.isArray(data?.party)) {
+    party.value = data.party;
+  }
+  if (data?.items != null) {
+    player.setItems(data.items);
+  }
 }
 
 function showStorySegment(segment) {
@@ -81,6 +113,15 @@ function showChoiceSegment(segment) {
   choiceActive.value = true;
 }
 
+function playStatCheckResultSe(segment) {
+  const result = segment?.stat_check_result;
+  if (result === 'success') {
+    playSe('success');
+  } else if (result === 'fail') {
+    playSe('miss');
+  }
+}
+
 async function handleExplorationPayload(data) {
   applyDungeonStatus(data);
   applyExplorationParty(data);
@@ -90,6 +131,9 @@ async function handleExplorationPayload(data) {
     explorationSessionId.value = '';
     return;
   }
+
+  unlock();
+  playStatCheckResultSe(segment);
 
   explorationSessionId.value = data.session_id ?? explorationSessionId.value;
 
@@ -207,8 +251,26 @@ async function loadParty() {
   try {
     const data = await api('/player/party', { method: 'GET' });
     party.value = data.characters ?? [];
+    if (data.gold != null) player.setGold(data.gold);
+    if (data.items != null) player.setItems(data.items);
   } catch (e) {
     error.value = e.message;
+  }
+}
+
+async function confirmRetreat() {
+  retreating.value = true;
+  error.value = '';
+  try {
+    const data = await api('/dungeon/retreat', { method: 'POST' });
+    applyDungeonStatus(data);
+    retreatModalOpen.value = false;
+    await player.fetchNavigation();
+    router.push('/hub');
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    retreating.value = false;
   }
 }
 
@@ -230,6 +292,8 @@ async function advance() {
   error.value = '';
   explorationSessionId.value = '';
   choiceActive.value = false;
+  unlock();
+  playSe('cursor');
   try {
     const data = await api('/dungeon/advance', { method: 'POST' });
 
@@ -270,11 +334,29 @@ onMounted(async () => {
 <template>
   <div class="hub-screen">
     <div class="exploration-body">
-      <ScenePanel image-src="/assets/bg/dungeon1.jpg" :loading="loading">
+      <ScenePanel :image-src="dungeonBgSrc" :loading="loading">
+        <button
+          v-if="!loading"
+          type="button"
+          class="scene-overlay-retreat"
+          :disabled="!canRetreat || retreating"
+          @click="retreatModalOpen = true"
+        >
+          撤退する
+        </button>
+
         <p class="scene-overlay-depth">
           {{ floor }}層　深さ {{ step }}
-          <template v-if="bossStep">（ボス: 深さ {{ bossStep }}）</template>
         </p>
+
+        <button
+          v-if="canHeal"
+          type="button"
+          class="scene-overlay-heal"
+          @click="healModalOpen = true"
+        >
+          回復
+        </button>
 
         <button
           v-if="!loading && !storyActive && !choiceActive && !explorationSessionId"
@@ -308,5 +390,33 @@ onMounted(async () => {
       :disabled="explorationBusy"
       @choose="onChoice"
     />
+    <RetreatConfirmModal
+      :visible="retreatModalOpen"
+      @cancel="retreatModalOpen = false"
+      @confirm="confirmRetreat"
+    />
+    <DungeonHealModal
+      :visible="healModalOpen"
+      :party="party"
+      :items="player.items"
+      @close="healModalOpen = false"
+      @updated="onHealUpdated"
+    />
   </Teleport>
 </template>
+
+<style scoped>
+.scene-overlay-heal {
+  position: absolute;
+  left: 1rem;
+  bottom: 5.5rem;
+  border: 1px solid rgba(200, 176, 255, 0.45);
+  background: rgba(20, 10, 40, 0.72);
+  color: #f8f4ff;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+</style>

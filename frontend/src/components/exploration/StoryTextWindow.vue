@@ -1,5 +1,8 @@
 <script setup>
-defineProps({
+import { computed, toRef } from 'vue';
+import { useTypewriterText } from '../../composables/useTypewriterText.js';
+
+const props = defineProps({
   mode: {
     type: String,
     required: true,
@@ -8,6 +11,11 @@ defineProps({
   text: { type: String, required: true },
   characterName: { type: String, default: '' },
 });
+
+const textSource = toRef(props, 'text');
+const { displayed, isComplete } = useTypewriterText(textSource);
+
+const showCursor = computed(() => !isComplete.value);
 </script>
 
 <template>
@@ -19,8 +27,14 @@ defineProps({
       {{ characterName }}
     </p>
     <p class="story-text-window__body">
-      <template v-if="mode === 'dialogue'">「{{ text }}」</template>
-      <template v-else>{{ text }}</template>
+      <template v-if="mode === 'dialogue'">
+        <span class="story-text-window__quote-open">「</span>{{ displayed }}<span
+          v-if="isComplete"
+          class="story-text-window__quote-close"
+        >」</span>
+      </template>
+      <template v-else>{{ displayed }}</template>
+      <span v-if="showCursor" class="story-text-window__cursor" aria-hidden="true">▌</span>
     </p>
   </div>
 </template>

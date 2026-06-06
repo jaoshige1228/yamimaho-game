@@ -1,7 +1,13 @@
 <script setup>
-import { PLACEHOLDER_DAY, PLACEHOLDER_GOLD } from '../../config/display';
+import { computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { PLACEHOLDER_DAY } from '../../config/display';
+import { usePlayerStore } from '../../stores/player';
 
-const goldLabel = `${PLACEHOLDER_GOLD.toLocaleString('ja-JP')}G`;
+const player = usePlayerStore();
+const { gold } = storeToRefs(player);
+
+const goldLabel = computed(() => `${gold.value.toLocaleString('ja-JP')}G`);
 </script>
 
 <template>

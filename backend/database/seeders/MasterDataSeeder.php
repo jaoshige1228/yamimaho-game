@@ -8,6 +8,7 @@ use App\Models\DungeonEncounterMaster;
 use App\Models\DungeonEventMaster;
 use App\Models\DungeonEventNode;
 use App\Models\EnemyMaster;
+use App\Models\ItemMaster;
 use App\Models\LevelMaster;
 use App\Models\SpellMaster;
 use App\Models\WeaponMaster;
@@ -18,6 +19,18 @@ class MasterDataSeeder extends Seeder
 {
     public function run(): void
     {
+        foreach (CsvMasterReader::read('item_masters.csv') as $row) {
+            ItemMaster::query()->updateOrCreate(
+                ['code' => $row['code']],
+                [
+                    'name' => $row['name'],
+                    'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
+                    'effect' => $row['effect'],
+                    'power' => (int) $row['power'],
+                ],
+            );
+        }
+
         foreach (CsvMasterReader::read('weapon_masters.csv') as $row) {
             WeaponMaster::query()->updateOrCreate(
                 ['code' => $row['code']],
@@ -25,6 +38,7 @@ class MasterDataSeeder extends Seeder
                     'name' => $row['name'],
                     'mag_bonus' => (int) $row['mag_bonus'],
                     'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
+                    'price' => ($row['price'] ?? '') !== '' ? (int) $row['price'] : null,
                 ],
             );
         }
@@ -36,6 +50,7 @@ class MasterDataSeeder extends Seeder
                     'name' => $row['name'],
                     'def_bonus' => (int) $row['def_bonus'],
                     'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
+                    'price' => ($row['price'] ?? '') !== '' ? (int) $row['price'] : null,
                 ],
             );
         }
@@ -54,6 +69,7 @@ class MasterDataSeeder extends Seeder
                     'spd' => (int) $row['spd'],
                     'know' => (int) $row['know'],
                     'spirit' => (int) $row['spirit'],
+                    'vit' => (int) ($row['vit'] ?? 10),
                     'default_weapon_code' => ($row['default_weapon'] ?? '') !== '' ? $row['default_weapon'] : null,
                     'default_armor_code' => ($row['default_armor'] ?? '') !== '' ? $row['default_armor'] : null,
                 ],
@@ -65,6 +81,7 @@ class MasterDataSeeder extends Seeder
                 ['code' => $row['code']],
                 [
                     'floor' => (int) ($row['floor'] ?? 1),
+                    'level' => (int) ($row['level'] ?? 1),
                     'name' => $row['name'],
                     'sprite' => $row['sprite'],
                     'hp' => (int) $row['hp'],
@@ -75,7 +92,11 @@ class MasterDataSeeder extends Seeder
                     'spd' => (int) $row['spd'],
                     'know' => (int) $row['know'],
                     'spirit' => (int) $row['spirit'],
+                    'vit' => (int) ($row['vit'] ?? 5),
                     'exp_reward' => (int) $row['exp_reward'],
+                    'gold_reward' => (int) ($row['gold_reward'] ?? 0),
+                    'evasion_rate' => (int) ($row['evasion_rate'] ?? 1),
+                    'crit_rate' => (int) ($row['crit_rate'] ?? 1),
                 ],
             );
         }

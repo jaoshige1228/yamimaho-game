@@ -17,7 +17,7 @@ class LevelGrowthService
     private const FLAT_STAT_PER_LEVEL = 2;
 
     /** @var list<string> */
-    private const FLAT_STATS = ['str', 'spd', 'know', 'spirit'];
+    private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];
 
     /** @var list<string> */
     private const MULTIPLY_STATS = ['mag', 'def'];
@@ -32,7 +32,7 @@ class LevelGrowthService
     }
 
     /**
-     * @return array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int}
+     * @return array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int, vit: int}
      */
     public function statsForLevel(CharacterMaster $master, int $level): array
     {
@@ -47,6 +47,7 @@ class LevelGrowthService
             'spd' => $master->spd,
             'know' => $master->know,
             'spirit' => $master->spirit,
+            'vit' => $master->vit,
         ];
 
         for ($current = 1; $current < $level; $current++) {
@@ -57,7 +58,7 @@ class LevelGrowthService
     }
 
     /**
-     * @param  array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int}  $stats
+     * @param  array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int, vit: int}  $stats
      */
     private function applyOneLevelGrowth(array &$stats): void
     {
@@ -105,6 +106,7 @@ class LevelGrowthService
             $character->spd = $after['spd'];
             $character->know = $after['know'];
             $character->spirit = $after['spirit'];
+            $character->vit = $after['vit'];
 
             $events[] = [
                 'type' => 'level_up',

@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   sprite: { type: String, required: true },
@@ -11,7 +12,9 @@ const props = defineProps({
   },
 });
 
-const imageSrc = computed(() => `/assets/characters/${props.sprite}.png`);
+const imageSrc = computed(() =>
+  publicAssetUrl(`/assets/characters/${props.sprite}.png`),
+);
 </script>
 
 <template>

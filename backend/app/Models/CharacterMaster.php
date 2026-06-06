@@ -21,6 +21,7 @@ class CharacterMaster extends Model
         'spd',
         'know',
         'spirit',
+        'vit',
         'default_weapon_code',
         'default_armor_code',
     ];

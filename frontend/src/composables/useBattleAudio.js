@@ -1,7 +1,22 @@
 import { onBeforeUnmount, ref } from 'vue';
+import { publicAssetUrl } from '../utils/publicAssetUrl.js';
 
-const BGM_URL = '/assets/audio/bgm/battle.mp3';
-const SE_URL = '/assets/audio/se/attack.mp3';
+const BGM_TRACKS = {
+  home: publicAssetUrl('/assets/audio/bgm/home.mp3'),
+  dungeon: publicAssetUrl('/assets/audio/bgm/dungeon.mp3'),
+  battle: publicAssetUrl('/assets/audio/bgm/battle.mp3'),
+  boss: publicAssetUrl('/assets/audio/bgm/boss_battle_2.mp3'),
+};
+
+const SE_TRACKS = {
+  cursor: publicAssetUrl('/assets/audio/se/cursor.mp3'),
+  attack_before: publicAssetUrl('/assets/audio/se/attack_before.mp3'),
+  magic: publicAssetUrl('/assets/audio/se/magic.mp3'),
+  damage: publicAssetUrl('/assets/audio/se/damage.mp3'),
+  miss: publicAssetUrl('/assets/audio/se/miss.mp3'),
+  success: publicAssetUrl('/assets/audio/se/success.mp3'),
+};
+
 const STORAGE_KEY = 'yamimaho-audio';
 
 const DEFAULT_SETTINGS = {
@@ -9,14 +24,21 @@ const DEFAULT_SETTINGS = {
   bgmVolume: 0.25,
 };
 
-/** SE は BGM 音量スライダーに対する倍率（最大 1.0 にクランプ） */
-const SE_BGM_RATIO = 1.2;
+/** 音源マスター（スライダー倍率とは別） */
+const BGM_MASTER_GAIN = 0.45;
+const SE_MASTER_GAIN = 1.45;
+/** cursor のみ追加ブースト */
+const SE_KEY_GAIN = {
+  cursor: 1.5,
+};
 
 const settings = ref(loadSettings());
 const unlocked = ref(false);
+const currentBgmTrack = ref(null);
 
 let bgm = null;
-let se = null;
+let activeSe = null;
+let activeSeKey = null;
 let fadeTimer = null;
 let mountCount = 0;
 
@@ -42,51 +64,112 @@ function persistSettings() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value));
 }
 
-function ensureAudio() {
-  if (!bgm) {
-    bgm = new Audio(BGM_URL);
-    bgm.loop = true;
-    bgm.preload = 'auto';
-  }
-  if (!se) {
-    se = new Audio(SE_URL);
-    se.preload = 'auto';
-  }
-  applyVolumes();
-}
-
-function effectiveSeVolume() {
+function effectiveBgmVolume() {
   if (!settings.value.bgmEnabled) {
     return 0;
   }
 
-  return Math.min(1, settings.value.bgmVolume * SE_BGM_RATIO);
+  return Math.min(1, settings.value.bgmVolume * BGM_MASTER_GAIN);
+}
+
+function effectiveSeVolume(seKey = activeSeKey) {
+  if (!settings.value.bgmEnabled) {
+    return 0;
+  }
+
+  const gain = seKey && SE_KEY_GAIN[seKey] ? SE_KEY_GAIN[seKey] : SE_MASTER_GAIN;
+
+  return Math.min(1, settings.value.bgmVolume * gain);
+}
+
+function ensureBgm() {
+  if (!bgm) {
+    bgm = new Audio();
+    bgm.loop = true;
+    bgm.preload = 'auto';
+  }
+  applyVolumes();
+}
+
+function ensureActiveSe() {
+  if (!activeSe) {
+    activeSe = new Audio();
+    activeSe.preload = 'auto';
+  }
 }
 
 function applyVolumes() {
   if (bgm) {
-    bgm.volume = settings.value.bgmEnabled ? settings.value.bgmVolume : 0;
+    bgm.volume = effectiveBgmVolume();
   }
-  if (se) {
-    se.volume = effectiveSeVolume();
+  if (activeSe && !activeSe.paused) {
+    activeSe.volume = effectiveSeVolume();
   }
+}
+
+function stopActiveSe() {
+  if (!activeSe) {
+    return;
+  }
+  activeSe.pause();
+  activeSe.currentTime = 0;
+  activeSeKey = null;
 }
 
 function isBgmPaused() {
   return !bgm || bgm.paused;
 }
 
+function preloadSeTracks() {
+  Object.entries(SE_TRACKS).forEach(([key, url]) => {
+    const clip = new Audio(url);
+    clip.preload = 'auto';
+    clip.load();
+    if (key === 'cursor' && activeSe) {
+      activeSe.src = url;
+      activeSeKey = 'cursor';
+    }
+  });
+}
+
 function unlock() {
-  ensureAudio();
+  ensureBgm();
+  ensureActiveSe();
+  preloadSeTracks();
   unlocked.value = true;
 }
 
-async function playBgm({ restart = true } = {}) {
-  ensureAudio();
-  if (!settings.value.bgmEnabled) return false;
+function cancelFadeOut() {
+  if (fadeTimer) {
+    clearInterval(fadeTimer);
+    fadeTimer = null;
+  }
+}
+
+async function switchBgm(trackKey, { restart = false } = {}) {
+  const url = BGM_TRACKS[trackKey];
+  if (!url) {
+    return false;
+  }
+
+  cancelFadeOut();
+  ensureBgm();
+  const previousTrack = currentBgmTrack.value;
+  currentBgmTrack.value = trackKey;
+
+  if (!settings.value.bgmEnabled) {
+    bgm.src = url;
+    return false;
+  }
+
+  const needsSrcChange = previousTrack !== trackKey || !bgm.src;
+  if (needsSrcChange) {
+    bgm.pause();
+    bgm.src = url;
+  }
 
   applyVolumes();
-  if (restart) {
+  if (restart || needsSrcChange) {
     bgm.currentTime = 0;
   }
 
@@ -98,14 +181,24 @@ async function playBgm({ restart = true } = {}) {
   }
 }
 
-async function resumeBgm() {
-  if (!settings.value.bgmEnabled) return false;
-  if (bgm && !bgm.paused) return true;
-  return playBgm({ restart: false });
+async function playBgm({ restart = true, track = 'battle' } = {}) {
+  return switchBgm(track, { restart });
 }
 
-async function unlockAndPlay() {
+async function resumeBgm() {
+  if (!settings.value.bgmEnabled) return false;
+  if (bgm && !bgm.paused && currentBgmTrack.value) return true;
+  if (currentBgmTrack.value) {
+    return switchBgm(currentBgmTrack.value, { restart: false });
+  }
+  return false;
+}
+
+async function unlockAndPlay(track = currentBgmTrack.value) {
   unlock();
+  if (track) {
+    return switchBgm(track, { restart: false });
+  }
   return resumeBgm();
 }
 
@@ -114,13 +207,16 @@ function setBgmEnabled(enabled) {
   persistSettings();
   applyVolumes();
 
-  if (!enabled && bgm) {
-    bgm.pause();
+  if (!enabled) {
+    if (bgm) {
+      bgm.pause();
+    }
+    stopActiveSe();
     return;
   }
 
-  if (enabled) {
-    resumeBgm();
+  if (currentBgmTrack.value) {
+    switchBgm(currentBgmTrack.value, { restart: false });
   }
 }
 
@@ -132,21 +228,34 @@ function setBgmVolume(volume) {
   applyVolumes();
 }
 
-function playAttackSe({ requireBgm = true } = {}) {
-  ensureAudio();
-  if (!unlocked.value || !se) return;
-  if (requireBgm && !settings.value.bgmEnabled) return;
-  const clip = se.cloneNode();
-  clip.volume = effectiveSeVolume();
-  clip.play().catch(() => {});
+function playSe(seKey) {
+  if (!unlocked.value || !settings.value.bgmEnabled) {
+    return;
+  }
+
+  const url = SE_TRACKS[seKey];
+  if (!url) {
+    return;
+  }
+
+  ensureActiveSe();
+
+  if (activeSeKey !== seKey) {
+    activeSe.pause();
+    activeSe.src = url;
+    activeSeKey = seKey;
+  } else {
+    activeSe.pause();
+    activeSe.currentTime = 0;
+  }
+
+  activeSe.volume = effectiveSeVolume(seKey);
+  activeSe.play().catch(() => {});
 }
 
 function fadeOutBgm(ms = 800) {
   if (!bgm) return;
-  if (fadeTimer) {
-    clearInterval(fadeTimer);
-    fadeTimer = null;
-  }
+  cancelFadeOut();
 
   const start = bgm.volume;
   const steps = 16;
@@ -177,19 +286,22 @@ export function useBattleAudio({ persistent = false } = {}) {
       if (!persistent && bgm) {
         bgm.pause();
       }
+      stopActiveSe();
     }
   });
 
   return {
     settings,
     unlocked,
+    currentBgmTrack,
     unlock,
+    switchBgm,
     playBgm,
     resumeBgm,
     unlockAndPlay,
     setBgmEnabled,
     setBgmVolume,
-    playAttackSe,
+    playSe,
     fadeOutBgm,
     isBgmPaused,
   };

@@ -10,9 +10,9 @@ class SpellMasterDataTest extends TestCase
     public function test_spell_masters_load_from_csv(): void
     {
         $provider = new MasterDataProvider;
-        $spell = $provider->findSpell('pc3_fire_heavy');
+        $spell = $provider->findSpell('pc3_fire_burst');
 
-        $this->assertSame('メテオフレイム', $spell['label']);
+        $this->assertSame('爆破', $spell['label']);
         $this->assertSame('damage', $spell['effect']);
         $this->assertArrayHasKey('coefficient', $spell);
         $this->assertGreaterThan(0, $spell['coefficient']);
@@ -23,7 +23,7 @@ class SpellMasterDataTest extends TestCase
         $provider = new MasterDataProvider;
 
         $this->assertSame(
-            ['pc1_water_single', 'pc1_heal_single', 'pc1_evasion_single_large', 'pc1_evasion_all_small'],
+            ['pc1_heal_water', 'pc1_water_blade', 'pc1_water_veil'],
             $provider->spellIdsForCharacter('pc1'),
         );
     }

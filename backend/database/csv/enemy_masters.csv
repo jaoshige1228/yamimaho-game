@@ -1,5 +1,5 @@
-code,floor,name,sprite,hp,mp,str,mag,def,spd,know,spirit,exp_reward
-bat,1,コーモリ,bat,55,0,30,11,6,8,5,5,13
-snake,1,ヘビビ,snake,100,0,40,11,9,8,5,5,26
-beetle,1,ムシプリンス,beetle,160,0,50,11,15,20,5,5,60
-inu_moe,1,イフリーヌ,inu_moe,400,0,60,11,30,20,5,5,200
+code,floor,level,name,sprite,hp,mp,str,mag,def,spd,know,spirit,vit,exp_reward,gold_reward,evasion_rate,crit_rate
+bat,1,1,コーモリ,bat,55,0,30,11,6,8,5,5,5,13,8,1,1
+snake,1,1,ヘビビ,snake,100,0,40,11,9,8,5,5,5,26,15,1,1
+beetle,1,1,ムシプリンス,beetle,160,0,50,11,15,20,5,5,5,60,35,1,1
+inu_moe,1,10,イフリーヌ,inu_moe,400,0,60,11,30,20,5,5,5,200,150,1,1

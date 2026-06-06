@@ -12,19 +12,30 @@ class BattleEngine
     /** @var (callable(): float)|null */
     private $damageRoll = null;
 
+    /** @var (callable(): int)|null */
+    private $hitRoll = null;
+
+    /** @var (callable(): int)|null */
+    private $critRoll = null;
+
     /**
      * @param  (callable(array<string, array<string, mixed>>): ?string)|null  $enemyTargetPicker
-     *        テスト・シミュレーション用。null のときはランダムに味方を選択。
      * @param  (callable(): float)|null  $damageRoll
-     *        テスト用。0.9〜1.1 の乱数を返す。null のときは random_int(90,110)/100。
+     * @param  (callable(): int)|null  $hitRoll  1〜100
+     * @param  (callable(): int)|null  $critRoll  1〜100
      */
     public function __construct(
         private readonly BattleFactory $factory = new BattleFactory,
+        private readonly EnemySkillPicker $enemySkillPicker = new EnemySkillPicker,
         ?callable $enemyTargetPicker = null,
         ?callable $damageRoll = null,
+        ?callable $hitRoll = null,
+        ?callable $critRoll = null,
     ) {
         $this->enemyTargetPicker = $enemyTargetPicker;
         $this->damageRoll = $damageRoll;
+        $this->hitRoll = $hitRoll;
+        $this->critRoll = $critRoll;
     }
 
     /**
@@ -47,12 +58,6 @@ class BattleEngine
 
         $events = [['type' => 'turn_start', 'actor' => $actorId]];
         $events = array_merge($events, $this->resolveAction($state, $actorId, $action, $spellId, $targetId));
-
-        if ($action !== 'defend') {
-            $state['units'][$actorId]['defending'] = false;
-        } else {
-            $state['units'][$actorId]['defending'] = true;
-        }
         $this->tickBuffsForUnit($state['units'][$actorId]);
 
         return $this->afterAction($state, $events, $actorId);
@@ -72,14 +77,11 @@ class BattleEngine
                 break;
             }
 
-            $events = [['type' => 'turn_start', 'actor' => $actor]];
-            $target = $this->pickRandomAliveAlly($state['units']);
-            if ($target === null) {
-                break;
-            }
+            $actorUnit = $state['units'][$actor];
+            $skill = $this->enemySkillPicker->pick((string) ($actorUnit['master_code'] ?? ''));
 
-            $events = array_merge($events, $this->resolveAction($state, $actor, 'punch', null, $target));
-            $state['units'][$actor]['defending'] = false;
+            $events = [['type' => 'turn_start', 'actor' => $actor]];
+            $events = array_merge($events, $this->resolveEnemySkill($state, $actor, $skill));
             $this->tickBuffsForUnit($state['units'][$actor]);
 
             $result = $this->afterAction($state, $events, $actor);
@@ -115,12 +117,51 @@ class BattleEngine
         $state['current_actor'] = $nextActor;
         $state['awaiting_input'] = $nextActor !== null && str_starts_with($nextActor, 'pc');
 
-        // 防御は敵フェーズを跨いで有効。同 PC の次の手番が来たときだけ解除する。
-        if ($nextActor !== null && str_starts_with($nextActor, 'pc')) {
-            $state['units'][$nextActor]['defending'] = false;
+        return ['state' => $state, 'events' => $events];
+    }
+
+    /**
+     * @param  array<string, mixed>  $skill
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function resolveEnemySkill(array &$state, string $actorId, array $skill): array
+    {
+        $actor = $state['units'][$actorId];
+        $announceText = $skill['skill_code'] === 'attack'
+            ? "{$actor['name']}の攻撃！"
+            : "{$actor['name']}の{$skill['label']}！";
+
+        $events = [$this->announceEvent($actorId, $announceText)];
+
+        $targetType = (string) $skill['target_type'];
+        $coefficient = (float) $skill['coefficient'];
+        $actionType = (string) $skill['action_type'];
+
+        if ($targetType === 'ally_all') {
+            foreach ($this->resolveEnemySkillTargets('ally_all', $state['units']) as $tid) {
+                $events = array_merge(
+                    $events,
+                    $this->resolvePhysicalHit($state, $actorId, $tid, $coefficient, null, false),
+                );
+            }
+
+            return $events;
         }
 
-        return ['state' => $state, 'events' => $events];
+        $target = $this->pickRandomAliveAlly($state['units']);
+        if ($target === null) {
+            return $events;
+        }
+
+        if ($actionType === 'punch' || $actionType === 'physical_single') {
+            return array_merge(
+                $events,
+                $this->resolvePhysicalHit($state, $actorId, $target, $coefficient, null, false),
+            );
+        }
+
+        throw new InvalidArgumentException("不明な敵行動です: {$actionType}");
     }
 
     /**
@@ -132,22 +173,35 @@ class BattleEngine
         $actor = &$state['units'][$actorId];
         $events = [];
 
-        if ($action === 'defend') {
-            $state['log'][] = "{$actor['name']}は防御の構えをとった。";
-            $events[] = ['type' => 'defend', 'actor' => $actorId];
-
-            return $events;
-        }
-
         if ($action === 'punch') {
             $targetSide = str_starts_with($actorId, 'enemy') ? 'ally_single' : 'enemy_single';
             $this->assertTarget($targetId, $targetSide, $state['units']);
             $coefficient = (float) config('battle.common_actions.punch.coefficient', 1.0);
-            $damage = $this->calcDamage($actor, $state['units'][$targetId], 'str', $coefficient);
-            $events = array_merge($events, $this->applyDamage($state, $actorId, $targetId, $damage, null));
-            $state['log'][] = "{$actor['name']}のこぶし！ {$state['units'][$targetId]['name']}に{$damage}ダメージ";
+            $events[] = $this->announceEvent($actorId, "{$actor['name']}のこぶし！");
 
-            return $events;
+            return array_merge(
+                $events,
+                $this->resolvePhysicalHit($state, $actorId, (string) $targetId, $coefficient, null, true),
+            );
+        }
+
+        if ($action === 'kick') {
+            $this->assertTarget($targetId, 'enemy_single', $state['units']);
+            $coefficient = (float) config('battle.common_actions.kick.coefficient', 2.0);
+            $hitRate = (int) config('battle.common_actions.kick.hit_rate', 50);
+            $events[] = $this->announceEvent($actorId, "{$actor['name']}のキック！");
+
+            if ($this->rollHit($hitRate) === false) {
+                $state['log'][] = "{$actor['name']}のキックは外れた";
+                $events[] = ['type' => 'miss', 'actor' => $actorId, 'target' => $targetId];
+
+                return $events;
+            }
+
+            return array_merge(
+                $events,
+                $this->resolvePhysicalHit($state, $actorId, (string) $targetId, $coefficient, null, false),
+            );
         }
 
         if ($action !== 'spell' || $spellId === null) {
@@ -159,22 +213,80 @@ class BattleEngine
         }
 
         $spell = $this->factory->findSpell($spellId);
-
         $mpCost = (int) $spell['mp_cost'];
         if ($actor['mp'] < $mpCost) {
             throw new InvalidArgumentException('MPが足りません。');
         }
 
+        $targets = $this->resolveSpellTargets($spell, $targetId, $state['units'], $actor['side']);
+        foreach ($targets as $tid) {
+            $this->assertSpellTargetValid($spell, $state['units'][$tid]);
+        }
+
         $actor['mp'] -= $mpCost;
         $events[] = ['type' => 'mp_spent', 'actor' => $actorId, 'amount' => $mpCost];
-
-        $targets = $this->resolveTargets($spell['target_type'], $targetId, $state['units'], $actor['side']);
+        $events[] = $this->announceEvent($actorId, "{$actor['name']}は{$spell['label']}を詠唱した！");
 
         foreach ($targets as $tid) {
             $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
         }
 
         return $events;
+    }
+
+    /**
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, mixed>  $target
+     */
+    private function assertSpellTargetValid(array $spell, array $target): void
+    {
+        $effect = $spell['effect'] ?? '';
+
+        if (in_array($effect, ['heal_mag', 'heal'], true)) {
+            if (! ($target['alive'] ?? false) || (int) $target['hp'] >= (int) $target['max_hp']) {
+                throw new InvalidArgumentException('回復できない対象です。');
+            }
+
+            return;
+        }
+
+        if ($effect === 'revive_chance') {
+            if ($target['alive'] ?? true) {
+                throw new InvalidArgumentException('蘇生できない対象です。');
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, array<string, mixed>>  $units
+     */
+    private function spellHasValidTarget(array $spell, array $units): bool
+    {
+        $effect = $spell['effect'] ?? '';
+        $targetType = $spell['target_type'] ?? 'ally_single';
+
+        foreach ($units as $unit) {
+            if (($unit['side'] ?? '') !== 'ally') {
+                continue;
+            }
+
+            if ($targetType === 'ally_all' || $targetType === 'ally_single') {
+                if (in_array($effect, ['heal_mag', 'heal'], true)) {
+                    if (($unit['alive'] ?? false) && (int) $unit['hp'] < (int) $unit['max_hp']) {
+                        return true;
+                    }
+                } elseif ($effect === 'revive_chance') {
+                    if (! ($unit['alive'] ?? true)) {
+                        return true;
+                    }
+                } else {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -192,9 +304,57 @@ class BattleEngine
         switch ($spell['effect']) {
             case 'damage':
                 $coefficient = (float) ($spell['coefficient'] ?? 1.0);
-                $damage = $this->calcDamage($actor, $target, 'mag', $coefficient);
-                $events = array_merge($events, $this->applyDamage($state, $actorId, $targetId, $damage, $spell['element'] ?? null));
-                $state['log'][] = "{$actor['name']}の{$label}！ {$target['name']}に{$damage}ダメージ";
+                $damageResult = $this->calcDamageWithCritical($actor, $target, 'mag', $coefficient);
+                $events = array_merge(
+                    $events,
+                    $this->applyDamage($state, $actorId, $targetId, $damageResult['damage'], $spell['element'] ?? null, $damageResult['critical']),
+                );
+                $state['log'][] = "{$actor['name']}の{$label}！ {$target['name']}に{$damageResult['damage']}ダメージ";
+                break;
+
+            case 'heal_mag':
+                $amount = (int) floor((float) $actor['mag'] * 3);
+                $healed = min($amount, $target['max_hp'] - $target['hp']);
+                $target['hp'] += $healed;
+                $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];
+                $state['log'][] = "{$target['name']}は{$healed}回復した";
+                break;
+
+            case 'buff_evasion_set':
+            case 'buff_def':
+            case 'debuff_def':
+                $buffKey = $spell['buff'];
+                $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
+                $events[] = [
+                    'type' => 'buff_applied',
+                    'actor' => $actorId,
+                    'target' => $targetId,
+                    'buff' => $buffKey,
+                    'icon' => config("battle.buffs.{$buffKey}.icon"),
+                ];
+                $state['log'][] = "{$target['name']}に{$label}";
+                break;
+
+            case 'shield_next':
+                $target['damage_shield'] = true;
+                $events[] = ['type' => 'shield_applied', 'actor' => $actorId, 'target' => $targetId];
+                $state['log'][] = "{$target['name']}に{$label}";
+                break;
+
+            case 'revive_chance':
+                if (! $target['alive']) {
+                    $chance = (int) ($spell['power'] ?? 50);
+                    if ($this->rollHit($chance)) {
+                        $revivedHp = (int) floor($target['max_hp'] / 2);
+                        $target['hp'] = max(1, $revivedHp);
+                        $target['alive'] = true;
+                        $events[] = ['type' => 'revive', 'actor' => $actorId, 'target' => $targetId, 'hp' => $target['hp']];
+                        $state['log'][] = "{$target['name']}は蘇生した";
+                    } else {
+                        $events[] = ['type' => 'revive_failed', 'actor' => $actorId, 'target' => $targetId];
+                        $state['log'][] = "{$label}は効果がなかった";
+                    }
+                }
                 break;
 
             case 'heal':
@@ -209,7 +369,13 @@ class BattleEngine
             case 'debuff':
                 $buffKey = $spell['buff'];
                 $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
-                $events[] = ['type' => 'buff_applied', 'actor' => $actorId, 'target' => $targetId, 'buff' => $buffKey];
+                $events[] = [
+                    'type' => 'buff_applied',
+                    'actor' => $actorId,
+                    'target' => $targetId,
+                    'buff' => $buffKey,
+                    'icon' => config("battle.buffs.{$buffKey}.icon"),
+                ];
                 $state['log'][] = "{$target['name']}に{$label}";
                 break;
 
@@ -220,8 +386,6 @@ class BattleEngine
                 break;
         }
 
-        $events[] = ['type' => 'spell_cast', 'actor' => $actorId, 'spell_id' => $spellId, 'target' => $targetId, 'element' => $spell['element'] ?? null];
-
         return $events;
     }
 
@@ -229,17 +393,102 @@ class BattleEngine
      * @param  array<string, mixed>  $state
      * @return list<array<string, mixed>>
      */
-    private function applyDamage(array &$state, string $actorId, string $targetId, int $damage, ?string $element): array
-    {
-        $target = &$state['units'][$targetId];
-        $target['hp'] = max(0, $target['hp'] - $damage);
-        if ($target['hp'] === 0) {
-            $target['alive'] = false;
+    private function resolvePhysicalHit(
+        array &$state,
+        string $actorId,
+        string $targetId,
+        float $coefficient,
+        ?string $element,
+        bool $checkEvasion,
+    ): array {
+        $actor = $state['units'][$actorId];
+        $target = $state['units'][$targetId];
+
+        if ($checkEvasion && $this->rollEvasion($target)) {
+            $state['log'][] = "{$target['name']}は攻撃を回避した";
+            return [['type' => 'miss', 'actor' => $actorId, 'target' => $targetId]];
         }
 
-        return [
-            ['type' => 'damage', 'actor' => $actorId, 'target' => $targetId, 'value' => $damage, 'element' => $element],
+        $damageResult = $this->calcDamageWithCritical($actor, $target, 'str', $coefficient);
+
+        return $this->applyDamage(
+            $state,
+            $actorId,
+            $targetId,
+            $damageResult['damage'],
+            $element,
+            $damageResult['critical'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function applyDamage(
+        array &$state,
+        string $actorId,
+        string $targetId,
+        int $damage,
+        ?string $element,
+        bool $critical = false,
+    ): array {
+        $target = &$state['units'][$targetId];
+
+        if ($target['damage_shield'] ?? false) {
+            $target['damage_shield'] = false;
+            $state['log'][] = "{$target['name']}はダメージを無効化した";
+
+            return [
+                ['type' => 'shield_break', 'actor' => $actorId, 'target' => $targetId],
+            ];
+        }
+
+        $target['hp'] = max(0, $target['hp'] - $damage);
+        $events = [
+            [
+                'type' => 'damage',
+                'actor' => $actorId,
+                'target' => $targetId,
+                'value' => $damage,
+                'element' => $element,
+                'critical' => $critical,
+            ],
         ];
+
+        if ($target['hp'] === 0) {
+            $target['alive'] = false;
+            if (($target['side'] ?? '') === 'enemy') {
+                $gold = (int) ($target['gold_reward'] ?? 0);
+                if ($gold > 0) {
+                    if (! isset($state['meta'])) {
+                        $state['meta'] = [];
+                    }
+                    $state['meta']['gold_earned'] = (int) ($state['meta']['gold_earned'] ?? 0) + $gold;
+                    $events[] = ['type' => 'gold_gained', 'amount' => $gold, 'total' => $state['meta']['gold_earned']];
+                }
+            }
+        }
+
+        return $events;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attacker
+     * @param  array<string, mixed>  $defender
+     * @return array{damage: int, critical: bool}
+     */
+    private function calcDamageWithCritical(array $attacker, array $defender, string $attackStat, float $coefficient): array
+    {
+        $critical = $this->rollCritical($attacker);
+        $defenderForCalc = $defender;
+        if ($critical) {
+            $defenderForCalc = [...$defender, 'def' => 0, 'buffs' => []];
+        }
+
+        $damage = $this->calcDamage($attacker, $defenderForCalc, $attackStat, $coefficient);
+
+        return ['damage' => $damage, 'critical' => $critical];
     }
 
     /**
@@ -253,7 +502,7 @@ class BattleEngine
         $roll = $this->rollDamageMultiplier();
         $raw = ($attack - ($def / 2)) * $roll * $coefficient;
 
-        return $this->finalizeDamage($raw, $defender);
+        return (int) max(1, floor($raw));
     }
 
     private function rollDamageMultiplier(): float
@@ -270,16 +519,16 @@ class BattleEngine
      */
     private function effectiveStat(array $unit, string $stat): float
     {
-        $base = match ($stat) {
-            'evasion' => (float) $unit['spd'],
-            default => (float) ($unit[$stat] ?? 0),
-        };
+        $base = (float) ($unit[$stat] ?? 0);
 
         foreach ($unit['buffs'] as $key => $turns) {
             if ($turns <= 0) {
                 continue;
             }
             $buff = config("battle.buffs.{$key}");
+            if (($buff['type'] ?? '') === 'evasion_set') {
+                continue;
+            }
             if (($buff['stat'] ?? '') === $stat) {
                 $base *= (float) $buff['multiplier'];
             }
@@ -291,14 +540,100 @@ class BattleEngine
     /**
      * @param  array<string, mixed>  $defender
      */
-    private function finalizeDamage(float $raw, array $defender): int
+    private function effectiveEvasionRate(array $defender): int
     {
-        $damage = (int) max(1, floor($raw));
-        if ($defender['defending'] ?? false) {
-            $damage = (int) max(1, floor($damage * (float) config('battle.defend_damage_multiplier')));
+        foreach ($defender['buffs'] as $key => $turns) {
+            if ($turns <= 0) {
+                continue;
+            }
+            $buff = config("battle.buffs.{$key}");
+            if (($buff['type'] ?? '') === 'evasion_set') {
+                return (int) ($buff['value'] ?? 50);
+            }
         }
 
-        return $damage;
+        return (int) ($defender['evasion_rate'] ?? 0);
+    }
+
+    /**
+     * @param  array<string, mixed>  $defender
+     */
+    private function rollEvasion(array $defender): bool
+    {
+        $rate = $this->effectiveEvasionRate($defender);
+
+        return $this->rollPercent($this->hitRoll) <= $rate;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attacker
+     */
+    private function rollCritical(array $attacker): bool
+    {
+        $rate = (int) ($attacker['crit_rate'] ?? 0);
+
+        return $this->rollPercent($this->critRoll) <= $rate;
+    }
+
+    private function rollHit(int $rate): bool
+    {
+        return $this->rollPercent($this->hitRoll) <= $rate;
+    }
+
+    /**
+     * @param  (callable(): int)|null  $roller
+     */
+    private function rollPercent(?callable $roller = null): int
+    {
+        if ($roller !== null) {
+            return $roller();
+        }
+
+        if ($this->hitRoll !== null) {
+            return ($this->hitRoll)();
+        }
+
+        return random_int(1, 100);
+    }
+
+    /**
+     * @return array{type: string, actor: string, text: string}
+     */
+    private function announceEvent(string $actorId, string $text): array
+    {
+        return ['type' => 'announce', 'actor' => $actorId, 'text' => $text];
+    }
+
+    /**
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, array<string, mixed>>  $units
+     * @return list<string>
+     */
+    private function resolveSpellTargets(array $spell, ?string $targetId, array $units, string $actorSide): array
+    {
+        if ($spell['effect'] === 'revive_chance') {
+            if ($targetId === null || ! isset($units[$targetId])) {
+                throw new InvalidArgumentException('ターゲットを指定してください。');
+            }
+
+            return [$targetId];
+        }
+
+        return $this->resolveTargets($spell['target_type'], $targetId, $units, $actorSide);
+    }
+
+    /**
+     * 敵特技の target_type（ally_*）はプレイヤー味方を指す。
+     *
+     * @param  array<string, array<string, mixed>>  $units
+     * @return list<string>
+     */
+    private function resolveEnemySkillTargets(string $targetType, array $units): array
+    {
+        return match ($targetType) {
+            'ally_all' => array_keys(array_filter($units, fn ($u) => $u['side'] === 'ally' && $u['alive'])),
+            default => throw new InvalidArgumentException("不明な敵ターゲット種別です: {$targetType}"),
+        };
     }
 
     /**
@@ -321,7 +656,15 @@ class BattleEngine
      */
     private function assertTarget(?string $targetId, string $expectedType, array $units): void
     {
-        if ($targetId === null || ! isset($units[$targetId]) || ! $units[$targetId]['alive']) {
+        if ($targetId === null || ! isset($units[$targetId])) {
+            throw new InvalidArgumentException('有効なターゲットを指定してください。');
+        }
+
+        if ($expectedType === 'ally_single' && ! $units[$targetId]['alive']) {
+            throw new InvalidArgumentException('有効なターゲットを指定してください。');
+        }
+
+        if ($expectedType === 'enemy_single' && ! $units[$targetId]['alive']) {
             throw new InvalidArgumentException('有効なターゲットを指定してください。');
         }
 
@@ -344,9 +687,7 @@ class BattleEngine
         $count = count($order);
 
         for ($i = 1; $i <= $count; $i++) {
-            $idx = ($current + $i) % $count;
-
-            return $idx;
+            return ($current + $i) % $count;
         }
 
         return 0;
@@ -421,22 +762,70 @@ class BattleEngine
         $actor = $state['current_actor'] ?? null;
         $unit = $actor ? ($state['units'][$actor] ?? null) : null;
 
+        $buffIcons = [];
+        foreach (config('battle.buffs', []) as $key => $buff) {
+            $buffIcons[$key] = $buff['icon'] ?? $key;
+        }
+
         return [
             'status' => $state['status'],
             'current_actor' => $actor,
             'awaiting_input' => $state['awaiting_input'] ?? false,
             'turn_index' => $state['turn_index'] ?? 0,
-            'units' => array_values($state['units']),
+            'meta' => $state['meta'] ?? null,
+            'units' => array_values(array_map(
+                fn (array $u) => $this->publicUnit($u),
+                $state['units'],
+            )),
             'log' => array_slice($state['log'] ?? [], -8),
-            'commands' => $this->availableCommands($unit),
+            'commands' => $this->availableCommands($unit, $state['units'] ?? []),
+            'buff_icons' => $buffIcons,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $unit
+     * @return array<string, mixed>
+     */
+    private function publicUnit(array $unit): array
+    {
+        $buffs = [];
+        foreach ($unit['buffs'] as $key => $turns) {
+            if ($turns > 0) {
+                $buffs[$key] = $turns;
+            }
+        }
+
+        return [
+            'id' => $unit['id'],
+            'side' => $unit['side'],
+            'name' => $unit['name'],
+            'sprite' => $unit['sprite'],
+            'master_code' => $unit['master_code'] ?? null,
+            'level' => $unit['level'] ?? 1,
+            'hp' => $unit['hp'],
+            'max_hp' => $unit['max_hp'],
+            'mp' => $unit['mp'],
+            'max_mp' => $unit['max_mp'],
+            'alive' => $unit['alive'],
+            'buffs' => $buffs,
+            'damage_shield' => (bool) ($unit['damage_shield'] ?? false),
+            'user_character_id' => $unit['user_character_id'] ?? null,
+            'weapon' => $unit['weapon'] ?? null,
+            'armor' => $unit['armor'] ?? null,
+            'str' => $unit['str'] ?? null,
+            'mag' => $unit['mag'] ?? null,
+            'def' => $unit['def'] ?? null,
+            'spd' => $unit['spd'] ?? null,
         ];
     }
 
     /**
      * @param  array<string, mixed>|null  $unit
+     * @param  array<string, array<string, mixed>>  $units
      * @return array<string, mixed>|null
      */
-    private function availableCommands(?array $unit): ?array
+    private function availableCommands(?array $unit, array $units = []): ?array
     {
         if ($unit === null || ! str_starts_with($unit['id'], 'pc')) {
             return null;
@@ -445,19 +834,23 @@ class BattleEngine
         $spells = [];
         foreach ($unit['spells'] as $spellId) {
             $spell = $this->factory->findSpell($spellId);
+            $affordable = $unit['mp'] >= $spell['mp_cost'];
+            $usable = $affordable && $this->spellHasValidTarget($spell, $units);
             $spells[] = [
                 'id' => $spellId,
                 'label' => $spell['label'],
                 'description' => $spell['description'] ?? '',
                 'mp_cost' => $spell['mp_cost'],
                 'target_type' => $spell['target_type'],
-                'affordable' => $unit['mp'] >= $spell['mp_cost'],
+                'effect' => $spell['effect'],
+                'affordable' => $affordable,
+                'usable' => $usable,
             ];
         }
 
         return [
             'punch' => config('battle.common_actions.punch'),
-            'defend' => config('battle.common_actions.defend'),
+            'kick' => config('battle.common_actions.kick'),
             'spells' => $spells,
         ];
     }

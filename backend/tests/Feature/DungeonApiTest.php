@@ -49,6 +49,11 @@ class DungeonApiTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $enemies->count());
         $this->assertLessThanOrEqual(3, $enemies->count());
         $this->assertTrue($enemies->every(fn (array $u) => $u['master_code'] === 'bat'));
+        $this->assertTrue(
+            $enemies->every(
+                fn (array $u) => $u['sprite'] === 'bat' && str_contains($u['name'], 'コーモリ'),
+            ),
+        );
     }
 
     public function test_player_party_includes_sprite_and_max_stats(): void
@@ -96,8 +101,10 @@ class DungeonApiTest extends TestCase
 
         $maxTurns = 120;
         while (($state['status'] ?? '') === 'active' && $maxTurns-- > 0) {
+            $enemy = collect($state['units'])->firstWhere('side', 'enemy');
             $response = $this->postJson("/api/battles/{$battleId}/actions", [
-                'action' => 'defend',
+                'action' => 'punch',
+                'target_id' => $enemy['id'] ?? 'enemy_1',
             ]);
             $response->assertOk();
             $state = $response->json('state');
@@ -170,7 +177,7 @@ class DungeonApiTest extends TestCase
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'healing_spring']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'suspicious_spring']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'mysterious_presence']);
-        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'rainbow_spring', 'weight' => 5]);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'rainbow_spring', 'weight' => 3]);
         $this->assertDatabaseHas('enemy_masters', ['code' => 'bat', 'floor' => 1]);
         $this->assertDatabaseHas('enemy_masters', ['code' => 'inu_moe', 'floor' => 1]);
     }
