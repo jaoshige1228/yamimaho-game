@@ -225,7 +225,7 @@ class BattleEngine
 
         $actor['mp'] -= $mpCost;
         $events[] = ['type' => 'mp_spent', 'actor' => $actorId, 'amount' => $mpCost];
-        $events[] = $this->announceEvent($actorId, "{$actor['name']}は{$spell['label']}を詠唱した！");
+        $events[] = $this->announceEvent($actorId, "{$actor['name']}は{$spell['label']}を唱えた！");
 
         foreach ($targets as $tid) {
             $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
@@ -266,23 +266,43 @@ class BattleEngine
         $effect = $spell['effect'] ?? '';
         $targetType = $spell['target_type'] ?? 'ally_single';
 
+        if (str_starts_with($targetType, 'enemy')) {
+            foreach ($units as $unit) {
+                if (($unit['side'] ?? '') === 'enemy' && ($unit['alive'] ?? false)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (! str_starts_with($targetType, 'ally')) {
+            return true;
+        }
+
         foreach ($units as $unit) {
             if (($unit['side'] ?? '') !== 'ally') {
                 continue;
             }
 
-            if ($targetType === 'ally_all' || $targetType === 'ally_single') {
-                if (in_array($effect, ['heal_mag', 'heal'], true)) {
-                    if (($unit['alive'] ?? false) && (int) $unit['hp'] < (int) $unit['max_hp']) {
-                        return true;
-                    }
-                } elseif ($effect === 'revive_chance') {
-                    if (! ($unit['alive'] ?? true)) {
-                        return true;
-                    }
-                } else {
+            if (in_array($effect, ['heal_mag', 'heal'], true)) {
+                if (($unit['alive'] ?? false) && (int) $unit['hp'] < (int) $unit['max_hp']) {
                     return true;
                 }
+
+                continue;
+            }
+
+            if ($effect === 'revive_chance') {
+                if (! ($unit['alive'] ?? true)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($unit['alive'] ?? false) {
+                return true;
             }
         }
 

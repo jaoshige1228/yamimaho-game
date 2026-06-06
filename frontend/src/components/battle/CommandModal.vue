@@ -11,6 +11,10 @@ const emit = defineEmits(['close', 'punch', 'kick', 'spell']);
 
 const { playSe, unlock } = useAppAudio();
 
+function isSpellDisabled(spell) {
+  return !spell.affordable;
+}
+
 function onChoose(event, payload) {
   unlock();
   playSe('cursor');
@@ -36,7 +40,7 @@ function onChoose(event, payload) {
             :key="spell.id"
             type="button"
             class="cmd spell"
-            :disabled="!spell.affordable || spell.usable === false"
+            :disabled="isSpellDisabled(spell)"
             @click="onChoose('spell', spell)"
           >
             <span class="label">{{ spell.label }}</span>

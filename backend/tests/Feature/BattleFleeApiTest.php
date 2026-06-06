@@ -17,7 +17,7 @@ class BattleFleeApiTest extends TestCase
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
     }
 
-    public function test_dungeon_battle_flee_decreases_step_by_three(): void
+    public function test_dungeon_battle_flee_decreases_step_by_one(): void
     {
         config(['game.dungeon.test_force' => 'battle']);
 
@@ -39,7 +39,7 @@ class BattleFleeApiTest extends TestCase
 
         $response->assertJsonPath('state.status', 'fled');
         $response->assertJsonFragment(['type' => 'fled']);
-        $this->assertSame(7, (int) UserDungeonProgress::query()->where('user_id', $user->id)->value('step'));
+        $this->assertSame(9, (int) UserDungeonProgress::query()->where('user_id', $user->id)->value('step'));
     }
 
     public function test_flee_step_does_not_go_below_one(): void
@@ -48,7 +48,7 @@ class BattleFleeApiTest extends TestCase
 
         $user = $this->demoUser();
         $this->postJson('/api/dungeon/enter')->assertOk();
-        UserDungeonProgress::query()->where('user_id', $user->id)->update(['step' => 2]);
+        UserDungeonProgress::query()->where('user_id', $user->id)->update(['step' => 0]);
 
         $start = $this->postJson('/api/dungeon/advance')->assertOk();
         $battleId = $start->json('battle_id');

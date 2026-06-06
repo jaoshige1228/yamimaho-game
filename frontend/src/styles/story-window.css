@@ -108,20 +108,6 @@
   text-align: left;
 }
 
-.story-text-window__cursor {
-  display: inline-block;
-  margin-left: 0.05em;
-  font-weight: 400;
-  opacity: 0.85;
-  animation: story-text-cursor-blink 0.55s step-end infinite;
-}
-
-@keyframes story-text-cursor-blink {
-  50% {
-    opacity: 0;
-  }
-}
-
 /*
  * セリフ: シーン下部の stage 内で
  * 立ち絵（背面）＋ 全幅テキスト枠（前面）を重ねる

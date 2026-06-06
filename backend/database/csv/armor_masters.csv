@@ -1,7 +1,7 @@
 code,name,def_bonus,description,price
-robe_basic,基本のローブ,1,学校から支給されたシンプルなローブ。大変イケてるデザインである。,
+robe_basic,基本のローブ,2,学校から支給されたシンプルなローブ。大変イケてるデザインである。,
 armor_leather,革の鎧,3,,
 armor_chain,鎖かたまり,4,,
 armor_plate,鉄の鎧,5,,
-robe_advanced,応用のローブ,50,簡素に見えて着こなすのが難しい。,800
+robe_advanced,応用のローブ,20,簡素に見えて着こなすのが難しい。,200
 robe_master,熟練のローブ,200,熟練者以外が着ると四肢が爆散すると言われているローブ,3000

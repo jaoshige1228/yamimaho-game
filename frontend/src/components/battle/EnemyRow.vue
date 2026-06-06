@@ -22,7 +22,14 @@ function supportEffectClass(unit) {
 }
 
 function displayHpFor(unit) {
-  return props.displayHp[unit.id] ?? unit.hp;
+  if (unit.id in props.displayHp) {
+    return props.displayHp[unit.id];
+  }
+  return unit.hp;
+}
+
+function isDisplayDead(unit) {
+  return displayHpFor(unit) <= 0;
 }
 
 const emit = defineEmits(['select', 'show-stats']);
@@ -57,7 +64,7 @@ function onSlotClick(unit) {
       class="enemy-slot"
       :class="[
         {
-          dead: !unit.alive,
+          dead: isDisplayDead(unit),
           selectable: canSelect(unit),
           shake: shakeTarget === unit.id,
           lunge: activeLunge === unit.id,
@@ -80,7 +87,7 @@ function onSlotClick(unit) {
         />
       </div>
       <UnitBars :hp="displayHpFor(unit)" :max-hp="unit.max_hp" />
-      <span class="name">Lv{{ unit.level ?? 1 }} {{ unit.name }}</span>
+      <span class="name">{{ unit.name }}</span>
     </button>
   </div>
 </template>
@@ -100,7 +107,7 @@ function onSlotClick(unit) {
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 0.2rem 0.25rem 0.35rem;
+  padding: 0.2rem 0.25rem 0.15rem;
   color: var(--text);
   font-size: 0.7rem;
   display: flex;

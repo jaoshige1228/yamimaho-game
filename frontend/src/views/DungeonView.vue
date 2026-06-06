@@ -35,6 +35,7 @@ const retreatModalOpen = ref(false);
 const retreating = ref(false);
 const storyActive = ref(false);
 const storyLines = ref([]);
+const storyPerLinePartySync = ref(false);
 const explorationSessionId = ref('');
 const choiceActive = ref(false);
 const choicePrompt = ref('');
@@ -42,6 +43,9 @@ const choiceOptions = ref([]);
 const pendingChoice = ref(null);
 const pendingCommittedParty = ref(null);
 const healModalOpen = ref(false);
+const sceneFadeActive = ref(false);
+/** @type {ReturnType<typeof setTimeout> | null} */
+let sceneFadeTimer = null;
 
 function applyParty(data) {
   if (Array.isArray(data?.party)) {
@@ -60,7 +64,15 @@ function applyExplorationParty(data) {
   applyParty(data);
 }
 
-function onStorySyncParty() {
+function onStorySyncParty(partialParty) {
+  if (Array.isArray(partialParty)) {
+    party.value = partialParty;
+    return;
+  }
+  // 行ごとに party を持つセグメントでは、sync_party だけの行で一括反映しない
+  if (storyPerLinePartySync.value) {
+    return;
+  }
   if (pendingCommittedParty.value) {
     party.value = pendingCommittedParty.value;
     pendingCommittedParty.value = null;
@@ -103,6 +115,7 @@ function showStorySegment(segment) {
     return false;
   }
   storyLines.value = lines;
+  storyPerLinePartySync.value = lines.some((line) => Array.isArray(line.party));
   storyActive.value = true;
   return true;
 }
@@ -210,6 +223,7 @@ async function continueExploration() {
 async function onStoryComplete() {
   storyActive.value = false;
   storyLines.value = [];
+  storyPerLinePartySync.value = false;
 
   if (pendingChoice.value) {
     showChoiceSegment(pendingChoice.value);
@@ -220,6 +234,17 @@ async function onStoryComplete() {
   if (explorationSessionId.value) {
     await continueExploration();
   }
+}
+
+function onScreenFade(ms) {
+  if (sceneFadeTimer !== null) {
+    clearTimeout(sceneFadeTimer);
+  }
+  sceneFadeActive.value = true;
+  sceneFadeTimer = setTimeout(() => {
+    sceneFadeActive.value = false;
+    sceneFadeTimer = null;
+  }, ms);
 }
 
 async function onChoice(slotId) {
@@ -318,6 +343,16 @@ async function advance() {
       return;
     }
 
+    if (data.event === 'flavor') {
+      applyDungeonStatus(data);
+      if (data.segment?.kind === 'story' && showStorySegment(data.segment)) {
+        return;
+      }
+
+      error.value = '不明な応答です';
+      return;
+    }
+
     error.value = '不明な応答です';
   } catch (e) {
     error.value = e.message;
@@ -334,7 +369,7 @@ onMounted(async () => {
 <template>
   <div class="hub-screen">
     <div class="exploration-body">
-      <ScenePanel :image-src="dungeonBgSrc" :loading="loading">
+      <ScenePanel :image-src="dungeonBgSrc" :loading="loading" :fade-active="sceneFadeActive">
         <button
           v-if="!loading"
           type="button"
@@ -382,6 +417,7 @@ onMounted(async () => {
       :party="party"
       @complete="onStoryComplete"
       @sync-party="onStorySyncParty"
+      @screen-fade="onScreenFade"
     />
     <ExplorationChoiceOverlay
       v-if="choiceActive"

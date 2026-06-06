@@ -16,6 +16,8 @@ class DungeonAdvanceService
         private readonly BattleOrchestrator $orchestrator = new BattleOrchestrator,
         private readonly DungeonEncounterCatalog $encounters = new DungeonEncounterCatalog,
         private readonly DungeonExplorationService $exploration = new DungeonExplorationService,
+        private readonly DungeonFlavorNarrativeService $flavor = new DungeonFlavorNarrativeService,
+        private readonly DungeonAdvanceOutcome $outcome = new DungeonAdvanceOutcome,
     ) {}
 
     /**
@@ -50,22 +52,25 @@ class DungeonAdvanceService
             );
         }
 
-        if ($forced === 'battle' || $this->rollBattle($user)) {
+        if ($forced === 'flavor') {
+            return $this->flavor->start($user, $floor, $nextStep);
+        }
+
+        if ($forced === 'battle') {
             return $this->startBattle($user, $floor, $nextStep);
         }
 
-        return $this->exploration->startEvent($user, $floor, $nextStep);
-    }
+        $rolled = $this->outcome->roll($user);
 
-    private function rollBattle(User $user): bool
-    {
-        if ($this->progress->shouldSkipBattles($user)) {
-            return false;
+        if ($rolled === 'battle') {
+            return $this->startBattle($user, $floor, $nextStep);
         }
 
-        $battleRate = (int) config('game.dungeon.battle_encounter_rate', 30);
+        if ($rolled === 'flavor') {
+            return $this->flavor->start($user, $floor, $nextStep);
+        }
 
-        return random_int(1, 100) <= $battleRate;
+        return $this->exploration->startEvent($user, $floor, $nextStep);
     }
 
     /**

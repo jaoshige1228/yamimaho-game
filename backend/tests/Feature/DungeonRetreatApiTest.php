@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\DungeonExplorationSession;
 use App\Models\User;
+use App\Models\UserCharacter;
 use App\Models\UserDungeonProgress;
+use App\Services\Growth\LevelGrowthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,6 +49,27 @@ class DungeonRetreatApiTest extends TestCase
         $response->assertJsonPath('floor', 1);
         $this->assertSame(0, DungeonExplorationSession::query()->where('user_id', $user->id)->count());
         $this->assertSame(80, (int) $user->fresh()->gold);
+    }
+
+    public function test_retreat_restores_party_hp_and_mp_to_full(): void
+    {
+        $user = $this->demoUser();
+        $character = UserCharacter::query()->where('user_id', $user->id)->firstOrFail();
+        $character->hp = 10;
+        $character->mp = 5;
+        $character->save();
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
+        $this->postJson('/api/dungeon/retreat')->assertOk();
+
+        $character->refresh();
+        $expected = app(LevelGrowthService::class)->statsForLevel(
+            $character->characterMaster,
+            $character->level,
+        );
+
+        $this->assertSame($expected['hp'], $character->hp);
+        $this->assertSame($expected['mp'], $character->mp);
     }
 
     private function demoUser(): User

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, toRef } from 'vue';
+import { toRef } from 'vue';
 import { useTypewriterText } from '../../composables/useTypewriterText.js';
 
 const props = defineProps({
@@ -14,8 +14,6 @@ const props = defineProps({
 
 const textSource = toRef(props, 'text');
 const { displayed, isComplete } = useTypewriterText(textSource);
-
-const showCursor = computed(() => !isComplete.value);
 </script>
 
 <template>
@@ -34,7 +32,6 @@ const showCursor = computed(() => !isComplete.value);
         >」</span>
       </template>
       <template v-else>{{ displayed }}</template>
-      <span v-if="showCursor" class="story-text-window__cursor" aria-hidden="true">▌</span>
     </p>
   </div>
 </template>

@@ -10,6 +10,8 @@ use App\Services\Dungeon\DungeonEventCatalog;
 use App\Services\Dungeon\DungeonProgressService;
 use App\Services\Dungeon\PartyExplorationDamageService;
 use App\Services\Growth\LevelGrowthService;
+use App\Services\Player\ItemInventoryService;
+use App\Services\Player\PartyGoldService;
 use App\Services\Player\UserCharacterService;
 
 class DungeonExplorationEngine
@@ -22,6 +24,8 @@ class DungeonExplorationEngine
         private readonly UserCharacterService $characters = new UserCharacterService,
         private readonly DungeonProgressService $progress = new DungeonProgressService,
         private readonly LevelGrowthService $growth = new LevelGrowthService,
+        private readonly ItemInventoryService $items = new ItemInventoryService,
+        private readonly PartyGoldService $gold = new PartyGoldService,
     ) {}
 
     /**
@@ -85,6 +89,25 @@ class DungeonExplorationEngine
                     'next_node' => $nodeKey,
                     'complete' => false,
                 ];
+            }
+
+            if ($node->node_type === 'assign_rescuer') {
+                $except = $context['target_slot'] ?? null;
+                $picked = $this->damage->pickRandomAliveSlot($user, is_string($except) ? $except : null);
+                if ($picked !== null) {
+                    $context['chosen_slot'] = $picked;
+                }
+                $session->context = $context;
+                $nodeKey = (string) $node->next_default;
+                continue;
+            }
+
+            if ($node->node_type === 'stat_check_each_ally') {
+                $this->capturePartySnapshot($user, $context);
+                $lines = array_merge($lines, $this->buildStatCheckEachAllyLines($user, $node, $context));
+                $session->context = $context;
+                $nodeKey = (string) $node->next_default;
+                continue;
             }
 
             if ($this->isDeferredEffectNode($node->node_type)) {
@@ -357,6 +380,8 @@ class DungeonExplorationEngine
             'apply_damage_party',
             'restore_party',
             'check_party_alive',
+            'grant_item',
+            'grant_gold',
         ], true);
     }
 
@@ -428,6 +453,8 @@ class DungeonExplorationEngine
             'apply_damage_party' => $this->executeApplyDamageParty($user, $node),
             'restore_party' => $this->executeRestoreParty($user, $node),
             'check_party_alive' => $this->executeCheckPartyAlive($user, $node),
+            'grant_item' => $this->executeGrantItem($user, $node),
+            'grant_gold' => $this->executeGrantGold($user, $node),
             default => throw new \InvalidArgumentException("Unknown effect node type: {$node->node_type}"),
         };
     }
@@ -439,7 +466,8 @@ class DungeonExplorationEngine
     {
         $targetSlot = (string) ($context['target_slot'] ?? '');
         if ($targetSlot !== '') {
-            $this->damage->applyDamageToSlot($user, $targetSlot, (int) $node->fixed_damage);
+            $minHp = max(0, (int) ($node->stat_multiplier ?? 0));
+            $this->damage->applyDamageToSlot($user, $targetSlot, (int) $node->fixed_damage, $minHp);
         }
 
         return (string) $node->next_default;
@@ -452,7 +480,8 @@ class DungeonExplorationEngine
     {
         $chosenSlot = (string) ($context['chosen_slot'] ?? '');
         if ($chosenSlot !== '') {
-            $this->damage->applyDamageToSlot($user, $chosenSlot, (int) $node->fixed_damage);
+            $minHp = max(0, (int) ($node->stat_multiplier ?? 0));
+            $this->damage->applyDamageToSlot($user, $chosenSlot, (int) $node->fixed_damage, $minHp);
         }
 
         return (string) $node->next_default;
@@ -482,6 +511,115 @@ class DungeonExplorationEngine
         return $this->damage->isPartyWiped($user)
             ? (string) ($node->next_on_fail ?: $node->next_default)
             : (string) ($node->next_on_success ?: $node->next_default);
+    }
+
+    private function executeGrantItem(User $user, DungeonEventNode $node): string
+    {
+        $itemCode = trim((string) ($node->stat_attr ?? ''));
+        if ($itemCode === '') {
+            throw new \InvalidArgumentException('grant_item ノードに stat_attr（アイテムコード）が必要です。');
+        }
+
+        $amount = (int) ($node->stat_multiplier ?? 1);
+        if ($amount <= 0) {
+            $amount = 1;
+        }
+
+        $this->items->add($user, $itemCode, $amount);
+
+        return (string) $node->next_default;
+    }
+
+    private function executeGrantGold(User $user, DungeonEventNode $node): string
+    {
+        $amount = (int) ($node->stat_multiplier ?? 0);
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('grant_gold ノードに stat_multiplier（付与量）が必要です。');
+        }
+
+        $this->gold->addGold($user, $amount);
+
+        return (string) $node->next_default;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function buildStatCheckEachAllyLines(User $user, DungeonEventNode $node, array &$context): array
+    {
+        $attr = (string) ($node->stat_attr ?: 'spirit');
+        $multiplier = (int) ($node->stat_multiplier ?? 3);
+        $failDamage = (int) ($node->fixed_damage ?? 0);
+        $label = $this->statCheckLabel($attr);
+        $lines = [];
+
+        foreach (['pc1', 'pc2', 'pc3', 'pc4'] as $slotId) {
+            $party = $this->characters->partyInSlotOrder($user);
+            /** @var UserCharacter|null $character */
+            $character = $party->get($slotId);
+            if ($character === null || $character->hp <= 0) {
+                continue;
+            }
+
+            $character->loadMissing('characterMaster');
+            $name = $character->characterMaster->name ?? '???';
+            $rate = $this->successRateForSlot($user, $slotId, $attr, $multiplier);
+
+            $lines[] = [
+                'type' => 'narration',
+                'text' => "{$name}は水の中で冷静さを保とうとした！\n{$label}\n成功率：{$rate}%",
+                'sfx' => null,
+            ];
+
+            if ($this->rollSuccess($rate)) {
+                $lines[] = [
+                    'type' => 'narration',
+                    'text' => "{$name}は落ち着いて水面から顔を出した！",
+                    'sfx' => null,
+                ];
+            } else {
+                $failLine = [
+                    'type' => 'narration',
+                    'text' => "{$name}はパニックに陥り水を飲んだ！",
+                    'sfx' => null,
+                ];
+                if ($failDamage > 0) {
+                    $this->damage->applyDamageToSlot($user, $slotId, $failDamage);
+                    $failLine['sync_party'] = true;
+                    $failLine['party'] = $this->partyPayload($user);
+                }
+                $lines[] = $failLine;
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function partyPayload(User $user): array
+    {
+        return $this->characters->partyInSlotOrder($user)
+            ->map(fn (UserCharacter $character, string $slotId) => $this->characters->toPartyUnitPayload($character, $slotId))
+            ->values()
+            ->all();
+    }
+
+    private function rollSuccess(int $rate): bool
+    {
+        $forcedSuccess = config('game.dungeon.test_stat_success');
+        if ($forcedSuccess === true) {
+            return true;
+        }
+        if ($forcedSuccess === false) {
+            return false;
+        }
+
+        $forcedRoll = config('game.dungeon.test_roll');
+        $roll = is_numeric($forcedRoll) ? (int) $forcedRoll : random_int(1, 100);
+
+        return $roll <= $rate;
     }
 
     /**
@@ -686,7 +824,7 @@ class DungeonExplorationEngine
      */
     private function slotForStatCheck(string $attr, array $context): string
     {
-        if ($attr === 'str') {
+        if (in_array($attr, ['str', 'know'], true)) {
             return (string) ($context['chosen_slot'] ?? $context['target_slot'] ?? '');
         }
 
@@ -763,11 +901,16 @@ class DungeonExplorationEngine
     private function nodeToLine(User $user, DungeonEventNode $node, array $context): ?array
     {
         if ($node->node_type === 'narration') {
-            return [
+            $line = [
                 'type' => 'narration',
                 'text' => $this->interpolate((string) $node->text, $user, $context),
                 'sfx' => $node->sfx ?: null,
             ];
+            if ($node->sfx === 'screen_fade') {
+                $line['screen_fade_ms'] = 1000;
+            }
+
+            return $line;
         }
 
         if ($node->node_type === 'dialogue') {
@@ -909,7 +1052,7 @@ class DungeonExplorationEngine
         $party = $this->characters->partyInSlotOrder($user);
 
         $statNode = null;
-        if ($node->node_type === 'party_choice' && $eventCode !== '') {
+        if (in_array($node->node_type, ['party_choice', 'party_choice_skip'], true) && $eventCode !== '') {
             $startKey = (string) ($node->next_on_success ?: $node->next_default ?: '');
             $statNode = $this->findUpcomingStatCheckNode($eventCode, $startKey);
         }
@@ -922,9 +1065,7 @@ class DungeonExplorationEngine
                 continue;
             }
 
-            if ($node->node_type === 'party_choice_skip') {
-                $label = $character->characterMaster->name;
-            } elseif ($statNode !== null) {
+            if ($statNode !== null) {
                 $rate = $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier);
                 $label = $character->characterMaster->name.'（成功率'.$rate.'%）';
             } else {

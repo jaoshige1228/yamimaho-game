@@ -6,6 +6,7 @@ use App\Models\BattleState;
 use App\Models\User;
 use App\Models\UserCharacter;
 use App\Models\UserDungeonProgress;
+use App\Services\Player\ItemInventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -32,6 +33,8 @@ class DungeonHealApiTest extends TestCase
             ->firstOrFail();
         $character->hp = 10;
         $character->save();
+
+        app(ItemInventoryService::class)->add($user, 'potion_hp_s', 1);
 
         $response = $this->postJson('/api/dungeon/heal', [
             'mode' => 'item',

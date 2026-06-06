@@ -188,6 +188,7 @@ function delay(ms) {
 
 const PARTY_ENTRANCE_DELAY_MS = 500;
 const PARTY_ENTRANCE_ANIM_MS = 450;
+const SPELL_CAST_ANNOUNCE_DELAY_MS = 700;
 
 async function runPartyEntrance() {
   partyPhase.value = 'hidden';
@@ -280,10 +281,45 @@ function syncDisplayHp(force = false) {
   }
 }
 
+function snapshotDisplayHp() {
+  const snap = {};
+  for (const unit of units.value) {
+    snap[unit.id] = unit.id in displayHp.value
+      ? displayHp.value[unit.id]
+      : unit.hp;
+  }
+  return snap;
+}
+
+function applyDisplayHpSnapshot(snap) {
+  displayHp.value = { ...snap };
+}
+
+/** state はイベント適用後だが、再生前の表示 HP に戻す */
+function rewindDisplayHpForEvents(events) {
+  const snap = snapshotDisplayHp();
+  for (const ev of events) {
+    if (ev.type === 'damage') {
+      const unit = units.value.find((u) => u.id === ev.target);
+      const max = unit?.max_hp ?? Infinity;
+      snap[ev.target] = Math.min(max, (snap[ev.target] ?? 0) + Number(ev.value || 0));
+    }
+    if (ev.type === 'heal') {
+      snap[ev.target] = Math.max(0, (snap[ev.target] ?? 0) - Number(ev.value || 0));
+    }
+    if (ev.type === 'revive') {
+      snap[ev.target] = 0;
+    }
+  }
+  applyDisplayHpSnapshot(snap);
+}
+
 function applyDisplayHpDelta(targetId, delta) {
   const unit = units.value.find((u) => u.id === targetId);
   if (!unit) return;
-  const current = displayHp.value[targetId] ?? unit.hp;
+  const current = targetId in displayHp.value
+    ? displayHp.value[targetId]
+    : unit.hp;
   displayHp.value[targetId] = Math.max(0, Math.min(unit.max_hp, current + delta));
 }
 
@@ -308,10 +344,10 @@ async function playEvents(events) {
     }
     if (ev.type === 'announce') {
       showActionBanner(ev.text);
-      const isSpell = ev.text?.includes('詠唱');
+      const isSpell = ev.text?.includes('唱え');
       if (isSpell) {
         playSe('magic');
-        await delay(500);
+        await delay(SPELL_CAST_ANNOUNCE_DELAY_MS);
       } else {
         await delay(360);
       }
@@ -325,10 +361,10 @@ async function playEvents(events) {
     if (ev.type === 'damage') {
       showFlash(ev.element || 'hit');
       shakeTarget.value = ev.target;
-      applyDisplayHpDelta(ev.target, -ev.value);
       showFloatingDamage(ev.target, ev.value);
       playSe('damage');
       await delay(300);
+      applyDisplayHpDelta(ev.target, -ev.value);
       shakeTarget.value = null;
       await delay(120);
     }
@@ -461,6 +497,9 @@ async function initBattle() {
       await runPartyEntrance();
     }
     const events = battle.dequeueEvents();
+    if (events.length > 0) {
+      rewindDisplayHpForEvents(events);
+    }
     await playEvents(events);
     syncDisplayHp(true);
   } catch (e) {
@@ -504,8 +543,10 @@ async function doAction(payload) {
   if (busy.value || !awaiting.value) return;
   busy.value = true;
   closeModals();
+  const hpSnapshot = snapshotDisplayHp();
   try {
     await battle.submitAction(payload);
+    applyDisplayHpSnapshot(hpSnapshot);
     await afterAction();
   } catch (e) {
     battle.error = e.message;
@@ -575,6 +616,9 @@ async function retry() {
     await tryPlayBgm({ restart: true });
     await runPartyEntrance();
     const events = battle.dequeueEvents();
+    if (events.length > 0) {
+      rewindDisplayHpForEvents(events);
+    }
     await playEvents(events);
     syncDisplayHp(true);
   } catch (e) {
@@ -759,9 +803,9 @@ watch(
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  padding: 0.5rem 0;
+  padding: 0;
 }
 .error {
   position: absolute;

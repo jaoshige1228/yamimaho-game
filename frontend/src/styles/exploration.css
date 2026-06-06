@@ -22,6 +22,14 @@
   display: block;
 }
 
+.scene-panel__fade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #000;
+  pointer-events: none;
+}
+
 .scene-panel__overlays {
   position: absolute;
   inset: 0;

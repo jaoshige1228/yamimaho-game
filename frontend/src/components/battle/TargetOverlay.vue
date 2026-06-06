@@ -20,7 +20,7 @@ const emit = defineEmits(['cancel', 'confirm-all']);
         <div class="actions">
           <button type="button" class="btn" @click="emit('cancel')">やめる</button>
           <button v-if="showExecute" type="button" class="btn primary" @click="emit('confirm-all')">
-            決定
+            唱える
           </button>
         </div>
       </div>

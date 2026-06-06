@@ -45,6 +45,7 @@ class DungeonAdminSettingsTest extends TestCase
 
         $this->postJson('/api/dungeon/enter')->assertOk();
         $response = $this->postJson('/api/dungeon/advance')->assertOk();
-        $this->assertSame('exploration', $response->json('event'));
+        $this->assertNotSame('battle', $response->json('event'));
+        $this->assertContains($response->json('event'), ['exploration', 'flavor']);
     }
 }

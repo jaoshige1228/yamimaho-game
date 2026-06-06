@@ -22,7 +22,8 @@ return [
     /** 実装済みで挑戦可能な最大層（2層目以降は未実装の間は 1） */
     'playable_floor' => 1,
     'battle_encounter_rate' => 30,
-    'exploration_event_rate' => 70,
+    'exploration_event_rate' => 60,
+    'flavor_narrative_rate' => 10,
     /**
      * 層ごとの設定。boss_step に到達した「進む」でボス戦（通常抽選は行わない）
      */
@@ -55,7 +56,7 @@ return [
         ],
       ],
     ],
-    /** テスト用: null | battle | exploration */
+    /** テスト用: null | battle | exploration | flavor */
     'test_force' => env('DUNGEON_TEST_FORCE'),
     /** テスト用: trap_arrow | treasure_chest など */
     'test_event_code' => env('DUNGEON_TEST_EVENT_CODE'),

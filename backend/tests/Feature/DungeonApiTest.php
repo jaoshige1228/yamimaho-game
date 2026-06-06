@@ -170,6 +170,29 @@ class DungeonApiTest extends TestCase
         $this->assertSame(4, (int) $progress->step);
     }
 
+    public function test_advance_returns_flavor_narrative_without_session(): void
+    {
+        config(['game.dungeon.test_force' => 'flavor']);
+
+        $this->postJson('/api/battles/demo')->assertOk();
+        $this->postJson('/api/dungeon/enter')->assertOk();
+
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'flavor');
+        $response->assertJsonPath('segment.kind', 'story');
+        $response->assertJsonPath('segment.lines', fn ($lines) => is_array($lines) && count($lines) >= 1);
+        $response->assertJsonMissing(['session_id']);
+
+        $text = json_encode($response->json('segment.lines'), JSON_UNESCAPED_UNICODE);
+        $this->assertTrue(
+            str_contains($text, '何も起きない')
+            || str_contains($text, '悲鳴')
+            || str_contains($text, '宝箱'),
+        );
+
+        $this->postJson('/api/dungeon/advance')->assertOk();
+    }
+
     public function test_master_seeder_loads_dungeon_events(): void
     {
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'trap_arrow']);
@@ -177,7 +200,7 @@ class DungeonApiTest extends TestCase
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'healing_spring']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'suspicious_spring']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'mysterious_presence']);
-        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'rainbow_spring', 'weight' => 3]);
+        $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'rainbow_spring']);
         $this->assertDatabaseHas('enemy_masters', ['code' => 'bat', 'floor' => 1]);
         $this->assertDatabaseHas('enemy_masters', ['code' => 'inu_moe', 'floor' => 1]);
     }

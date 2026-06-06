@@ -72,4 +72,22 @@ class BattleEngineSpellRestrictionTest extends TestCase
             'pc2',
         );
     }
+
+    public function test_damage_spell_is_usable_when_enemy_alive(): void
+    {
+        $engine = new BattleEngine(new BattleFactory);
+        $method = new \ReflectionMethod(BattleEngine::class, 'spellHasValidTarget');
+        $method->setAccessible(true);
+
+        $spell = [
+            'effect' => 'damage',
+            'target_type' => 'enemy_single',
+        ];
+        $units = [
+            'pc3' => ['side' => 'ally', 'alive' => true],
+            'enemy_1' => ['side' => 'enemy', 'alive' => true],
+        ];
+
+        $this->assertTrue($method->invoke($engine, $spell, $units));
+    }
 }

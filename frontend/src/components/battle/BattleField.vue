@@ -68,7 +68,7 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
 .battle-field {
   position: relative;
   width: 100%;
-  height: min(800px, 100%);
+  height: 100%;
   max-height: 800px;
   overflow: hidden;
   flex-shrink: 0;
@@ -99,14 +99,43 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
   min-height: 0;
   background: var(--battle-bg-bottom);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  padding: 0.3rem 0.2rem;
+  padding: 0.25rem 0.2rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
   border-top: 2px solid rgba(157, 124, 255, 0.25);
   overflow: hidden;
 }
 .party-entrance-wrap {
   width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+.party-entrance-wrap :deep(.party-row) {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  gap: 0.25rem;
+}
+.party-entrance-wrap :deep(.party-slot) {
+  height: 100%;
+  min-height: 0;
+  padding-bottom: 0.2rem;
+}
+.party-entrance-wrap :deep(.unit-sprite-frame.party) {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  max-height: 72%;
+}
+.party-entrance-wrap :deep(.unit-meta) {
+  flex: 0 0 auto;
+}
+.party-entrance-wrap :deep(.name) {
+  line-height: 1.35;
+  padding-bottom: 1px;
 }
 .party-entrance-wrap.entering {
   animation: partyDeploy 0.45s ease-out both;

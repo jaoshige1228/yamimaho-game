@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useAppAudio } from '../../composables/useAppAudio.js';
 import StoryCharacterSprite from './StoryCharacterSprite.vue';
 import StoryTextWindow from './StoryTextWindow.vue';
@@ -12,9 +12,12 @@ const props = defineProps({
   party: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['complete', 'sync-party']);
+const emit = defineEmits(['complete', 'sync-party', 'screen-fade']);
 
 const index = ref(0);
+const inputLocked = ref(false);
+/** @type {ReturnType<typeof setTimeout> | null} */
+let fadeTimer = null;
 
 const currentLine = computed(() => props.lines[index.value] ?? null);
 
@@ -38,9 +41,37 @@ const characterInfo = computed(() => {
   };
 });
 
+function clearFadeTimer() {
+  if (fadeTimer !== null) {
+    clearTimeout(fadeTimer);
+    fadeTimer = null;
+  }
+}
+
+function advanceLine() {
+  if (index.value >= props.lines.length - 1) {
+    emit('complete');
+    return;
+  }
+  index.value += 1;
+}
+
+function runScreenFade(ms) {
+  clearFadeTimer();
+  emit('screen-fade', ms);
+  inputLocked.value = true;
+  fadeTimer = setTimeout(() => {
+    inputLocked.value = false;
+    fadeTimer = null;
+    advanceLine();
+  }, ms);
+}
+
 watch(
   () => props.lines,
   () => {
+    clearFadeTimer();
+    inputLocked.value = false;
     index.value = 0;
   },
 );
@@ -48,25 +79,32 @@ watch(
 function emitSyncPartyIfNeeded(lineIndex) {
   const line = props.lines[lineIndex];
   if (line?.sync_party) {
-    emit('sync-party');
+    emit('sync-party', Array.isArray(line.party) ? line.party : null);
   }
 }
 
 watch(index, (lineIndex) => {
   emitSyncPartyIfNeeded(lineIndex);
+  const line = props.lines[lineIndex];
+  const fadeMs = Number(line?.screen_fade_ms);
+  if (fadeMs > 0) {
+    runScreenFade(fadeMs);
+  }
 }, { immediate: true });
 
+onUnmounted(() => {
+  clearFadeTimer();
+});
+
 function onPointerDown() {
+  if (inputLocked.value) return;
   unlock();
   playSe('cursor');
 }
 
 function onTap() {
-  if (index.value >= props.lines.length - 1) {
-    emit('complete');
-    return;
-  }
-  index.value += 1;
+  if (inputLocked.value) return;
+  advanceLine();
 }
 </script>
 

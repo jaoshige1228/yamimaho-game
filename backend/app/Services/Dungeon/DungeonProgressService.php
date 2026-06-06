@@ -6,11 +6,13 @@ use App\Models\DungeonExplorationSession;
 use App\Models\User;
 use App\Models\UserDungeonProgress;
 use App\Services\Player\PartyGoldService;
+use App\Services\Player\UserCharacterService;
 
 class DungeonProgressService
 {
     public function __construct(
         private readonly PartyGoldService $gold = new PartyGoldService,
+        private readonly UserCharacterService $characters = new UserCharacterService,
     ) {}
     public function getStep(User $user): int
     {
@@ -81,6 +83,7 @@ class DungeonProgressService
         DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
         $user->refresh();
         $this->gold->applyRetreatPenalty($user);
+        $this->characters->restorePartyToFull($user);
         $record = $this->findOrCreate($user);
         $record->in_dungeon = false;
         $record->save();

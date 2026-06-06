@@ -167,7 +167,7 @@ class BattleOrchestrator
         }
 
         $this->rewards->syncPartyHpMp($state, $user);
-        $newStep = $this->dungeonProgress->decreaseStep($user, 3, 1);
+        $newStep = $this->dungeonProgress->decreaseStep($user, 1, 1);
 
         $state['status'] = 'fled';
         $state['awaiting_input'] = false;

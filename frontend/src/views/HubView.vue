@@ -72,6 +72,9 @@ onMounted(() => loadParty());
           <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'equip' })">
             装備を整える
           </button>
+          <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'items' })">
+            持ち物を見る
+          </button>
         </div>
         <p v-if="error" class="scene-error">{{ error }}</p>
       </ScenePanel>

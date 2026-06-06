@@ -14,7 +14,7 @@ class PartyExplorationDamageService
         private readonly LevelGrowthService $growth = new LevelGrowthService,
     ) {}
 
-    public function applyDamageToSlot(User $user, string $slotId, int $damage): void
+    public function applyDamageToSlot(User $user, string $slotId, int $damage, int $minHp = 0): void
     {
         $party = $this->characters->partyInSlotOrder($user);
         /** @var UserCharacter|null $character */
@@ -23,7 +23,14 @@ class PartyExplorationDamageService
             return;
         }
 
-        $character->hp = max(0, (int) $character->hp - $damage);
+        $nextHp = (int) $character->hp - $damage;
+        if ($minHp > 0) {
+            $nextHp = max($minHp, $nextHp);
+        } else {
+            $nextHp = max(0, $nextHp);
+        }
+
+        $character->hp = $nextHp;
         $character->save();
     }
 

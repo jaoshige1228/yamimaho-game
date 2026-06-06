@@ -3,7 +3,7 @@
  * @param {{ delay?: number }} [options]
  */
 export function useLongPress(onLongPress, options = {}) {
-  const delay = options.delay ?? 480;
+  const delay = options.delay ?? 200;
 
   /** @type {ReturnType<typeof setTimeout> | null} */
   let timer = null;

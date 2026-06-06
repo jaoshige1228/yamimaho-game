@@ -11,11 +11,8 @@ class ItemInventoryService
 {
     /** @var array<string, int> */
     private const STARTER_ITEMS = [
-        'potion_hp_s' => 3,
-        'potion_mp_s' => 3,
-        'potion_hp_m' => 1,
-        'potion_mp_m' => 1,
-        'world_tree_leaf' => 1,
+        'potion_hp_s' => 4,
+        'potion_mp_s' => 4,
     ];
 
     public function grantStarterItems(User $user): void
@@ -86,6 +83,26 @@ class ItemInventoryService
         } else {
             $record->save();
         }
+    }
+
+    public function add(User $user, string $itemCode, int $amount = 1): void
+    {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('数量が不正です。');
+        }
+
+        $item = $this->findItem($itemCode);
+
+        $record = UserItem::query()->firstOrCreate(
+            [
+                'user_id' => $user->id,
+                'item_master_id' => $item->id,
+            ],
+            ['quantity' => 0],
+        );
+
+        $record->quantity += $amount;
+        $record->save();
     }
 
     public function findItem(string $code): ItemMaster

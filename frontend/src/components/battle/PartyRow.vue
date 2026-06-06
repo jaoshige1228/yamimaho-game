@@ -23,7 +23,14 @@ function supportEffectClass(unit) {
 }
 
 function displayHpFor(unit) {
-  return props.displayHp[unit.id] ?? unit.hp;
+  if (unit.id in props.displayHp) {
+    return props.displayHp[unit.id];
+  }
+  return unit.hp;
+}
+
+function isDisplayDead(unit) {
+  return displayHpFor(unit) <= 0;
 }
 
 const emit = defineEmits(['select', 'open-commands', 'show-stats']);
@@ -82,7 +89,7 @@ function onSlotClick(unit) {
       :class="[
         {
           active: currentActor === unit.id,
-          dead: !unit.alive,
+          dead: isDisplayDead(unit),
           selectable: canSelect(unit),
           commandable: canOpenCommands(unit),
           shake: shakeTarget === unit.id,
@@ -111,7 +118,7 @@ function onSlotClick(unit) {
           :mp="unit.mp"
           :max-mp="unit.max_mp"
         />
-        <span class="name">Lv{{ unit.level ?? 1 }} {{ unit.name }}</span>
+        <span class="name">{{ unit.name }}</span>
         <span v-if="canOpenCommands(unit)" class="tap-hint">タップして選ぶ</span>
       </div>
     </button>
@@ -124,7 +131,7 @@ function onSlotClick(unit) {
   grid-template-columns: repeat(4, 1fr);
   gap: 0.3rem;
   width: 100%;
-  max-height: 480px;
+  max-height: 100%;
   padding: 0 0.15rem;
 }
 .party-slot {
@@ -144,6 +151,15 @@ function onSlotClick(unit) {
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+.party-slot:active {
+  background: rgba(8, 5, 18, 0.55);
+}
+.party-slot:focus {
+  outline: none;
 }
 .party-slot.commandable {
   cursor: pointer;
@@ -154,7 +170,7 @@ function onSlotClick(unit) {
 }
 .party-slot.active .unit-sprite-frame {
   filter: drop-shadow(0 0 10px rgba(157, 124, 255, 0.75));
-  animation: unitPulse 1.2s ease-in-out infinite;
+  animation: unitPulse 2.4s ease-in-out infinite;
 }
 .party-slot.dead {
   opacity: 0.35;
@@ -169,6 +185,7 @@ function onSlotClick(unit) {
 }
 .unit-meta {
   flex: 0 0 auto;
+  flex-shrink: 0;
   min-width: 0;
 }
 .name {
@@ -176,10 +193,12 @@ function onSlotClick(unit) {
   margin-top: 0.15rem;
   font-weight: 600;
   font-size: 0.62rem;
+  line-height: 1.35;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .tap-hint {
   display: block;

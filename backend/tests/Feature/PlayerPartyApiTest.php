@@ -59,6 +59,18 @@ class PlayerPartyApiTest extends TestCase
         $this->assertStringContainsString('イケてる', $pc1['armor']['description']);
     }
 
+    public function test_new_player_starts_with_starter_potions(): void
+    {
+        $this->postJson('/api/battles/demo')->assertOk();
+
+        $response = $this->getJson('/api/player/party')->assertOk();
+        $items = collect($response->json('items'))->keyBy('code');
+
+        $this->assertSame(4, $items->get('potion_hp_s')['quantity'] ?? 0);
+        $this->assertSame(4, $items->get('potion_mp_s')['quantity'] ?? 0);
+        $this->assertCount(2, $items);
+    }
+
     public function test_player_stats_endpoint_matches_party(): void
     {
         $this->postJson('/api/battles/demo')->assertOk();
