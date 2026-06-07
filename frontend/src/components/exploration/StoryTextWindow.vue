@@ -13,7 +13,14 @@ const props = defineProps({
 });
 
 const textSource = toRef(props, 'text');
-const { displayed, isComplete } = useTypewriterText(textSource);
+const { displayed, isComplete, skip } = useTypewriterText(textSource);
+
+defineExpose({
+  get isComplete() {
+    return isComplete.value;
+  },
+  skip,
+});
 </script>
 
 <template>

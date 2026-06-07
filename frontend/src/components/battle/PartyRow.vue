@@ -2,7 +2,7 @@
 import BuffIcons from './BuffIcons.vue';
 import UnitBars from './UnitBars.vue';
 import { useLongPress } from '../../composables/useLongPress';
-import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
+import { characterSpriteUrls } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   units: { type: Array, required: true },
@@ -37,8 +37,8 @@ const emit = defineEmits(['select', 'open-commands', 'show-stats']);
 
 const longPress = useLongPress((unit) => emit('show-stats', unit));
 
-function spriteUrl(unit) {
-  return publicAssetUrl(`/assets/characters/${unit.sprite}.png`);
+function spriteUrls(unit) {
+  return characterSpriteUrls(unit.sprite);
 }
 
 function canSelect(unit) {
@@ -104,7 +104,16 @@ function onSlotClick(unit) {
       @contextmenu.prevent
     >
       <div class="unit-sprite-frame party">
-        <img :src="spriteUrl(unit)" :alt="unit.name" class="unit-sprite-bust" />
+        <picture>
+          <source :srcset="spriteUrls(unit).webp" type="image/webp" />
+          <img
+            :src="spriteUrls(unit).png"
+            :alt="unit.name"
+            class="unit-sprite-bust"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
         <BuffIcons
           :buffs="unit.buffs"
           :buff-icons="buffIcons"
@@ -171,6 +180,13 @@ function onSlotClick(unit) {
 .party-slot.active .unit-sprite-frame {
   filter: drop-shadow(0 0 10px rgba(157, 124, 255, 0.75));
   animation: unitPulse 2.4s ease-in-out infinite;
+}
+@media (pointer: coarse) {
+  .party-slot.active .unit-sprite-frame {
+    filter: none;
+    animation: none;
+    transform: scale(1.02);
+  }
 }
 .party-slot.dead {
   opacity: 0.35;

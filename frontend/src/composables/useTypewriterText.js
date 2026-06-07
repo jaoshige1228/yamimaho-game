@@ -1,24 +1,45 @@
 import { onUnmounted, ref, toValue, watch } from 'vue';
 
-/** 1文字あたりの表示間隔（ms）。体感で読める RPG 寄りの速度 */
-const DEFAULT_MS_PER_CHAR = 5;
+function prefersReducedMotion() {
+  return typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function isCoarsePointer() {
+  return typeof window !== 'undefined'
+    && window.matchMedia('(pointer: coarse)').matches;
+}
+
+/** @returns {{ tickMs: number, charsPerTick: number }} */
+function resolveTiming(options) {
+  if (prefersReducedMotion()) {
+    return { tickMs: 0, charsPerTick: Number.MAX_SAFE_INTEGER };
+  }
+  if (options.tickMs != null && options.charsPerTick != null) {
+    return { tickMs: options.tickMs, charsPerTick: options.charsPerTick };
+  }
+  if (isCoarsePointer()) {
+    return { tickMs: 32, charsPerTick: 3 };
+  }
+  return { tickMs: 28, charsPerTick: 2 };
+}
 
 /**
- * requestAnimationFrame ベースの文字送り（経過時間で文字数を進める）。
+ * 低頻度タイマーで文字送り（モバイル Safari 向けに rAF 連打を避ける）。
  * @param {import('vue').MaybeRefOrGetter<string>} source
- * @param {{ msPerChar?: number }} [options]
+ * @param {{ tickMs?: number, charsPerTick?: number }} [options]
  */
 export function useTypewriterText(source, options = {}) {
-  const msPerChar = options.msPerChar ?? DEFAULT_MS_PER_CHAR;
   const displayed = ref('');
   const isComplete = ref(true);
-  let rafId = 0;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let timerId = null;
   let fullText = '';
 
   function cancel() {
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = 0;
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
     }
   }
 
@@ -37,33 +58,29 @@ export function useTypewriterText(source, options = {}) {
       return;
     }
 
+    const { tickMs, charsPerTick } = resolveTiming(options);
+    if (tickMs === 0 || charsPerTick >= fullText.length) {
+      finish();
+      return;
+    }
+
     displayed.value = '';
     isComplete.value = false;
     let index = 0;
-    let lastTimestamp = 0;
 
-    const step = (timestamp) => {
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp;
-      }
-
-      const elapsed = timestamp - lastTimestamp;
-      const charsToReveal = Math.floor(elapsed / msPerChar);
-      if (charsToReveal > 0) {
-        lastTimestamp = timestamp;
-        index = Math.min(fullText.length, index + charsToReveal);
-        displayed.value = fullText.slice(0, index);
-      }
+    const tick = () => {
+      index = Math.min(fullText.length, index + charsPerTick);
+      displayed.value = fullText.slice(0, index);
 
       if (index < fullText.length) {
-        rafId = requestAnimationFrame(step);
+        timerId = setTimeout(tick, tickMs);
       } else {
-        rafId = 0;
+        timerId = null;
         isComplete.value = true;
       }
     };
 
-    rafId = requestAnimationFrame(step);
+    timerId = setTimeout(tick, tickMs);
   }
 
   function skip() {

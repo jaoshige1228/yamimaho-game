@@ -12,3 +12,15 @@ export function publicAssetUrl(path) {
   const separator = normalized.includes('?') ? '&' : '?';
   return `${normalized}${separator}v=${encodeURIComponent(version)}`;
 }
+
+/**
+ * キャラクター立ち絵（WebP 優先、PNG フォールバック）。
+ * @param {string} sprite 例: PC1
+ */
+export function characterSpriteUrls(sprite) {
+  const base = `/assets/characters/${sprite}`;
+  return {
+    webp: publicAssetUrl(`${base}.webp`),
+    png: publicAssetUrl(`${base}.png`),
+  };
+}

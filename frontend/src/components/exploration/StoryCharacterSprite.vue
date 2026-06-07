@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
+import { characterSpriteUrls } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   sprite: { type: String, required: true },
@@ -12,9 +12,7 @@ const props = defineProps({
   },
 });
 
-const imageSrc = computed(() =>
-  publicAssetUrl(`/assets/characters/${props.sprite}.png`),
-);
+const imageUrls = computed(() => characterSpriteUrls(props.sprite));
 </script>
 
 <template>
@@ -22,6 +20,14 @@ const imageSrc = computed(() =>
     class="story-character-sprite"
     :class="variant === 'dialogue' ? 'story-character-sprite--dialogue' : null"
   >
-    <img :src="imageSrc" :alt="alt" class="story-character-sprite__image" />
+    <picture>
+      <source :srcset="imageUrls.webp" type="image/webp" />
+      <img
+        :src="imageUrls.png"
+        :alt="alt"
+        class="story-character-sprite__image"
+        decoding="async"
+      />
+    </picture>
   </div>
 </template>

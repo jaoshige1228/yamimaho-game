@@ -16,6 +16,7 @@ const emit = defineEmits(['complete', 'sync-party', 'screen-fade']);
 
 const index = ref(0);
 const inputLocked = ref(false);
+const textWindowRef = ref(null);
 /** @type {ReturnType<typeof setTimeout> | null} */
 let fadeTimer = null;
 
@@ -104,6 +105,11 @@ function onPointerDown() {
 
 function onTap() {
   if (inputLocked.value) return;
+  const windowApi = textWindowRef.value;
+  if (windowApi && !windowApi.isComplete) {
+    windowApi.skip();
+    return;
+  }
   advanceLine();
 }
 </script>
@@ -125,6 +131,7 @@ function onTap() {
             :alt="characterInfo.name"
           />
           <StoryTextWindow
+            ref="textWindowRef"
             mode="dialogue"
             :text="currentLine.text"
             :character-name="characterInfo.name"
@@ -132,6 +139,7 @@ function onTap() {
         </div>
         <StoryTextWindow
           v-else-if="currentLine"
+          ref="textWindowRef"
           mode="narration"
           :text="currentLine.text"
         />

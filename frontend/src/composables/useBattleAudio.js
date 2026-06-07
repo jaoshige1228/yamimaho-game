@@ -15,13 +15,16 @@ const SE_TRACKS = {
   damage: publicAssetUrl('/assets/audio/se/damage.mp3'),
   miss: publicAssetUrl('/assets/audio/se/miss.mp3'),
   success: publicAssetUrl('/assets/audio/se/success.mp3'),
+  heal: publicAssetUrl('/assets/audio/se/heal.mp3'),
 };
 
 const STORAGE_KEY = 'yamimaho-audio';
+const SE_POOL_SIZE = 4;
 
 const DEFAULT_SETTINGS = {
   bgmEnabled: false,
   bgmVolume: 0.25,
+  seEnabled: true,
 };
 
 /** 音源マスター（スライダー倍率とは別） */
@@ -37,8 +40,8 @@ const unlocked = ref(false);
 const currentBgmTrack = ref(null);
 
 let bgm = null;
-let activeSe = null;
-let activeSeKey = null;
+/** @type {Array<{ audio: HTMLAudioElement, seKey: string | null, playing: boolean }>} */
+let sePool = [];
 let fadeTimer = null;
 let mountCount = 0;
 
@@ -51,6 +54,7 @@ function loadSettings() {
       return {
         ...DEFAULT_SETTINGS,
         bgmEnabled: typeof parsed.bgmEnabled === 'boolean' ? parsed.bgmEnabled : DEFAULT_SETTINGS.bgmEnabled,
+        seEnabled: typeof parsed.seEnabled === 'boolean' ? parsed.seEnabled : DEFAULT_SETTINGS.seEnabled,
         bgmVolume: Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : DEFAULT_SETTINGS.bgmVolume,
       };
     }
@@ -72,8 +76,8 @@ function effectiveBgmVolume() {
   return Math.min(1, settings.value.bgmVolume * BGM_MASTER_GAIN);
 }
 
-function effectiveSeVolume(seKey = activeSeKey) {
-  if (!settings.value.bgmEnabled) {
+function effectiveSeVolume(seKey) {
+  if (!settings.value.seEnabled) {
     return 0;
   }
 
@@ -91,51 +95,75 @@ function ensureBgm() {
   applyVolumes();
 }
 
-function ensureActiveSe() {
-  if (!activeSe) {
-    activeSe = new Audio();
-    activeSe.preload = 'auto';
+function ensureSePool() {
+  if (sePool.length >= SE_POOL_SIZE) {
+    return;
   }
+
+  while (sePool.length < SE_POOL_SIZE) {
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.addEventListener('ended', () => {
+      const slot = sePool.find((entry) => entry.audio === audio);
+      if (slot) {
+        slot.playing = false;
+        slot.seKey = null;
+      }
+    });
+    sePool.push({ audio, seKey: null, playing: false });
+  }
+}
+
+function preloadSePool() {
+  ensureSePool();
+  const urls = Object.values(SE_TRACKS);
+  sePool.forEach((slot, index) => {
+    const url = urls[index % urls.length];
+    if (url && slot.audio.src !== url) {
+      slot.audio.src = url;
+      slot.audio.load();
+    }
+  });
 }
 
 function applyVolumes() {
   if (bgm) {
     bgm.volume = effectiveBgmVolume();
   }
-  if (activeSe && !activeSe.paused) {
-    activeSe.volume = effectiveSeVolume();
-  }
+  sePool.forEach(({ audio, seKey, playing }) => {
+    if (playing && seKey) {
+      audio.volume = effectiveSeVolume(seKey);
+    }
+  });
 }
 
-function stopActiveSe() {
-  if (!activeSe) {
-    return;
+function stopAllSe() {
+  sePool.forEach((slot) => {
+    slot.audio.pause();
+    slot.audio.currentTime = 0;
+    slot.playing = false;
+    slot.seKey = null;
+  });
+}
+
+function findSeSlot() {
+  const idle = sePool.find((slot) => !slot.playing || slot.audio.paused || slot.audio.ended);
+  if (idle) {
+    return idle;
   }
-  activeSe.pause();
-  activeSe.currentTime = 0;
-  activeSeKey = null;
+  return sePool.reduce((oldest, slot) => (
+    slot.audio.currentTime >= oldest.audio.currentTime ? slot : oldest
+  ));
 }
 
 function isBgmPaused() {
   return !bgm || bgm.paused;
 }
 
-function preloadSeTracks() {
-  Object.entries(SE_TRACKS).forEach(([key, url]) => {
-    const clip = new Audio(url);
-    clip.preload = 'auto';
-    clip.load();
-    if (key === 'cursor' && activeSe) {
-      activeSe.src = url;
-      activeSeKey = 'cursor';
-    }
-  });
-}
-
 function unlock() {
   ensureBgm();
-  ensureActiveSe();
-  preloadSeTracks();
+  ensureSePool();
+  preloadSePool();
   unlocked.value = true;
 }
 
@@ -211,12 +239,20 @@ function setBgmEnabled(enabled) {
     if (bgm) {
       bgm.pause();
     }
-    stopActiveSe();
     return;
   }
 
   if (currentBgmTrack.value) {
     switchBgm(currentBgmTrack.value, { restart: false });
+  }
+}
+
+function setSeEnabled(enabled) {
+  settings.value.seEnabled = enabled;
+  persistSettings();
+  applyVolumes();
+  if (!enabled) {
+    stopAllSe();
   }
 }
 
@@ -229,7 +265,7 @@ function setBgmVolume(volume) {
 }
 
 function playSe(seKey) {
-  if (!unlocked.value || !settings.value.bgmEnabled) {
+  if (!unlocked.value || !settings.value.seEnabled) {
     return;
   }
 
@@ -238,19 +274,25 @@ function playSe(seKey) {
     return;
   }
 
-  ensureActiveSe();
+  ensureSePool();
+  const slot = findSeSlot();
+  const { audio } = slot;
 
-  if (activeSeKey !== seKey) {
-    activeSe.pause();
-    activeSe.src = url;
-    activeSeKey = seKey;
+  if (slot.seKey !== seKey || audio.src !== url) {
+    audio.pause();
+    audio.src = url;
+    slot.seKey = seKey;
   } else {
-    activeSe.pause();
-    activeSe.currentTime = 0;
+    audio.pause();
+    audio.currentTime = 0;
   }
 
-  activeSe.volume = effectiveSeVolume(seKey);
-  activeSe.play().catch(() => {});
+  slot.playing = true;
+  audio.volume = effectiveSeVolume(seKey);
+  audio.play().catch(() => {
+    slot.playing = false;
+    slot.seKey = null;
+  });
 }
 
 function fadeOutBgm(ms = 800) {
@@ -286,7 +328,7 @@ export function useBattleAudio({ persistent = false } = {}) {
       if (!persistent && bgm) {
         bgm.pause();
       }
-      stopActiveSe();
+      stopAllSe();
     }
   });
 
@@ -300,6 +342,7 @@ export function useBattleAudio({ persistent = false } = {}) {
     resumeBgm,
     unlockAndPlay,
     setBgmEnabled,
+    setSeEnabled,
     setBgmVolume,
     playSe,
     fadeOutBgm,

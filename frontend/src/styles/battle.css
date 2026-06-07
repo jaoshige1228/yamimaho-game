@@ -161,6 +161,34 @@
   }
 }
 
+@keyframes supportGlowLite {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (pointer: coarse) {
+  .party-slot.support-heal .unit-sprite-frame,
+  .party-slot.support-buff .unit-sprite-frame,
+  .party-slot.support-debuff .unit-sprite-frame,
+  .enemy-slot.support-debuff .sprite,
+  .party-slot.support-shield .unit-sprite-frame,
+  .party-slot.support-revive .unit-sprite-frame,
+  .enemy-slot.support-heal .sprite,
+  .enemy-slot.support-buff .sprite,
+  .enemy-slot.support-shield .sprite,
+  .enemy-slot.support-revive .sprite {
+    animation: supportGlowLite 0.45s ease;
+    filter: none;
+  }
+}
+
 .party-slot.support-heal .unit-sprite-frame {
   animation: supportGlow 0.45s ease;
   filter: drop-shadow(0 0 12px rgba(80, 220, 140, 0.85));
@@ -251,6 +279,11 @@
   overflow: hidden;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.22);
+}
+.unit-sprite-frame picture {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .unit-sprite-frame.party {
   height: clamp(100px, 28dvh, 280px);
