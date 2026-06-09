@@ -38,18 +38,25 @@ class MasterDataProvider
         return $all[$code];
     }
 
+    public static function enemyKey(int $floor, string $code): string
+    {
+        return "{$floor}.{$code}";
+    }
+
     /**
      * @return array<string, mixed>
      */
-    public function findEnemy(string $code): array
+    public function findEnemy(string $code, ?int $floor = null): array
     {
+        $floor = $floor ?? 1;
         $all = $this->enemyMasters();
+        $key = self::enemyKey($floor, $code);
 
-        if (! isset($all[$code])) {
-            throw new \InvalidArgumentException("Enemy master not found: {$code}");
+        if (! isset($all[$key])) {
+            throw new \InvalidArgumentException("Enemy master not found: {$code} (floor {$floor})");
         }
 
-        return [...$all[$code]];
+        return [...$all[$key]];
     }
 
     /**
@@ -148,7 +155,7 @@ class MasterDataProvider
         if ($this->hasEnemyMastersTable() && EnemyMaster::query()->exists()) {
             $this->enemyCache = EnemyMaster::query()
                 ->get()
-                ->keyBy('code')
+                ->keyBy(fn (EnemyMaster $m) => self::enemyKey((int) $m->floor, (string) $m->code))
                 ->map(fn (EnemyMaster $m) => $this->normalizeEnemy($m->toArray()))
                 ->all();
         } else {
@@ -256,7 +263,9 @@ class MasterDataProvider
     {
         $masters = [];
         foreach (CsvMasterReader::read('enemy_masters.csv') as $row) {
-            $masters[$row['code']] = $this->normalizeEnemy($row);
+            $floor = (int) ($row['floor'] ?? 1);
+            $code = (string) $row['code'];
+            $masters[self::enemyKey($floor, $code)] = $this->normalizeEnemy($row);
         }
 
         return $masters;
@@ -307,6 +316,7 @@ class MasterDataProvider
     {
         return [
             ...$this->normalizeMaster($row),
+            'floor' => (int) ($row['floor'] ?? 1),
             'level' => (int) ($row['level'] ?? 1),
             'exp_reward' => (int) ($row['exp_reward'] ?? 0),
             'gold_reward' => (int) ($row['gold_reward'] ?? 0),

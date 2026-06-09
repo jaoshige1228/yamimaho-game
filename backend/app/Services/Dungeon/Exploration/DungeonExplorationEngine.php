@@ -401,24 +401,57 @@ class DungeonExplorationEngine
             return;
         }
 
+        $syncKey = array_key_last($lines);
+
         if ($effectNode !== null) {
-            $this->appendEffectAmountToLastLine($lines, $effectNode);
+            $narrationKey = $this->findLastNarrationLineKey($lines);
+            if ($narrationKey !== null) {
+                $this->appendEffectAmountToLine($lines, $narrationKey, $effectNode);
+                $syncKey = $narrationKey;
+            } else {
+                $this->appendEffectAmountToLine($lines, $syncKey, $effectNode);
+            }
         }
 
-        $lines[array_key_last($lines)]['sync_party'] = true;
+        $lines[$syncKey]['sync_party'] = true;
     }
 
     /**
      * @param  list<array<string, mixed>>  $lines
      */
-    private function appendEffectAmountToLastLine(array &$lines, DungeonEventNode $effectNode): void
+    private function findLastNarrationLineKey(array $lines): ?int
     {
-        $key = array_key_last($lines);
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            if (($lines[$i]['type'] ?? '') === 'narration') {
+                return $i;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     */
+    private function appendEffectAmountToLine(array &$lines, int $key, DungeonEventNode $effectNode): void
+    {
+        if (($lines[$key]['type'] ?? '') === 'dialogue') {
+            return;
+        }
+
         $text = (string) ($lines[$key]['text'] ?? '');
 
         if ($effectNode->node_type === 'grant_gold') {
             $amount = (int) ($effectNode->stat_multiplier ?? 0);
-            if ($amount > 0 && ! $this->textContainsAmount($text, $amount)) {
+            if ($amount <= 0) {
+                return;
+            }
+            if (str_contains($text, '{gold_amount}')) {
+                $lines[$key]['text'] = str_replace('{gold_amount}', (string) $amount, $text);
+
+                return;
+            }
+            if (! $this->textContainsAmount($text, $amount)) {
                 $lines[$key]['text'] = rtrim($text)."\n{$amount}ゴールド！";
             }
 
@@ -427,7 +460,18 @@ class DungeonExplorationEngine
 
         if (in_array($effectNode->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)) {
             $amount = (int) ($effectNode->fixed_damage ?? 0);
-            if ($amount > 0 && ! $this->textContainsAmount($text, $amount)) {
+            if ($amount <= 0) {
+                return;
+            }
+            if (str_contains($text, '{damage_amount}')) {
+                $lines[$key]['text'] = str_replace('{damage_amount}', (string) $amount, $text);
+
+                return;
+            }
+            if ($amount > 500) {
+                return;
+            }
+            if (! $this->textContainsAmount($text, $amount)) {
                 $lines[$key]['text'] = rtrim($text)."\n{$amount}ダメージ！";
             }
         }

@@ -66,6 +66,15 @@ class DungeonStepEncounterBuilderTest extends TestCase
         $enemies = $this->builder->build(1, 31);
         $this->assertCount(1, $enemies);
         $this->assertSame('inu_moe', $enemies[0]['master_code']);
+        $this->assertSame(1, $enemies[0]['floor']);
         $this->assertSame('イフリーヌ', $enemies[0]['name']);
+    }
+
+    public function test_encounter_includes_floor_for_battle_lookup(): void
+    {
+        $enemies = $this->builder->build(2, 5);
+
+        $this->assertNotEmpty($enemies);
+        $this->assertTrue(collect($enemies)->every(fn (array $enemy) => $enemy['floor'] === 2));
     }
 }

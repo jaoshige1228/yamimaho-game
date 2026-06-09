@@ -54,6 +54,27 @@ class DungeonApiTest extends TestCase
                 fn (array $u) => $u['sprite'] === 'bat' && str_contains($u['name'], 'コーモリ'),
             ),
         );
+        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === 50));
+    }
+
+    public function test_floor_two_battle_uses_floor_two_enemy_stats(): void
+    {
+        config(['game.dungeon.test_force' => 'battle']);
+
+        $user = $this->demoUser();
+        \App\Models\UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 0, 'in_dungeon' => false],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 2])->assertOk();
+
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('floor', 2);
+
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === 400));
     }
 
     public function test_player_party_includes_sprite_and_max_stats(): void

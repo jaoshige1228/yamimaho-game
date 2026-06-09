@@ -112,7 +112,8 @@ class BattleFactory
     private function appendEnemiesFromList(array &$units, array $enemyList): void
     {
         foreach ($enemyList as $meta) {
-            $master = $this->masters->findEnemy($meta['master_code']);
+            $floor = isset($meta['floor']) ? (int) $meta['floor'] : null;
+            $master = $this->masters->findEnemy($meta['master_code'], $floor);
             $sprite = (string) ($meta['sprite'] ?? $master['sprite'] ?? $master['code']);
             if (! preg_match('/^[a-z][a-z0-9_]*$/i', $sprite)) {
                 $sprite = (string) $master['code'];

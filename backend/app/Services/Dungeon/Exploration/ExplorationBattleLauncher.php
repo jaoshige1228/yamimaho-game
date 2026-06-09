@@ -28,6 +28,7 @@ class ExplorationBattleLauncher
         $enemies = [[
             'slot' => 'enemy_1',
             'master_code' => $master->code,
+            'floor' => $floor,
             'name' => $master->name,
             'sprite' => $master->sprite,
         ]];

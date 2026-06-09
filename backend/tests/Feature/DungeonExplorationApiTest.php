@@ -620,6 +620,20 @@ class DungeonExplorationApiTest extends TestCase
             json_encode($failStory, JSON_UNESCAPED_UNICODE),
         );
 
+        $failLines = collect($failStory['segment']['lines'] ?? []);
+        $swallowLine = $failLines->first(
+            fn (array $line) => str_contains((string) ($line['text'] ?? ''), '飲み込まれ'),
+        );
+        $this->assertNotNull($swallowLine, '飲み込みの地の文があること');
+        $this->assertSame('narration', $swallowLine['type'] ?? null);
+        $this->assertStringContainsString('150', (string) $swallowLine['text']);
+        $this->assertTrue(
+            $failLines
+                ->where('type', 'dialogue')
+                ->every(fn (array $line) => ! str_contains((string) ($line['text'] ?? ''), 'ダメージ')),
+            'ダメージ表記はセリフに含めないこと',
+        );
+
         $victim = app(\App\Services\Player\UserCharacterService::class)
             ->partyInSlotOrder($user->fresh())
             ->get($targetSlot);

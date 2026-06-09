@@ -7,7 +7,7 @@ use App\Models\EnemyMaster;
 class DungeonStepEncounterBuilder
 {
     /**
-     * @return list<array{slot: string, master_code: string, name: string, sprite: string}>
+     * @return list<array{slot: string, master_code: string, floor: int, name: string, sprite: string}>
      */
     public function build(int $floor, int $step): array
     {
@@ -31,6 +31,7 @@ class DungeonStepEncounterBuilder
             $enemies[] = [
                 'slot' => 'enemy_'.$i,
                 'master_code' => $master->code,
+                'floor' => $floor,
                 'name' => $this->displayName($master, $i, $count),
                 'sprite' => $master->sprite,
             ];
@@ -40,7 +41,7 @@ class DungeonStepEncounterBuilder
     }
 
     /**
-     * @return list<array{slot: string, master_code: string, name: string, sprite: string}>
+     * @return list<array{slot: string, master_code: string, floor: int, name: string, sprite: string}>
      */
     private function buildBoss(int $floor): array
     {
@@ -50,6 +51,7 @@ class DungeonStepEncounterBuilder
         return [[
             'slot' => 'enemy_1',
             'master_code' => $master->code,
+            'floor' => $floor,
             'name' => $master->name,
             'sprite' => $master->sprite,
         ]];

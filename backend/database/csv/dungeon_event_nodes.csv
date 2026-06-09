@@ -41,9 +41,9 @@ suspicious_spring,taste_ok_line,dialogue,,chosen,ぷはー！うまいわ！,こ
 suspicious_spring,taste_ok_heal,restore_party,,,,,,,,20,,,,,taste_ok_after
 suspicious_spring,taste_ok_after,narration,一同は泉を飲んで元気になった！,,,,,,,,,,,,end
 suspicious_spring,taste_bad_intro,narration,{chosen_name}は恐る恐る泉の水を口にした。,,,,,,,,,,,,taste_bad_line
-suspicious_spring,taste_bad_line,dialogue,,chosen,うっ！マズイわ！！,貴様ぁ！マズイぞ！,うわ、マズっ！飲めたもんじゃない！,うぇ……ゲロマズ……,,,,,,,taste_bad_dmg
-suspicious_spring,taste_bad_dmg,apply_damage_chosen,,,,,,,,,30,,,,taste_bad_narr
-suspicious_spring,taste_bad_narr,narration,{chosen_name}は胃腸に{damage_amount}ダメージを負った！,,,,,,,,,,,,taste_bad_other
+suspicious_spring,taste_bad_line,dialogue,,chosen,うっ！マズイわ！！,貴様ぁ！マズイぞ！,うわ、マズっ！飲めたもんじゃない！,うぇ……ゲロマズ……,,,,,,,taste_bad_narr
+suspicious_spring,taste_bad_narr,narration,{chosen_name}は胃腸に{damage_amount}ダメージを負った！,,,,,,,,,,,,taste_bad_dmg
+suspicious_spring,taste_bad_dmg,apply_damage_chosen,,,,,,,,,30,,,,taste_bad_other
 suspicious_spring,taste_bad_other,dialogue,,random_ally_except_chosen,（あらら……飲まなくてよかったわ）,（ふっ……飲まなくてよかった）,（うわ、飲まなくてよかったな……）,（……。飲まなくてよかった……）,,,,,,,end
 suspicious_spring,skip_react,dialogue,,random_ally,君子危うきに近寄らず、よ,自然を舐めないに越したことはないな,まぁ怖いし、やめとこうぜ,やめとこ……お腹壊したくないし……,,,,,,,end
 suspicious_spring,end,end,,,,,,,,,,,,,
@@ -90,7 +90,7 @@ man_eating_plant,str_roll,stat_check,,,,,,,str,5,,,success_narr,fail_swallow,
 man_eating_plant,success_narr,narration,根性！{chosen_name}は{target_name}を救い上げた！,,,,,,,,,,,,success_victim
 man_eating_plant,success_victim,dialogue,,target,{chosen_name}……助かったわ。あ、ありがと……,あぁ、人喰い植物に喰われてみたかっ……あ、いや冗談だ。えーとありがとう,マジで助かった……！{chosen_name}、ありがとうな！,こ、怖かった……{chosen_name}、ありがとう……,,,,,,,success_rescuer
 man_eating_plant,success_rescuer,dialogue,,chosen,ふん。まぁ、無事ならよかったわね。さっさと行くわよ,あぁ、植物が行ってしまう！くそっ！…………あ、無事？まぁ、よかったな,無事で何よりだよ。さて、先に進むか,うん……無事で良かった……。落ち着いたら、行こっか……,,,,,,,end
-man_eating_plant,fail_swallow,narration,だめだ！{target_name}は人喰い植物に飲み込まれてしまった！,,,,,,,,,,,,fail_scream
+man_eating_plant,fail_swallow,narration,だめだ！{target_name}は人喰い植物に飲み込まれてしまった！\n{damage_amount}ダメージ！,,,,,,,,,,,,fail_scream
 man_eating_plant,fail_scream,dialogue,,chosen,{target_name}ー！,{target_name}ー！,{target_name}ー！,{target_name}ー！,,,,,,,fail_dmg
 man_eating_plant,fail_dmg,apply_damage,,,,,,,,1,150,,,,fail_burst
 man_eating_plant,fail_burst,dialogue,,target,フンッ！！！！！！,フンッ！！！！！！,フンッ！！！！！！,フンッ！！！！！！,,,,,,,fail_worry
