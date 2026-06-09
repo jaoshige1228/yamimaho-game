@@ -44,11 +44,11 @@ class DungeonRetreatApiTest extends TestCase
 
         $response = $this->postJson('/api/dungeon/retreat')->assertOk();
 
-        $response->assertJsonPath('gold', 80);
+        $response->assertJsonPath('gold', 90);
         $response->assertJsonPath('step', 7);
         $response->assertJsonPath('floor', 1);
         $this->assertSame(0, DungeonExplorationSession::query()->where('user_id', $user->id)->count());
-        $this->assertSame(80, (int) $user->fresh()->gold);
+        $this->assertSame(90, (int) $user->fresh()->gold);
     }
 
     public function test_retreat_restores_party_hp_and_mp_to_full(): void

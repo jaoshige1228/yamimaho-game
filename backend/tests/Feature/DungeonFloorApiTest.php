@@ -18,6 +18,7 @@ class DungeonFloorApiTest extends TestCase
         $this->postJson('/api/battles/demo')->assertOk();
         config([
             'game.dungeon.floors.1.boss_step' => 3,
+            'game.dungeon.floors.2.boss_step' => 5,
             'game.dungeon.test_force' => null,
         ]);
     }
@@ -31,13 +32,15 @@ class DungeonFloorApiTest extends TestCase
                 'step' => 0,
                 'unlocked_floor' => 1,
                 'max_floor' => 3,
-                'playable_floor' => 1,
+                'playable_floor' => 2,
                 'boss_step' => 3,
             ]);
     }
 
     public function test_enter_floor_two_is_forbidden_while_not_playable(): void
     {
+        config(['game.dungeon.playable_floor' => 1]);
+
         $user = $this->demoUser();
         UserDungeonProgress::query()->updateOrCreate(
             ['user_id' => $user->id],
@@ -46,6 +49,19 @@ class DungeonFloorApiTest extends TestCase
 
         $this->postJson('/api/dungeon/enter', ['floor' => 2])
             ->assertStatus(403);
+    }
+
+    public function test_enter_floor_two_when_unlocked_and_playable(): void
+    {
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 1, 'unlocked_floor' => 2, 'step' => 0],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 2])
+            ->assertOk()
+            ->assertJsonPath('floor', 2);
     }
 
     public function test_boss_encounter_at_boss_step(): void
@@ -65,7 +81,29 @@ class DungeonFloorApiTest extends TestCase
         $response->assertJsonPath('step', 3);
     }
 
-    public function test_boss_victory_unlocks_floor_two_but_floor_two_not_enterable(): void
+    public function test_floor_two_boss_encounter_at_step_41(): void
+    {
+        config([
+            'game.dungeon.floors.2.boss_step' => 41,
+            'game.dungeon.test_force' => 'battle',
+        ]);
+
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 40, 'in_dungeon' => false],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 2])->assertOk();
+
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('boss_encounter', true);
+        $response->assertJsonPath('floor', 2);
+        $response->assertJsonPath('step', 41);
+    }
+
+    public function test_boss_victory_unlocks_floor_two_and_floor_two_is_enterable(): void
     {
         $user = $this->demoUser();
         $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
@@ -79,14 +117,15 @@ class DungeonFloorApiTest extends TestCase
 
         $this->assertSame('dungeon_floor_cleared', $event['type']);
         $this->assertSame(2, $event['unlocked_floor']);
-        $this->assertFalse($event['next_floor_playable']);
+        $this->assertTrue($event['next_floor_playable']);
 
         $progress = UserDungeonProgress::query()->where('user_id', $user->id)->first();
         $this->assertSame(2, (int) $progress->unlocked_floor);
         $this->assertSame(0, (int) $progress->step);
 
         $this->postJson('/api/dungeon/enter', ['floor' => 2])
-            ->assertStatus(403);
+            ->assertOk()
+            ->assertJsonPath('floor', 2);
     }
 
     private function demoUser(): User
@@ -100,6 +139,8 @@ class DungeonFloorApiTest extends TestCase
     {
         config([
             'game.dungeon.floors.1.boss_step' => 31,
+            'game.dungeon.floors.2.boss_step' => 41,
+            'game.dungeon.playable_floor' => 2,
             'game.dungeon.test_force' => null,
         ]);
 

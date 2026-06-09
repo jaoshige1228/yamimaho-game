@@ -49,12 +49,12 @@ class PartyGoldService
     }
 
     /**
-     * 撤退ペナルティ: 所持金を 0.8 倍（端数切り上げ）にする。
+     * 撤退ペナルティ: 所持金を 0.9 倍（端数切り上げ）にする。
      */
     public function applyRetreatPenalty(User $user): int
     {
         $current = $this->getGold($user);
-        $next = (int) ceil($current * 0.8);
+        $next = (int) ceil($current * 0.9);
 
         return $this->setGold($user, $next);
     }

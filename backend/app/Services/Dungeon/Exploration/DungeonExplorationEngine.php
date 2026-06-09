@@ -7,6 +7,7 @@ use App\Models\DungeonExplorationSession;
 use App\Models\User;
 use App\Models\UserCharacter;
 use App\Services\Dungeon\DungeonEventCatalog;
+use App\Services\Dungeon\DungeonFloorConfig;
 use App\Services\Dungeon\DungeonProgressService;
 use App\Services\Dungeon\PartyExplorationDamageService;
 use App\Services\Growth\LevelGrowthService;
@@ -52,6 +53,7 @@ class DungeonExplorationEngine
     {
         $lines = [];
         $nodeKey = $session->current_node_key;
+        $floor = (int) $session->floor_at_start;
 
         while ($nodeKey !== null && $nodeKey !== '') {
             $node = $this->catalog->findNode($session->event_code, $nodeKey);
@@ -65,6 +67,7 @@ class DungeonExplorationEngine
                     $context,
                     includeSkip: $node->node_type === 'party_choice_skip',
                     eventCode: $session->event_code,
+                    floor: $floor,
                 );
                 if ($lines !== []) {
                     $segment['lines'] = $lines;
@@ -104,7 +107,7 @@ class DungeonExplorationEngine
 
             if ($node->node_type === 'stat_check_each_ally') {
                 $this->capturePartySnapshot($user, $context);
-                $lines = array_merge($lines, $this->buildStatCheckEachAllyLines($user, $node, $context));
+                $lines = array_merge($lines, $this->buildStatCheckEachAllyLines($user, $node, $context, $floor));
                 $session->context = $context;
                 $nodeKey = (string) $node->next_default;
                 continue;
@@ -112,7 +115,7 @@ class DungeonExplorationEngine
 
             if ($this->isDeferredEffectNode($node->node_type)) {
                 if ($lines !== []) {
-                    $this->markLastLineSyncParty($lines);
+                    $this->markLastLineSyncParty($lines, $node);
                 }
 
                 $nodeKey = $this->commitEffectNode($user, $node, $context, $nodeKey);
@@ -180,6 +183,7 @@ class DungeonExplorationEngine
                     (string) $node->next_default,
                     $user,
                     $context,
+                    $floor,
                 );
                 $session->context = $context;
             }
@@ -193,6 +197,9 @@ class DungeonExplorationEngine
                     }
                 }
             }
+
+            $this->applyUpcomingEffectAmounts($session->event_code, $node, $context);
+            $session->context = $context;
 
             $line = $this->nodeToLine($user, $node, $context);
             if ($line !== null) {
@@ -388,13 +395,94 @@ class DungeonExplorationEngine
     /**
      * @param  list<array<string, mixed>>  $lines
      */
-    private function markLastLineSyncParty(array &$lines): void
+    private function markLastLineSyncParty(array &$lines, ?DungeonEventNode $effectNode = null): void
     {
         if ($lines === []) {
             return;
         }
 
+        if ($effectNode !== null) {
+            $this->appendEffectAmountToLastLine($lines, $effectNode);
+        }
+
         $lines[array_key_last($lines)]['sync_party'] = true;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     */
+    private function appendEffectAmountToLastLine(array &$lines, DungeonEventNode $effectNode): void
+    {
+        $key = array_key_last($lines);
+        $text = (string) ($lines[$key]['text'] ?? '');
+
+        if ($effectNode->node_type === 'grant_gold') {
+            $amount = (int) ($effectNode->stat_multiplier ?? 0);
+            if ($amount > 0 && ! $this->textContainsAmount($text, $amount)) {
+                $lines[$key]['text'] = rtrim($text)."\n{$amount}ゴールド！";
+            }
+
+            return;
+        }
+
+        if (in_array($effectNode->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)) {
+            $amount = (int) ($effectNode->fixed_damage ?? 0);
+            if ($amount > 0 && ! $this->textContainsAmount($text, $amount)) {
+                $lines[$key]['text'] = rtrim($text)."\n{$amount}ダメージ！";
+            }
+        }
+    }
+
+    private function textContainsAmount(string $text, int $amount): bool
+    {
+        return str_contains($text, (string) $amount)
+            || str_contains($text, '{gold_amount}')
+            || str_contains($text, '{damage_amount}');
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function applyUpcomingEffectAmounts(string $eventCode, DungeonEventNode $node, array &$context): void
+    {
+        unset($context['pending_gold_amount'], $context['pending_damage_amount']);
+
+        $nextKey = (string) ($node->next_default ?? '');
+        if ($nextKey === '') {
+            return;
+        }
+
+        try {
+            $next = $this->catalog->findNode($eventCode, $nextKey);
+        } catch (\InvalidArgumentException) {
+            return;
+        }
+
+        if ($next->node_type === 'grant_gold') {
+            $context['pending_gold_amount'] = (int) ($next->stat_multiplier ?? 0);
+        }
+
+        if (in_array($next->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)) {
+            $context['pending_damage_amount'] = (int) ($next->fixed_damage ?? 0);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function recordEffectAmountInContext(DungeonEventNode $node, array &$context): void
+    {
+        if ($node->node_type === 'grant_gold') {
+            $context['last_gold_amount'] = (int) ($node->stat_multiplier ?? 0);
+            unset($context['pending_gold_amount']);
+
+            return;
+        }
+
+        if (in_array($node->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)) {
+            $context['last_damage_amount'] = (int) ($node->fixed_damage ?? 0);
+            unset($context['pending_damage_amount']);
+        }
     }
 
     /**
@@ -414,6 +502,7 @@ class DungeonExplorationEngine
 
         $this->capturePartySnapshot($user, $context);
         $next = $this->executeEffectNode($user, $node, $context);
+        $this->recordEffectAmountInContext($node, $context);
         $outcomes[$effectNodeKey] = $next;
         $context['committed_effect_outcomes'] = $outcomes;
 
@@ -545,7 +634,7 @@ class DungeonExplorationEngine
     /**
      * @return list<array<string, mixed>>
      */
-    private function buildStatCheckEachAllyLines(User $user, DungeonEventNode $node, array &$context): array
+    private function buildStatCheckEachAllyLines(User $user, DungeonEventNode $node, array &$context, int $floor): array
     {
         $attr = (string) ($node->stat_attr ?: 'spirit');
         $multiplier = (int) ($node->stat_multiplier ?? 3);
@@ -563,7 +652,7 @@ class DungeonExplorationEngine
 
             $character->loadMissing('characterMaster');
             $name = $character->characterMaster->name ?? '???';
-            $rate = $this->successRateForSlot($user, $slotId, $attr, $multiplier);
+            $rate = $this->successRateForSlot($user, $slotId, $attr, $multiplier, $floor);
 
             $lines[] = [
                 'type' => 'narration',
@@ -580,7 +669,9 @@ class DungeonExplorationEngine
             } else {
                 $failLine = [
                     'type' => 'narration',
-                    'text' => "{$name}はパニックに陥り水を飲んだ！",
+                    'text' => $failDamage > 0
+                        ? "{$name}はパニックに陥り水を飲んだ！\n{$failDamage}ダメージ！"
+                        : "{$name}はパニックに陥り水を飲んだ！",
                     'sfx' => null,
                 ];
                 if ($failDamage > 0) {
@@ -676,7 +767,8 @@ class DungeonExplorationEngine
         $multiplier = (int) ($node->stat_multiplier ?? 2);
         $slot = $this->slotForStatCheck($attr, $context);
 
-        $rate = $this->successRateForSlot($user, $slot, $attr, $multiplier);
+        $floor = (int) $session->floor_at_start;
+        $rate = $this->successRateForSlot($user, $slot, $attr, $multiplier, $floor);
         $context['last_success_rate'] = $rate;
         $context['last_stat_check_label'] = $this->statCheckLabel($attr);
 
@@ -719,7 +811,7 @@ class DungeonExplorationEngine
         array $context,
         bool $performRoll = false,
     ): array {
-        $rate = min(100, max(0, (int) ($node->stat_multiplier ?? 50)));
+        $rate = $this->clampSuccessRate((int) ($node->stat_multiplier ?? 50));
 
         if (! $performRoll) {
             return [
@@ -803,6 +895,7 @@ class DungeonExplorationEngine
         string $startNodeKey,
         User $user,
         array $context,
+        int $floor,
     ): array {
         $statNode = $this->findUpcomingStatCheckNode($eventCode, $startNodeKey);
         if ($statNode === null) {
@@ -813,7 +906,7 @@ class DungeonExplorationEngine
         $multiplier = (int) ($statNode->stat_multiplier ?? 2);
         $slot = $this->slotForStatCheck($attr, $context);
 
-        $context['last_success_rate'] = $this->successRateForSlot($user, $slot, $attr, $multiplier);
+        $context['last_success_rate'] = $this->successRateForSlot($user, $slot, $attr, $multiplier, $floor);
         $context['last_stat_check_label'] = $this->statCheckLabel($attr);
 
         return $context;
@@ -874,7 +967,24 @@ class DungeonExplorationEngine
         return min(1.0, max(0.0, (int) $character->hp / $maxHp));
     }
 
-    private function successRateForSlot(User $user, string $slotId, string $attr, int $multiplier): int
+    private function maxSuccessRate(): int
+    {
+        return (int) config('game.dungeon.max_stat_success_rate', 95);
+    }
+
+    private function clampSuccessRate(int $rate): int
+    {
+        return min($this->maxSuccessRate(), max(0, $rate));
+    }
+
+    private function scaledStatMultiplier(int $baseMultiplier, int $floor): int
+    {
+        $scale = DungeonFloorConfig::statMultiplierScale($floor);
+
+        return max(1, (int) ceil($baseMultiplier * $scale / 100));
+    }
+
+    private function successRateForSlot(User $user, string $slotId, string $attr, int $baseMultiplier, int $floor): int
     {
         if ($slotId === '') {
             return 0;
@@ -890,8 +1000,9 @@ class DungeonExplorationEngine
         $character->loadMissing('characterMaster');
         $value = $this->statValueForCharacter($character, $attr);
         $hpRatio = $this->hpRatioForCharacter($character);
+        $multiplier = $this->scaledStatMultiplier($baseMultiplier, $floor);
 
-        return min(100, (int) ceil($value * $multiplier * $hpRatio));
+        return $this->clampSuccessRate((int) ceil($value * $multiplier * $hpRatio));
     }
 
     /**
@@ -960,11 +1071,33 @@ class DungeonExplorationEngine
             '{name}' => $chosenSlot !== '' ? $chosenName : $targetName,
             '{success_rate}' => (string) ($context['last_success_rate'] ?? 0),
             '{stat_check_label}' => (string) ($context['last_stat_check_label'] ?? ''),
+            '{gold_amount}' => $this->goldAmountForInterpolation($context),
+            '{damage_amount}' => $this->damageAmountForInterpolation($context),
         ];
 
         $text = str_replace(array_keys($replacements), array_values($replacements), $text);
 
         return str_replace('\\n', "\n", $text);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function goldAmountForInterpolation(array $context): string
+    {
+        $amount = $context['pending_gold_amount'] ?? $context['last_gold_amount'] ?? 0;
+
+        return (string) max(0, (int) $amount);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function damageAmountForInterpolation(array $context): string
+    {
+        $amount = $context['pending_damage_amount'] ?? $context['last_damage_amount'] ?? 0;
+
+        return (string) max(0, (int) $amount);
     }
 
     private function nameForSlot(User $user, string $slotId): string
@@ -1047,6 +1180,7 @@ class DungeonExplorationEngine
         array $context,
         bool $includeSkip = false,
         string $eventCode = '',
+        int $floor = 1,
     ): array {
         $options = [];
         $party = $this->characters->partyInSlotOrder($user);
@@ -1066,7 +1200,7 @@ class DungeonExplorationEngine
             }
 
             if ($statNode !== null) {
-                $rate = $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier);
+                $rate = $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier, $floor);
                 $label = $character->characterMaster->name.'（成功率'.$rate.'%）';
             } else {
                 $label = $character->characterMaster->name;
@@ -1077,7 +1211,7 @@ class DungeonExplorationEngine
                 'name' => $character->characterMaster->name,
                 'str' => (int) $character->str,
                 'success_rate' => $statNode !== null
-                    ? $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier)
+                    ? $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier, $floor)
                     : null,
                 'label' => $label,
             ];

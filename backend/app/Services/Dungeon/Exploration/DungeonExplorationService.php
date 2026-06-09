@@ -34,7 +34,7 @@ class DungeonExplorationService
         $this->clearSessions($user);
 
         $code = $eventCode ?? $this->catalog->pickRandomEventCode($floor);
-        $event = $this->catalog->findEvent($code);
+        $event = $this->catalog->findEvent($floor, $code);
         $context = $this->engine->buildInitialContext($user, $code);
 
         $session = DungeonExplorationSession::query()->create([

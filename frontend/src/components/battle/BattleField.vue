@@ -17,6 +17,7 @@ defineProps({
   shakeTarget: { type: String, default: null },
   supportEffectTarget: { type: Object, default: null },
   activeEnemyLunge: { type: String, default: null },
+  floor1BossSprite: { type: Boolean, default: false },
   canOpenCommands: { type: Boolean, default: false },
 });
 
@@ -35,6 +36,7 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
         :shake-target="shakeTarget"
         :support-effect-target="supportEffectTarget"
         :active-lunge="activeEnemyLunge"
+        :floor1-boss-sprite="floor1BossSprite"
         @select="emit('select-target', $event)"
         @show-stats="emit('show-stats', $event)"
       />

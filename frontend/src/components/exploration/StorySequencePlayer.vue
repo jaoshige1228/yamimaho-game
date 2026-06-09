@@ -5,7 +5,7 @@ import StoryCharacterSprite from './StoryCharacterSprite.vue';
 import StoryTextWindow from './StoryTextWindow.vue';
 import '../../styles/story-window.css';
 
-const { playSe, unlock } = useAppAudio();
+const { unlock } = useAppAudio();
 
 const props = defineProps({
   lines: { type: Array, required: true },
@@ -97,14 +97,9 @@ onUnmounted(() => {
   clearFadeTimer();
 });
 
-function onPointerDown() {
-  if (inputLocked.value) return;
-  unlock();
-  playSe('cursor');
-}
-
 function onTap() {
   if (inputLocked.value) return;
+  unlock();
   const windowApi = textWindowRef.value;
   if (windowApi && !windowApi.isComplete) {
     windowApi.skip();
@@ -119,7 +114,6 @@ function onTap() {
     type="button"
     class="story-sequence"
     aria-label="次へ"
-    @pointerdown="onPointerDown"
     @click="onTap"
   >
     <div class="story-sequence__viewport">

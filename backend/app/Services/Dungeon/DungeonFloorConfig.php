@@ -2,6 +2,8 @@
 
 namespace App\Services\Dungeon;
 
+use App\Models\DungeonFloorMaster;
+
 class DungeonFloorConfig
 {
     public static function maxFloor(): int
@@ -46,5 +48,15 @@ class DungeonFloorConfig
         $bands = $floors[$floor]['encounter_bands'] ?? [];
 
         return is_array($bands) ? $bands : [];
+    }
+
+    public static function statMultiplierScale(int $floor): int
+    {
+        $record = DungeonFloorMaster::query()->find($floor);
+        if ($record === null) {
+            return 100;
+        }
+
+        return max(1, min(100, (int) $record->stat_multiplier_scale));
     }
 }

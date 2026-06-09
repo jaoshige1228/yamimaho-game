@@ -225,7 +225,12 @@ class BattleEngine
 
         $actor['mp'] -= $mpCost;
         $events[] = ['type' => 'mp_spent', 'actor' => $actorId, 'amount' => $mpCost];
-        $events[] = $this->announceEvent($actorId, "{$actor['name']}は{$spell['label']}を唱えた！");
+        $events[] = $this->announceEvent(
+            $actorId,
+            "{$actor['name']}は{$spell['label']}を唱えた！",
+            isset($spell['element']) && $spell['element'] !== '' ? (string) $spell['element'] : null,
+            isset($spell['effect']) && $spell['effect'] !== '' ? (string) $spell['effect'] : null,
+        );
 
         foreach ($targets as $tid) {
             $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
@@ -617,11 +622,23 @@ class BattleEngine
     }
 
     /**
-     * @return array{type: string, actor: string, text: string}
+     * @return array{type: string, actor: string, text: string, spell_element?: string, spell_effect?: string}
      */
-    private function announceEvent(string $actorId, string $text): array
-    {
-        return ['type' => 'announce', 'actor' => $actorId, 'text' => $text];
+    private function announceEvent(
+        string $actorId,
+        string $text,
+        ?string $spellElement = null,
+        ?string $spellEffect = null,
+    ): array {
+        $event = ['type' => 'announce', 'actor' => $actorId, 'text' => $text];
+        if ($spellElement !== null && $spellElement !== '') {
+            $event['spell_element'] = $spellElement;
+        }
+        if ($spellEffect !== null && $spellEffect !== '') {
+            $event['spell_effect'] = $spellEffect;
+        }
+
+        return $event;
     }
 
     /**

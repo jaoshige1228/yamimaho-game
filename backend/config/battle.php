@@ -55,6 +55,6 @@ return [
         'atk_up_large' => ['stat' => 'str', 'multiplier' => 1.5, 'turns' => 3, 'icon' => 'atk_up_large'],
         'atk_down' => ['stat' => 'str', 'multiplier' => 0.8, 'turns' => 3, 'icon' => 'atk_down'],
         'atk_down_large' => ['stat' => 'str', 'multiplier' => 0.6, 'turns' => 3, 'icon' => 'atk_down_large'],
-        'evasion_set' => ['type' => 'evasion_set', 'value' => 50, 'turns' => 3, 'icon' => 'evasion'],
+        'evasion_set' => ['type' => 'evasion_set', 'value' => 60, 'turns' => 3, 'icon' => 'evasion'],
     ],
 ];

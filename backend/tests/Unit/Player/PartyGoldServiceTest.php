@@ -26,14 +26,14 @@ class PartyGoldServiceTest extends TestCase
         $this->assertSame(0, $this->gold->getGold($user));
     }
 
-    public function test_retreat_penalty_applies_eighty_percent_ceil(): void
+    public function test_retreat_penalty_applies_ninety_percent_ceil(): void
     {
         $user = User::factory()->create(['gold' => 100]);
-        $this->assertSame(80, $this->gold->applyRetreatPenalty($user->fresh()));
+        $this->assertSame(90, $this->gold->applyRetreatPenalty($user->fresh()));
 
         $user->gold = 99;
         $user->save();
-        $this->assertSame(80, $this->gold->applyRetreatPenalty($user->fresh()));
+        $this->assertSame(90, $this->gold->applyRetreatPenalty($user->fresh()));
 
         $user->gold = 1;
         $user->save();

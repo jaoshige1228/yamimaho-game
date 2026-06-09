@@ -20,7 +20,7 @@ return [
   'dungeon' => [
     'max_floor' => 3,
     /** 実装済みで挑戦可能な最大層（2層目以降は未実装の間は 1） */
-    'playable_floor' => 1,
+    'playable_floor' => 2,
     'battle_encounter_rate' => 30,
     'exploration_event_rate' => 60,
     'flavor_narrative_rate' => 10,
@@ -55,6 +55,40 @@ return [
           ],
         ],
       ],
+      2 => [
+        'boss_step' => 41,
+        'boss_enemy_code' => 'inu_moe',
+        'encounter_bands' => [
+          [
+            'from' => 1,
+            'to' => 10,
+            'codes' => ['bat'],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+          [
+            'from' => 11,
+            'to' => 20,
+            'codes' => ['bat', 'snake'],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+          [
+            'from' => 21,
+            'to' => 30,
+            'codes' => ['snake', 'beetle'],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+          [
+            'from' => 31,
+            'to' => 40,
+            'codes' => ['snake', 'beetle'],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+        ],
+      ],
     ],
     /** テスト用: null | battle | exploration | flavor */
     'test_force' => env('DUNGEON_TEST_FORCE'),
@@ -64,5 +98,7 @@ return [
     'test_roll' => env('DUNGEON_TEST_ROLL'),
     /** テスト用: true/false で判定結果を固定（null で通常） */
     'test_stat_success' => env('DUNGEON_TEST_STAT_SUCCESS'),
+    /** ステータス判定・chance_branch の成功率上限（%） */
+    'max_stat_success_rate' => 95,
   ],
 ];

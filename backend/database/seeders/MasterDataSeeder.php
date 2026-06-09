@@ -7,6 +7,7 @@ use App\Models\CharacterMaster;
 use App\Models\DungeonEncounterMaster;
 use App\Models\DungeonEventMaster;
 use App\Models\DungeonEventNode;
+use App\Models\DungeonFloorMaster;
 use App\Models\EnemyMaster;
 use App\Models\ItemMaster;
 use App\Models\LevelMaster;
@@ -78,9 +79,11 @@ class MasterDataSeeder extends Seeder
 
         foreach (CsvMasterReader::read('enemy_masters.csv') as $row) {
             EnemyMaster::query()->updateOrCreate(
-                ['code' => $row['code']],
                 [
                     'floor' => (int) ($row['floor'] ?? 1),
+                    'code' => $row['code'],
+                ],
+                [
                     'level' => (int) ($row['level'] ?? 1),
                     'name' => $row['name'],
                     'sprite' => $row['sprite'],
@@ -157,11 +160,26 @@ class MasterDataSeeder extends Seeder
             );
         }
 
+        foreach (CsvMasterReader::read('dungeon_floors.csv') as $row) {
+            DungeonFloorMaster::query()->updateOrCreate(
+                ['floor' => (int) $row['floor']],
+                [
+                    'stat_multiplier_scale' => (int) $row['stat_multiplier_scale'],
+                ],
+            );
+        }
+
         foreach (CsvMasterReader::read('dungeon_events.csv') as $row) {
+            if (($row['code'] ?? '') === '') {
+                continue;
+            }
+
             DungeonEventMaster::query()->updateOrCreate(
-                ['code' => $row['code']],
                 [
                     'floor' => (int) $row['floor'],
+                    'code' => $row['code'],
+                ],
+                [
                     'name' => $row['name'],
                     'weight' => (int) $row['weight'],
                     'event_type' => $row['event_type'],

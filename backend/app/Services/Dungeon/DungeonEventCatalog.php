@@ -28,11 +28,14 @@ class DungeonEventCatalog
         return (string) $events->last()->code;
     }
 
-    public function findEvent(string $code): DungeonEventMaster
+    public function findEvent(int $floor, string $code): DungeonEventMaster
     {
-        $event = DungeonEventMaster::query()->where('code', $code)->first();
+        $event = DungeonEventMaster::query()
+            ->where('floor', $floor)
+            ->where('code', $code)
+            ->first();
         if ($event === null) {
-            throw new \InvalidArgumentException("Unknown dungeon event: {$code}");
+            throw new \InvalidArgumentException("Unknown dungeon event: {$code} (floor {$floor})");
         }
 
         return $event;

@@ -84,6 +84,10 @@ const canFlee = computed(
   () => canShowFlee.value && awaiting.value && !busy.value && partyPhase.value === 'ready',
 );
 
+const floor1BossSprite = computed(
+  () => state.value?.meta?.boss === true && Number(state.value?.meta?.floor) === 1,
+);
+
 const resultTitle = computed(() => {
   if (dungeonCleared.value) {
     return 'クリア！';
@@ -221,6 +225,32 @@ function showFlash(element) {
   });
 }
 
+function flashKindForSpellAnnounce(ev) {
+  const element = ev.spell_element;
+  if (element) {
+    return element;
+  }
+
+  const effect = String(ev.spell_effect ?? '');
+  if (effect.includes('heal')) {
+    return 'heal';
+  }
+  if (effect.startsWith('debuff') || effect.includes('down')) {
+    return 'debuff';
+  }
+  if (effect.startsWith('buff') || effect.includes('up') || effect.includes('evasion')) {
+    return 'buff';
+  }
+  if (effect === 'shield_next') {
+    return 'shield';
+  }
+  if (effect.includes('revive')) {
+    return 'revive';
+  }
+
+  return 'buff';
+}
+
 function showFloatingDamage(targetId, value) {
   const pos = unitPosition(targetId);
   floatingDamages.value.push({
@@ -250,7 +280,6 @@ function showFloatingSupport(targetId, text, kind = 'heal') {
 
 async function showSupportEffect(targetId, kind) {
   supportEffectTarget.value = { id: targetId, kind };
-  showFlash(kind);
   await delay(420);
   supportEffectTarget.value = null;
 }
@@ -346,6 +375,7 @@ async function playEvents(events) {
       showActionBanner(ev.text);
       const isSpell = ev.text?.includes('唱え');
       if (isSpell) {
+        showFlash(flashKindForSpellAnnounce(ev));
         playSe('magic');
         await delay(SPELL_CAST_ANNOUNCE_DELAY_MS);
       } else {
@@ -359,7 +389,6 @@ async function playEvents(events) {
       await delay(120);
     }
     if (ev.type === 'damage') {
-      showFlash(ev.element || 'hit');
       shakeTarget.value = ev.target;
       showFloatingDamage(ev.target, ev.value);
       playSe('damage');
@@ -702,6 +731,7 @@ watch(
         :shake-target="shakeTarget"
         :support-effect-target="supportEffectTarget"
         :active-enemy-lunge="activeEnemyLunge"
+        :floor1-boss-sprite="floor1BossSprite"
         :can-open-commands="canOpenCommands"
         @select-target="onSelectTarget"
         @open-commands="onOpenCommands"

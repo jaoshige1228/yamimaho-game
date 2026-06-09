@@ -313,12 +313,18 @@ async function loadStatus() {
 }
 
 async function advance() {
+  if (advancing.value || explorationBusy.value) {
+    return;
+  }
+
   advancing.value = true;
   error.value = '';
   explorationSessionId.value = '';
   choiceActive.value = false;
   unlock();
   playSe('cursor');
+
+  let keepAdvanceLocked = false;
   try {
     const data = await api('/dungeon/advance', { method: 'POST' });
 
@@ -327,6 +333,7 @@ async function advance() {
       battle.battleId = data.battle_id;
       battle.state = data.state;
       battle.pendingEvents = data.events ?? [];
+      keepAdvanceLocked = true;
       router.push({
         name: 'battle',
         params: { id: data.battle_id },
@@ -357,7 +364,9 @@ async function advance() {
   } catch (e) {
     error.value = e.message;
   } finally {
-    advancing.value = false;
+    if (!keepAdvanceLocked) {
+      advancing.value = false;
+    }
   }
 }
 

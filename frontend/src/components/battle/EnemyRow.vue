@@ -13,6 +13,7 @@ const props = defineProps({
   shakeTarget: { type: String, default: null },
   supportEffectTarget: { type: Object, default: null },
   activeLunge: { type: String, default: null },
+  floor1BossSprite: { type: Boolean, default: false },
 });
 
 function supportEffectClass(unit) {
@@ -68,6 +69,7 @@ function onSlotClick(unit) {
           selectable: canSelect(unit),
           shake: shakeTarget === unit.id,
           lunge: activeLunge === unit.id,
+          'boss-floor1': floor1BossSprite,
         },
         supportEffectClass(unit),
       ]"
@@ -144,6 +146,10 @@ function onSlotClick(unit) {
   transform-origin: bottom center;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
   pointer-events: none;
+}
+.enemy-slot.boss-floor1 .sprite {
+  max-height: 110px;
+  transform: scale(1.3);
 }
 .name {
   display: block;

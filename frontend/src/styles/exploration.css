@@ -118,6 +118,7 @@
 .scene-overlay-enter:disabled {
   opacity: 0.55;
   cursor: default;
+  pointer-events: none;
 }
 
 .scene-overlay-enter {

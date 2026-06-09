@@ -80,6 +80,7 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertSame('story', $failStory['segment']['kind']);
         $this->assertSame('fail', $failStory['segment']['stat_check_result'] ?? null);
         $this->assertStringContainsString('突き刺さる', json_encode($failStory, JSON_UNESCAPED_UNICODE));
+        $this->assertStringContainsString('30ダメージ', json_encode($failStory, JSON_UNESCAPED_UNICODE));
         $this->assertIsArray($failStory['party_snapshot'] ?? null);
         $failLines = $failStory['segment']['lines'] ?? [];
         $this->assertTrue(
@@ -502,7 +503,7 @@ class DungeonExplorationApiTest extends TestCase
         $sessionId = $start->json('session_id');
         $start->assertJsonPath('segment.kind', 'story');
         $start->assertJsonPath('segment.lines', fn ($lines) => collect($lines)->contains(
-            fn ($line) => str_contains((string) ($line['text'] ?? ''), 'ゴールド'),
+            fn ($line) => str_contains((string) ($line['text'] ?? ''), '50ゴールド'),
         ));
 
         $this->completeExplorationSession($sessionId);
@@ -666,6 +667,136 @@ class DungeonExplorationApiTest extends TestCase
             ->exists();
 
         $this->assertTrue($hasGold || $hasItem);
+    }
+
+    public function test_safe_chest_grants_reward(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'safe_chest',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $beforeGold = (int) $user->gold;
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $sessionId = $start->json('session_id');
+        $this->completeExplorationSession($sessionId);
+
+        $user->refresh();
+        $hasGold = (int) $user->gold > $beforeGold;
+        $hasItem = UserItem::query()
+            ->where('user_id', $user->id)
+            ->whereIn('item_master_id', ItemMaster::query()
+                ->whereIn('code', ['potion_hp_s', 'potion_mp_s'])
+                ->pluck('id'))
+            ->where('quantity', '>', 0)
+            ->exists();
+
+        $this->assertTrue($hasGold || $hasItem);
+    }
+
+    public function test_sphinx_quiz_know_success_grants_item(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'sphinx_quiz',
+            'game.dungeon.test_roll' => 1,
+            'game.dungeon.test_stat_success' => true,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $sessionId = $start->json('session_id');
+        $choice = $this->reachExplorationChoiceSegment($start, $sessionId);
+        $choice->assertJsonPath('segment.stat_check_label', '知力判定');
+        $slotId = $choice->json('segment.options.0.slot_id');
+        $this->assertNotSame('skip', $slotId);
+
+        $this->postJson('/api/dungeon/exploration/choose', [
+            'session_id' => $sessionId,
+            'slot_id' => $slotId,
+        ])->assertOk();
+
+        $this->completeExplorationSession($sessionId);
+
+        $hasItem = UserItem::query()
+            ->where('user_id', $user->id)
+            ->whereIn('item_master_id', ItemMaster::query()
+                ->whereIn('code', ['potion_hp_s', 'potion_mp_s'])
+                ->pluck('id'))
+            ->where('quantity', '>', 0)
+            ->exists();
+
+        $this->assertTrue($hasItem);
+    }
+
+    public function test_sphinx_quiz_know_fail_deals_damage(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'sphinx_quiz',
+            'game.dungeon.test_roll' => 1,
+            'game.dungeon.test_stat_success' => false,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $sessionId = $start->json('session_id');
+        $choice = $this->reachExplorationChoiceSegment($start, $sessionId);
+        $slotId = $choice->json('segment.options.0.slot_id');
+        $this->assertNotSame('skip', $slotId);
+
+        $beforeHp = (int) app(\App\Services\Player\UserCharacterService::class)
+            ->partyInSlotOrder($user)
+            ->get($slotId)
+            ->hp;
+
+        $this->postJson('/api/dungeon/exploration/choose', [
+            'session_id' => $sessionId,
+            'slot_id' => $slotId,
+        ])->assertOk();
+
+        $this->completeExplorationSession($sessionId);
+
+        $afterHp = (int) app(\App\Services\Player\UserCharacterService::class)
+            ->partyInSlotOrder($user->fresh())
+            ->get($slotId)
+            ->hp;
+
+        $this->assertSame($beforeHp - 100, $afterHp);
+    }
+
+    public function test_pitfall_fail_knocks_out_target(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'pitfall',
+            'game.dungeon.test_stat_success' => false,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'pitfall');
+        $sessionId = $start['session_id'];
+        $session = DungeonExplorationSession::query()->findOrFail($sessionId);
+        $targetSlot = (string) (($session->context ?? [])['target_slot'] ?? 'pc1');
+
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                break;
+            }
+        }
+
+        $victim = app(\App\Services\Player\UserCharacterService::class)
+            ->partyInSlotOrder($user->fresh())
+            ->get($targetSlot);
+        $this->assertNotNull($victim);
+        $this->assertSame(0, (int) $victim->hp);
     }
 
     public function test_advance_is_rejected_while_exploration_session_active(): void
