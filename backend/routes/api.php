@@ -38,5 +38,6 @@ Route::middleware(['demo.player', 'non.production'])->prefix('admins')->group(fu
     Route::get('/status', [AdminController::class, 'status']);
     Route::get('/party', [AdminController::class, 'party']);
     Route::post('/grant-exp', [AdminController::class, 'grantExp']);
+    Route::get('/dungeon-settings', [AdminController::class, 'dungeonSettingsShow']);
     Route::post('/dungeon-settings', [AdminController::class, 'dungeonSettings']);
 });

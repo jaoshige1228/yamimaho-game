@@ -29,19 +29,27 @@ class DungeonExplorationService
     /**
      * @return array<string, mixed>
      */
-    public function startEvent(User $user, int $floor, int $step, ?string $eventCode = null): array
-    {
+    public function startEvent(
+        User $user,
+        int $floor,
+        int $step,
+        ?string $eventCode = null,
+        bool $dialogueOnlyPool = false,
+    ): array {
         $this->clearSessions($user);
 
-        $code = $eventCode ?? $this->catalog->pickRandomEventCode($floor);
-        $event = $this->catalog->findEvent($floor, $code);
+        $code = $eventCode ?? ($dialogueOnlyPool
+            ? $this->catalog->pickRandomDialogueEventCode($floor)
+            : $this->catalog->pickRandomEventCode($floor));
+        $event = $this->catalog->resolveEvent($floor, $code);
         $context = $this->engine->buildInitialContext($user, $code);
+        $context['skip_epilogue'] = $event->skipEpilogue;
 
         $session = DungeonExplorationSession::query()->create([
             'id' => (string) Str::uuid(),
             'user_id' => $user->id,
             'event_code' => $code,
-            'current_node_key' => $event->start_node_key,
+            'current_node_key' => $event->startNodeKey,
             'context' => $context,
             'step_at_start' => $step,
             'floor_at_start' => $floor,

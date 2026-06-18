@@ -14,6 +14,7 @@ class UserDungeonProgress extends Model
         'unlocked_floor',
         'step',
         'skip_battle_encounters',
+        'force_dialogue_events',
         'in_dungeon',
     ];
 
@@ -22,6 +23,7 @@ class UserDungeonProgress extends Model
     {
         return [
             'skip_battle_encounters' => 'boolean',
+            'force_dialogue_events' => 'boolean',
             'in_dungeon' => 'boolean',
         ];
     }

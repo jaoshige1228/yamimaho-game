@@ -122,10 +122,63 @@ class DungeonFloorApiTest extends TestCase
         $progress = UserDungeonProgress::query()->where('user_id', $user->id)->first();
         $this->assertSame(2, (int) $progress->unlocked_floor);
         $this->assertSame(0, (int) $progress->step);
+        $this->assertFalse((bool) $progress->in_dungeon);
+
+        $this->getJson('/api/player/navigation')
+            ->assertOk()
+            ->assertJsonPath('in_dungeon', false);
 
         $this->postJson('/api/dungeon/enter', ['floor' => 2])
             ->assertOk()
             ->assertJsonPath('floor', 2);
+    }
+
+    public function test_boss_battle_victory_exits_dungeon_and_emits_floor_cleared(): void
+    {
+        $this->postJson('/api/battles/demo')->assertOk();
+        $user = $this->demoUser();
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
+
+        $orchestrator = app(\App\Services\Battle\BattleOrchestrator::class);
+        $result = $orchestrator->createBattleForUser($user, [[
+            'slot' => 'enemy_1',
+            'master_code' => 'inu_moe',
+            'floor' => 1,
+            'name' => 'イフリーヌ',
+            'sprite' => 'inu_moe',
+        ]], [
+            'source' => 'dungeon',
+            'floor' => 1,
+            'step' => 3,
+            'boss' => true,
+            'can_flee' => false,
+        ]);
+
+        $state = $result['state'];
+        $state['units']['enemy_1']['hp'] = 1;
+
+        $action = $orchestrator->submitPlayerAction(
+            $state,
+            'punch',
+            null,
+            'enemy_1',
+            $user,
+        );
+
+        $this->assertSame('victory', $action['state']['status']);
+        $this->assertTrue(
+            collect($action['events'])->contains(
+                fn (array $event): bool => ($event['type'] ?? '') === 'dungeon_floor_cleared',
+            ),
+        );
+
+        $progress = UserDungeonProgress::query()->where('user_id', $user->id)->first();
+        $this->assertSame(0, (int) $progress->step);
+        $this->assertFalse((bool) $progress->in_dungeon);
+
+        $this->getJson('/api/player/navigation')
+            ->assertOk()
+            ->assertJsonPath('in_dungeon', false);
     }
 
     private function demoUser(): User

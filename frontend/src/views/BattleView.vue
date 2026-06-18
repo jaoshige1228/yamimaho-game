@@ -670,17 +670,20 @@ function leaveBattle() {
   battle.battleId = null;
   battle.state = null;
   battle.pendingEvents = [];
-  player.fetchNavigation();
 
-  if (cleared || (status === 'defeat' && wasDungeon)) {
-    router.push('/hub');
-    return;
-  }
-  if ((status === 'victory' || status === 'fled') && wasDungeon) {
-    router.push('/dungeon');
-    return;
-  }
-  router.push('/');
+  const destination = (() => {
+    if (cleared || (status === 'defeat' && wasDungeon)) {
+      return '/hub';
+    }
+    if ((status === 'victory' || status === 'fled') && wasDungeon) {
+      return '/dungeon';
+    }
+    return '/';
+  })();
+
+  player.fetchNavigation().finally(() => {
+    router.push(destination);
+  });
 }
 
 watch(currentActor, () => {

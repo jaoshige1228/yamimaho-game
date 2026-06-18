@@ -245,6 +245,7 @@ class BattleFactory
             'spirit' => $master['spirit'],
             'vit' => $master['vit'] ?? 10,
             'gold_reward' => $isEnemy ? (int) ($master['gold_reward'] ?? 0) : 0,
+            'exp_reward' => $isEnemy ? (int) ($master['exp_reward'] ?? 0) : 0,
             'alive' => true,
             'evasion_rate' => $isEnemy
                 ? (int) ($master['evasion_rate'] ?? 1)

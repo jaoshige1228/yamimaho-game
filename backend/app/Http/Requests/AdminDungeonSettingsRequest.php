@@ -18,6 +18,7 @@ class AdminDungeonSettingsRequest extends FormRequest
     {
         return [
             'skip_battles' => ['required', 'boolean'],
+            'force_dialogue_events' => ['required', 'boolean'],
             'reset_progress' => ['required', 'boolean'],
         ];
     }

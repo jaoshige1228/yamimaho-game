@@ -813,6 +813,222 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertSame(0, (int) $victim->hp);
     }
 
+    public function test_ghost_possession_success_reaches_victory_line_with_epilogue(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'ghost_possession',
+            'game.dungeon.test_stat_success' => true,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'ghost_possession');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $successStory = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['stat_check_result'] ?? null) === 'success') {
+                $successStory = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($successStory, '精神力判定成功ルートに到達すること');
+        $this->assertStringContainsString('おりゃーっ', $transcript);
+        $this->assertStringContainsString('なんとか', $transcript);
+
+        $epilogue = $service->continue($user, $sessionId);
+        while (($epilogue['segment']['kind'] ?? '') === 'story') {
+            if (($epilogue['segment']['lines'][0]['text'] ?? '') === self::EPILOGUE_TEXT) {
+                break;
+            }
+            $epilogue = $service->continue($user, $sessionId);
+        }
+
+        $this->assertSame(self::EPILOGUE_TEXT, $epilogue['segment']['lines'][0]['text'] ?? null);
+    }
+
+    public function test_ghost_possession_fail_slap_deals_ten_damage_leaving_at_least_one_hp(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'ghost_possession',
+            'game.dungeon.test_stat_success' => false,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'ghost_possession');
+        $sessionId = $start['session_id'];
+        $session = DungeonExplorationSession::query()->findOrFail($sessionId);
+        $targetSlot = (string) (($session->context ?? [])['target_slot'] ?? 'pc1');
+
+        $target = app(\App\Services\Player\UserCharacterService::class)
+            ->partyInSlotOrder($user)
+            ->get($targetSlot);
+        $this->assertNotNull($target);
+        $beforeHp = 15;
+        $target->hp = $beforeHp;
+        $target->save();
+
+        $failStory = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            if (($step['segment']['stat_check_result'] ?? null) === 'fail') {
+                $failStory = $step;
+            }
+            if (str_contains(json_encode($step, JSON_UNESCAPED_UNICODE), 'ビンタ')) {
+                $failStory = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($failStory, 'ビンタ描写に到達すること');
+        $failLines = collect($failStory['segment']['lines'] ?? []);
+        $slapLine = $failLines->first(
+            fn (array $line) => str_contains((string) ($line['text'] ?? ''), 'ビンタ'),
+        );
+        $this->assertNotNull($slapLine);
+        $this->assertSame('narration', $slapLine['type'] ?? null);
+        $this->assertStringContainsString('10', (string) $slapLine['text']);
+        $this->assertTrue(
+            $failLines
+                ->where('type', 'dialogue')
+                ->every(fn (array $line) => ! str_contains((string) ($line['text'] ?? ''), 'ダメージ')),
+            'ダメージ表記はセリフに含めないこと',
+        );
+
+        $target->refresh();
+        $this->assertSame(max(1, $beforeHp - 10), (int) $target->hp);
+    }
+
+    public function test_stumble_near_fall_completes_without_epilogue(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'stumble_near_fall',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'stumble_near_fall');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $done = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                $done = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($done, 'イベントが完了すること');
+        $this->assertStringContainsString('草木がしおれている', $transcript);
+        $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
+    }
+
+    public function test_maj_umai_leaf_completes_without_epilogue(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'maj_umai_leaf',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'maj_umai_leaf');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $done = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                $done = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($done, 'イベントが完了すること');
+        $this->assertStringContainsString('マジ=ウマ=イ', $transcript);
+        $this->assertStringContainsString('ジジィすぎない', $transcript);
+        $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
+    }
+
+    public function test_talent_man_completes_without_epilogue(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'talent_man',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'talent_man');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $done = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                $done = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($done, 'イベントが完了すること');
+        $this->assertStringContainsString('才能マンだ才能マン', $transcript);
+        $this->assertStringContainsString('魔術鍵', $transcript);
+        $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
+    }
+
+    public function test_music_talk_substitutes_party_member_names(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'music_talk',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'music_talk');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $done = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                $done = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($done, 'イベントが完了すること');
+        $this->assertStringContainsString('最近ヨウの演奏を聴いていないな', $transcript);
+        $this->assertStringContainsString('イルミはピアノな', $transcript);
+        $this->assertStringContainsString('弾けるんだ', $transcript);
+        $this->assertStringNotContainsString('{PC2}', $transcript);
+        $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
+    }
+
     public function test_advance_is_rejected_while_exploration_session_active(): void
     {
         config([

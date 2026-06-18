@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class DungeonEventMaster extends Model
+class DungeonDialogueEventMaster extends Model
 {
     /** @var list<string> */
     protected $fillable = [
@@ -13,18 +13,8 @@ class DungeonEventMaster extends Model
         'code',
         'name',
         'weight',
-        'event_type',
         'start_node_key',
-        'skip_epilogue',
     ];
-
-    /** @return array<string, string> */
-    protected function casts(): array
-    {
-        return [
-            'skip_epilogue' => 'boolean',
-        ];
-    }
 
     /** @return HasMany<DungeonEventNode, $this> */
     public function nodes(): HasMany

@@ -51,11 +51,22 @@ class PartyExplorationDamageService
         return $alive;
     }
 
-    public function pickRandomAliveSlot(User $user, ?string $except = null): ?string
+    /**
+     * @param  string|list<string>|null  $except
+     */
+    public function pickRandomAliveSlot(User $user, string|array|null $except = null): ?string
     {
         $alive = $this->aliveSlotIds($user);
-        if ($except !== null) {
-            $alive = array_values(array_filter($alive, fn (string $id) => $id !== $except));
+        $exceptSlots = match (true) {
+            is_string($except) => [$except],
+            is_array($except) => $except,
+            default => [],
+        };
+        if ($exceptSlots !== []) {
+            $alive = array_values(array_filter(
+                $alive,
+                fn (string $id) => ! in_array($id, $exceptSlots, true),
+            ));
         }
 
         if ($alive === []) {

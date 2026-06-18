@@ -52,6 +52,18 @@ class DungeonAdvanceService
             );
         }
 
+        if ($forced === 'dialogue') {
+            $eventCode = config('game.dungeon.test_event_code');
+
+            return $this->exploration->startEvent(
+                $user,
+                $floor,
+                $nextStep,
+                is_string($eventCode) && $eventCode !== '' ? $eventCode : null,
+                dialogueOnlyPool: true,
+            );
+        }
+
         if ($forced === 'flavor') {
             return $this->flavor->start($user, $floor, $nextStep);
         }
@@ -68,6 +80,10 @@ class DungeonAdvanceService
 
         if ($rolled === 'flavor') {
             return $this->flavor->start($user, $floor, $nextStep);
+        }
+
+        if ($rolled === 'dialogue') {
+            return $this->exploration->startEvent($user, $floor, $nextStep, dialogueOnlyPool: true);
         }
 
         return $this->exploration->startEvent($user, $floor, $nextStep);

@@ -52,6 +52,22 @@ class AdminController extends Controller
         ]);
     }
 
+    public function dungeonSettingsShow(): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        return response()->json(array_merge(
+            [
+                'skip_battles' => $this->dungeonProgress->shouldSkipBattles($user),
+                'force_dialogue_events' => $this->dungeonProgress->shouldForceDialogueEvents($user),
+            ],
+            $this->dungeonProgress->statusPayload($user),
+        ));
+    }
+
     public function dungeonSettings(AdminDungeonSettingsRequest $request): JsonResponse
     {
         $user = Auth::user();
@@ -61,6 +77,7 @@ class AdminController extends Controller
 
         $validated = $request->validated();
         $this->dungeonProgress->setSkipBattles($user, (bool) $validated['skip_battles']);
+        $this->dungeonProgress->setForceDialogueEvents($user, (bool) $validated['force_dialogue_events']);
 
         if ($validated['reset_progress']) {
             $this->dungeonProgress->reset($user);
@@ -70,6 +87,7 @@ class AdminController extends Controller
             [
                 'message' => 'ダンジョン設定を反映しました。',
                 'skip_battles' => (bool) $validated['skip_battles'],
+                'force_dialogue_events' => (bool) $validated['force_dialogue_events'],
             ],
             $this->dungeonProgress->statusPayload($user),
         ));

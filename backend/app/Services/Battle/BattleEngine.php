@@ -484,13 +484,17 @@ class BattleEngine
         if ($target['hp'] === 0) {
             $target['alive'] = false;
             if (($target['side'] ?? '') === 'enemy') {
+                if (! isset($state['meta'])) {
+                    $state['meta'] = [];
+                }
                 $gold = (int) ($target['gold_reward'] ?? 0);
                 if ($gold > 0) {
-                    if (! isset($state['meta'])) {
-                        $state['meta'] = [];
-                    }
                     $state['meta']['gold_earned'] = (int) ($state['meta']['gold_earned'] ?? 0) + $gold;
                     $events[] = ['type' => 'gold_gained', 'amount' => $gold, 'total' => $state['meta']['gold_earned']];
+                }
+                $exp = (int) ($target['exp_reward'] ?? 0);
+                if ($exp > 0) {
+                    $state['meta']['exp_earned'] = (int) ($state['meta']['exp_earned'] ?? 0) + $exp;
                 }
             }
         }

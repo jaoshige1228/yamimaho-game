@@ -18,8 +18,8 @@ class EnemyMasterDataTest extends TestCase
         $bat = $provider->findEnemy('bat');
         $snake = $provider->findEnemy('snake');
 
-        $this->assertSame(13, $bat['exp_reward']);
-        $this->assertSame(26, $snake['exp_reward']);
+        $this->assertSame(20, $bat['exp_reward']);
+        $this->assertSame(30, $snake['exp_reward']);
     }
 
     public function test_enemy_masters_load_exp_reward_from_db(): void
@@ -29,11 +29,11 @@ class EnemyMasterDataTest extends TestCase
         $provider = new MasterDataProvider;
         $bat = $provider->findEnemy('bat');
 
-        $this->assertSame(13, $bat['exp_reward']);
+        $this->assertSame(20, $bat['exp_reward']);
         $this->assertSame(50, $bat['hp']);
         $this->assertSame(1, $bat['floor']);
         $this->assertSame(
-            13,
+            20,
             EnemyMaster::query()->where('floor', 1)->where('code', 'bat')->value('exp_reward'),
         );
     }
@@ -47,8 +47,8 @@ class EnemyMasterDataTest extends TestCase
         $batFloor2 = $provider->findEnemy('bat', 2);
 
         $this->assertSame(50, $batFloor1['hp']);
-        $this->assertSame(400, $batFloor2['hp']);
-        $this->assertSame(13, $batFloor1['exp_reward']);
-        $this->assertSame(200, $batFloor2['exp_reward']);
+        $this->assertSame(300, $batFloor2['hp']);
+        $this->assertSame(20, $batFloor1['exp_reward']);
+        $this->assertSame(100, $batFloor2['exp_reward']);
     }
 }

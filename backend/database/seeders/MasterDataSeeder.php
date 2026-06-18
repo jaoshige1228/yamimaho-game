@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\ArmorMaster;
 use App\Models\CharacterMaster;
 use App\Models\DungeonEncounterMaster;
+use App\Models\DungeonDialogueEventMaster;
 use App\Models\DungeonEventMaster;
 use App\Models\DungeonEventNode;
 use App\Models\DungeonFloorMaster;
@@ -184,9 +185,32 @@ class MasterDataSeeder extends Seeder
                     'weight' => (int) $row['weight'],
                     'event_type' => $row['event_type'],
                     'start_node_key' => $row['start_node_key'],
+                    'skip_epilogue' => (bool) ((int) ($row['skip_epilogue'] ?? 0)),
                 ],
             );
         }
+
+        foreach (CsvMasterReader::read('dungeon_dialogue_events.csv') as $row) {
+            if (($row['code'] ?? '') === '') {
+                continue;
+            }
+
+            DungeonDialogueEventMaster::query()->updateOrCreate(
+                [
+                    'floor' => (int) $row['floor'],
+                    'code' => $row['code'],
+                ],
+                [
+                    'name' => $row['name'],
+                    'weight' => (int) $row['weight'],
+                    'start_node_key' => $row['start_node_key'],
+                ],
+            );
+        }
+
+        DungeonEventMaster::query()
+            ->whereIn('code', ['stumble_near_fall', 'maj_umai_leaf'])
+            ->delete();
 
         foreach (CsvMasterReader::read('dungeon_event_nodes.csv') as $row) {
             DungeonEventNode::query()->updateOrCreate(

@@ -11,6 +11,7 @@ const expInput = ref(50);
 const party = ref([]);
 const lastResults = ref([]);
 const skipBattles = ref(false);
+const forceDialogueEvents = ref(false);
 const resetProgress = ref(false);
 const dungeonStatus = ref({
   floor: 1,
@@ -25,13 +26,26 @@ async function loadParty() {
   party.value = data.characters ?? [];
 }
 
+async function loadDungeonSettings() {
+  const data = await api('/admins/dungeon-settings', { method: 'GET' });
+  skipBattles.value = Boolean(data.skip_battles);
+  forceDialogueEvents.value = Boolean(data.force_dialogue_events);
+  dungeonStatus.value = {
+    floor: data.floor ?? 1,
+    step: data.step ?? 0,
+    unlocked_floor: data.unlocked_floor ?? 1,
+    max_floor: data.max_floor ?? 3,
+    playable_floor: data.playable_floor ?? 1,
+  };
+}
+
 async function init() {
   loading.value = true;
   error.value = '';
   try {
     await api('/admins/status', { method: 'GET' });
     available.value = true;
-    await loadParty();
+    await Promise.all([loadParty(), loadDungeonSettings()]);
   } catch (e) {
     available.value = false;
     if (e.status !== 404) {
@@ -76,10 +90,13 @@ async function applyDungeonSettings() {
       method: 'POST',
       body: JSON.stringify({
         skip_battles: skipBattles.value,
+        force_dialogue_events: forceDialogueEvents.value,
         reset_progress: resetProgress.value,
       }),
     });
     message.value = data.message ?? 'ダンジョン設定を反映しました';
+    skipBattles.value = Boolean(data.skip_battles);
+    forceDialogueEvents.value = Boolean(data.force_dialogue_events);
     dungeonStatus.value = {
       floor: data.floor ?? 1,
       step: data.step ?? 0,
@@ -134,6 +151,10 @@ onMounted(() => init());
           <label class="check">
             <input v-model="skipBattles" type="checkbox" />
             <span>ダンジョン敵無しモード（戦闘抽選をスキップ）</span>
+          </label>
+          <label class="check">
+            <input v-model="forceDialogueEvents" type="checkbox" />
+            <span>会話のみイベント100%モード（デバッグ用）</span>
           </label>
           <label class="check">
             <input v-model="resetProgress" type="checkbox" />

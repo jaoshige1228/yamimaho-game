@@ -121,6 +121,7 @@ class DungeonProgressService
         $record->step = 0;
         $record->unlocked_floor = 1;
         $record->skip_battle_encounters = false;
+        $record->force_dialogue_events = false;
         $record->in_dungeon = false;
         $record->save();
 
@@ -155,11 +156,25 @@ class DungeonProgressService
         $record->save();
     }
 
+    public function shouldForceDialogueEvents(User $user): bool
+    {
+        return (bool) $this->findOrCreate($user)->force_dialogue_events;
+    }
+
+    public function setForceDialogueEvents(User $user, bool $force): void
+    {
+        $record = $this->findOrCreate($user);
+        $record->force_dialogue_events = $force;
+        $record->save();
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function onBossVictory(User $user, int $floor): array
     {
+        DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
+
         $record = $this->findOrCreate($user);
         $maxFloor = DungeonFloorConfig::maxFloor();
 
@@ -168,6 +183,7 @@ class DungeonProgressService
         }
 
         $record->step = 0;
+        $record->in_dungeon = false;
         $record->save();
 
         $nextFloor = $floor + 1;
@@ -195,6 +211,7 @@ class DungeonProgressService
                 'unlocked_floor' => 1,
                 'step' => 0,
                 'skip_battle_encounters' => false,
+                'force_dialogue_events' => false,
                 'in_dungeon' => false,
             ],
         );

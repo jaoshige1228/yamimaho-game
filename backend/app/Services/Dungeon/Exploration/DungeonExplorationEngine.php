@@ -188,12 +188,23 @@ class DungeonExplorationEngine
                 $session->context = $context;
             }
 
-            if ($node->node_type === 'dialogue' && $node->speaker_role === 'random_ally_store') {
-                if (empty($context['reactor_slot'])) {
-                    $picked = $this->damage->pickRandomAliveSlot($user);
+            if ($node->node_type === 'dialogue') {
+                if ($node->speaker_role === 'random_ally_store') {
+                    if (empty($context['reactor_slot'])) {
+                        $picked = $this->damage->pickRandomAliveSlot($user);
+                        if ($picked !== null) {
+                            $context['reactor_slot'] = $picked;
+                        }
+                    }
+                } elseif ($node->speaker_role === 'random_ally_except_target_store') {
+                    $picked = $this->damage->pickRandomAliveSlot($user, $context['target_slot'] ?? null);
                     if ($picked !== null) {
                         $context['reactor_slot'] = $picked;
-                        $session->context = $context;
+                    }
+                } elseif ($node->speaker_role === 'random_ally_except_target_and_reactor_as_helper') {
+                    $picked = $this->pickRandomExceptTargetAndReactor($user, $context);
+                    if ($picked !== null) {
+                        $context['helper_slot'] = $picked;
                     }
                 }
             }
@@ -348,6 +359,10 @@ class DungeonExplorationEngine
         array $context,
         string $resumeNodeKey,
     ): ?array {
+        if ((bool) ($context['skip_epilogue'] ?? false)) {
+            return null;
+        }
+
         if ((bool) ($context['epilogue_shown'] ?? false)) {
             return null;
         }
@@ -1105,19 +1120,26 @@ class DungeonExplorationEngine
     {
         $targetSlot = (string) ($context['target_slot'] ?? '');
         $chosenSlot = (string) ($context['chosen_slot'] ?? '');
+        $helperSlot = (string) ($context['helper_slot'] ?? '');
 
         $targetName = $this->nameForSlot($user, $targetSlot);
         $chosenName = $this->nameForSlot($user, $chosenSlot);
+        $helperName = $this->nameForSlot($user, $helperSlot);
 
         $replacements = [
             '{target_name}' => $targetName,
             '{chosen_name}' => $chosenName,
+            '{helper_name}' => $helperName,
             '{name}' => $chosenSlot !== '' ? $chosenName : $targetName,
             '{success_rate}' => (string) ($context['last_success_rate'] ?? 0),
             '{stat_check_label}' => (string) ($context['last_stat_check_label'] ?? ''),
             '{gold_amount}' => $this->goldAmountForInterpolation($context),
             '{damage_amount}' => $this->damageAmountForInterpolation($context),
         ];
+
+        foreach (['PC1' => 'pc1', 'PC2' => 'pc2', 'PC3' => 'pc3', 'PC4' => 'pc4'] as $placeholder => $slot) {
+            $replacements['{'.$placeholder.'}'] = $this->nameForSlot($user, $slot);
+        }
 
         $text = str_replace(array_keys($replacements), array_values($replacements), $text);
 
@@ -1180,6 +1202,20 @@ class DungeonExplorationEngine
             return $this->damage->pickRandomAliveSlot($user, $context['target_slot'] ?? null);
         }
 
+        if ($role === 'random_ally_except_target_store') {
+            return $context['reactor_slot']
+                ?? $this->damage->pickRandomAliveSlot($user, $context['target_slot'] ?? null);
+        }
+
+        if ($role === 'random_ally_except_target_and_reactor') {
+            return $this->pickRandomExceptTargetAndReactor($user, $context);
+        }
+
+        if ($role === 'random_ally_except_target_and_reactor_as_helper') {
+            return $context['helper_slot']
+                ?? $this->pickRandomExceptTargetAndReactor($user, $context);
+        }
+
         if ($role === 'random_ally_store') {
             return $context['reactor_slot'] ?? $this->damage->pickRandomAliveSlot($user);
         }
@@ -1197,6 +1233,19 @@ class DungeonExplorationEngine
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function pickRandomExceptTargetAndReactor(User $user, array $context): ?string
+    {
+        $except = array_values(array_filter([
+            $context['target_slot'] ?? null,
+            $context['reactor_slot'] ?? null,
+        ], fn ($slot) => is_string($slot) && $slot !== ''));
+
+        return $this->damage->pickRandomAliveSlot($user, $except);
     }
 
     private function dialogueTextForSlot(DungeonEventNode $node, string $slotId): ?string

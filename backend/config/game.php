@@ -3,7 +3,7 @@
 return [
   'demo_user_email' => 'demo@yamimaho.local',
 
-  /** 勝利時に味方1人あたりが得る経験値 */
+  /** @deprecated 勝利時経験値は enemy_masters.exp_reward の合計を使用 */
   'exp_per_victory' => 40,
 
   /** 味方スロット ID → character_masters.code */
@@ -22,8 +22,9 @@ return [
     /** 実装済みで挑戦可能な最大層（2層目以降は未実装の間は 1） */
     'playable_floor' => 2,
     'battle_encounter_rate' => 30,
-    'exploration_event_rate' => 60,
-    'flavor_narrative_rate' => 10,
+    'exploration_event_rate' => 55,
+    'dialogue_event_rate' => 10,
+    'flavor_narrative_rate' => 5,
     /**
      * 層ごとの設定。boss_step に到達した「進む」でボス戦（通常抽選は行わない）
      */
@@ -90,7 +91,7 @@ return [
         ],
       ],
     ],
-    /** テスト用: null | battle | exploration | flavor */
+    /** テスト用: null | battle | exploration | dialogue | flavor */
     'test_force' => env('DUNGEON_TEST_FORCE'),
     /** テスト用: trap_arrow | treasure_chest など */
     'test_event_code' => env('DUNGEON_TEST_EVENT_CODE'),

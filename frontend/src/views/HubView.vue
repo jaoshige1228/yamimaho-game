@@ -74,7 +74,7 @@ onMounted(() => loadHubData());
             v-for="floor in enterableFloors"
             :key="floor"
             type="button"
-            class="scene-overlay-enter"
+            class="hub-enter-btn"
             :disabled="enteringFloor !== null"
             @click="enterDungeon(floor)"
           >
@@ -100,11 +100,36 @@ onMounted(() => loadHubData());
 
 <style scoped>
 .hub-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
   align-items: stretch;
   width: min(240px, 72%);
+  z-index: 3;
+}
+.hub-enter-btn {
+  min-width: 88px;
+  min-height: 44px;
+  padding: 0.55rem 1.35rem;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: rgba(12, 8, 24, 0.55);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: 'Hiragino Sans', system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  touch-action: manipulation;
+}
+.hub-enter-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
 }
 .hub-secondary-btn {
   border: 1px solid rgba(200, 176, 255, 0.45);

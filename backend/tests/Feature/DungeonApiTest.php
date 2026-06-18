@@ -217,6 +217,11 @@ class DungeonApiTest extends TestCase
     public function test_master_seeder_loads_dungeon_events(): void
     {
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'trap_arrow']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'stumble_near_fall']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'maj_umai_leaf']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'talent_man']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'music_talk']);
+        $this->assertDatabaseMissing('dungeon_event_masters', ['code' => 'stumble_near_fall']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'treasure_chest']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'healing_spring']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'suspicious_spring']);

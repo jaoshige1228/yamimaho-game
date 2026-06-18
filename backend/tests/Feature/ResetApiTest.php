@@ -60,6 +60,7 @@ class ResetApiTest extends TestCase
         $this->assertSame(0, (int) $dungeon->step);
         $this->assertSame(1, (int) $dungeon->unlocked_floor);
         $this->assertFalse((bool) $dungeon->skip_battle_encounters);
+        $this->assertFalse((bool) $dungeon->force_dialogue_events);
         $this->assertSame(0, DungeonExplorationSession::query()->where('user_id', $user->id)->count());
     }
 }
