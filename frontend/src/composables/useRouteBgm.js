@@ -6,7 +6,7 @@ import { useAppAudio } from './useAppAudio';
 
 function resolveBgmTrack(route, battleState, player) {
   const name = route.name;
-  if (name === 'hub' || name === 'shop' || name === 'equip' || name === 'items') {
+  if (name === 'hub' || name === 'shop' || name === 'equip' || name === 'items' || name === 'dungeon-enter') {
     return 'home';
   }
   if (name === 'dungeon') {
@@ -14,6 +14,13 @@ function resolveBgmTrack(route, battleState, player) {
   }
   if (name === 'status') {
     if (player.activeBattleId) {
+      if (
+        route.query.mid_boss === '1'
+        || battleState?.meta?.mid_boss === true
+        || battleState?.meta?.bgm === 'broken'
+      ) {
+        return 'broken';
+      }
       const isBoss =
         route.query.boss === '1' || battleState?.meta?.boss === true;
       return isBoss ? 'boss' : 'battle';
@@ -21,6 +28,13 @@ function resolveBgmTrack(route, battleState, player) {
     return player.inDungeon ? 'dungeon' : 'home';
   }
   if (name === 'battle') {
+    if (
+      route.query.mid_boss === '1'
+      || battleState?.meta?.mid_boss === true
+      || battleState?.meta?.bgm === 'broken'
+    ) {
+      return 'broken';
+    }
     const isBoss =
       route.query.boss === '1' || battleState?.meta?.boss === true;
     return isBoss ? 'boss' : 'battle';
@@ -53,7 +67,10 @@ export function useRouteBgm() {
     () => [
       route.name,
       route.query.boss,
+      route.query.mid_boss,
       battle.state?.meta?.boss,
+      battle.state?.meta?.mid_boss,
+      battle.state?.meta?.bgm,
       settings.value.bgmEnabled,
       player.inDungeon,
       player.activeBattleId,

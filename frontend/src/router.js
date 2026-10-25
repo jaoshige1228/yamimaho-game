@@ -2,12 +2,14 @@ import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from './views/HomeView.vue';
 import BattleView from './views/BattleView.vue';
 import AdminView from './views/AdminView.vue';
+import TestBattlesView from './views/TestBattlesView.vue';
 import HubView from './views/HubView.vue';
 import DungeonView from './views/DungeonView.vue';
 import StatusView from './views/StatusView.vue';
 import ShopView from './views/ShopView.vue';
 import EquipView from './views/EquipView.vue';
 import ItemsView from './views/ItemsView.vue';
+import DungeonEnterView from './views/DungeonEnterView.vue';
 import { usePlayerStore } from './stores/player';
 
 const router = createRouter({
@@ -44,6 +46,12 @@ const router = createRouter({
       meta: { title: '持ち物' },
     },
     {
+      path: '/dungeon/enter',
+      name: 'dungeon-enter',
+      component: DungeonEnterView,
+      meta: { title: 'ダンジョンに潜る' },
+    },
+    {
       path: '/dungeon',
       name: 'dungeon',
       component: DungeonView,
@@ -68,6 +76,12 @@ const router = createRouter({
       component: AdminView,
       meta: { title: '管理' },
     },
+    {
+      path: '/test_battles',
+      name: 'test-battles',
+      component: TestBattlesView,
+      meta: { title: 'テスト戦闘' },
+    },
   ],
 });
 
@@ -80,13 +94,13 @@ router.beforeEach(async (to) => {
     return true;
   }
 
-  const hubBlocked = ['hub', 'shop', 'equip', 'items'];
+  const hubBlocked = ['hub', 'shop', 'equip', 'items', 'dungeon-enter'];
   if (player.inDungeon && hubBlocked.includes(String(to.name))) {
     return { name: 'dungeon', replace: true };
   }
 
   if (player.activeBattleId) {
-    if (['hub', 'dungeon', 'shop', 'equip', 'items'].includes(String(to.name))) {
+    if (['hub', 'dungeon', 'dungeon-enter', 'shop', 'equip', 'items'].includes(String(to.name))) {
       return {
         name: 'battle',
         params: { id: player.activeBattleId },

@@ -22,9 +22,9 @@ return [
     /** 実装済みで挑戦可能な最大層（2層目以降は未実装の間は 1） */
     'playable_floor' => 2,
     'battle_encounter_rate' => 30,
-    'exploration_event_rate' => 55,
-    'dialogue_event_rate' => 10,
-    'flavor_narrative_rate' => 5,
+    'exploration_event_rate' => 60,
+    'dialogue_event_rate' => 9,
+    'flavor_narrative_rate' => 1,
     /**
      * 層ごとの設定。boss_step に到達した「進む」でボス戦（通常抽選は行わない）
      */
@@ -37,7 +37,7 @@ return [
             'from' => 1,
             'to' => 10,
             'codes' => ['bat'],
-            'count_min' => 2,
+            'count_min' => 1,
             'count_max' => 3,
           ],
           [
@@ -59,13 +59,16 @@ return [
       2 => [
         'boss_step' => 41,
         'boss_enemy_code' => 'inu_moe',
+        'mid_boss_step' => 20,
+        'mid_boss_event_code' => 'floor2_mid_boss',
+        'mid_boss_enemy_codes' => ['npc_kasu', 'npc_gusu'],
         'encounter_bands' => [
           [
             'from' => 1,
             'to' => 10,
             'codes' => ['bat'],
-            'count_min' => 2,
-            'count_max' => 3,
+            'count_min' => 1,
+            'count_max' => 2,
           ],
           [
             'from' => 11,

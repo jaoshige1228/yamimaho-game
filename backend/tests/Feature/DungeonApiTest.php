@@ -74,7 +74,7 @@ class DungeonApiTest extends TestCase
         $response->assertJsonPath('floor', 2);
 
         $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
-        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === 400));
+        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === 135));
     }
 
     public function test_player_party_includes_sprite_and_max_stats(): void
@@ -109,9 +109,15 @@ class DungeonApiTest extends TestCase
     public function test_dungeon_defeat_restores_party_to_full_and_resets_step(): void
     {
         $user = $this->demoUser();
+        $this->actingAs($user);
         UserCharacter::query()
             ->where('user_id', $user->id)
             ->update(['hp' => 1, 'mp' => 1]);
+
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 1, 'unlocked_floor' => 1, 'step' => 30, 'in_dungeon' => false],
+        );
 
         config(['game.dungeon.test_force' => 'battle']);
 
@@ -221,6 +227,10 @@ class DungeonApiTest extends TestCase
         $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'maj_umai_leaf']);
         $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'talent_man']);
         $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'music_talk']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'sketchy_plant']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'cat_teaser']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'class_grumbling']);
+        $this->assertDatabaseHas('dungeon_dialogue_event_masters', ['code' => 'smile_water']);
         $this->assertDatabaseMissing('dungeon_event_masters', ['code' => 'stumble_near_fall']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'treasure_chest']);
         $this->assertDatabaseHas('dungeon_event_masters', ['code' => 'healing_spring']);

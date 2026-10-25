@@ -21,7 +21,14 @@ export async function api(path, init = {}) {
 
   const data = await res.json();
   if (!res.ok) {
-    const err = new Error(data.message || res.statusText);
+    let message = data.message || res.statusText;
+    if (data.errors && typeof data.errors === 'object') {
+      const first = Object.values(data.errors).flat().find(Boolean);
+      if (first) {
+        message = first;
+      }
+    }
+    const err = new Error(message);
     err.status = res.status;
     err.data = data;
     throw err;

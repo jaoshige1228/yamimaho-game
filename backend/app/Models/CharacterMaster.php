@@ -12,6 +12,7 @@ class CharacterMaster extends Model
     protected $fillable = [
         'code',
         'name',
+        'second_name',
         'sprite',
         'hp',
         'mp',

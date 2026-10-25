@@ -25,9 +25,7 @@ class DungeonAdvanceService
      */
     public function advance(User $user): array
     {
-        if ($this->exploration->hasActiveSession($user)) {
-            throw new \RuntimeException('探索イベントの途中です。');
-        }
+        $this->exploration->abandonActiveSession($user);
 
         $floor = $this->progress->getFloor($user);
         if (! $this->progress->isFloorPlayable($user, $floor)) {
@@ -38,6 +36,13 @@ class DungeonAdvanceService
 
         if (DungeonFloorConfig::isBossStep($floor, $nextStep)) {
             return $this->startBattle($user, $floor, $nextStep);
+        }
+
+        if (DungeonFloorConfig::isMidBossStep($floor, $nextStep)) {
+            $eventCode = DungeonFloorConfig::midBossEventCode($floor);
+            if ($eventCode !== null) {
+                return $this->exploration->startEvent($user, $floor, $nextStep, $eventCode);
+            }
         }
 
         $forced = config('game.dungeon.test_force');

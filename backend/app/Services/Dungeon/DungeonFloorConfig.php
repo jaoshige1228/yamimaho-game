@@ -39,6 +39,44 @@ class DungeonFloorConfig
         return is_string($code) && $code !== '' ? $code : null;
     }
 
+    public static function midBossStep(int $floor): ?int
+    {
+        $floors = config('game.dungeon.floors', []);
+        $step = $floors[$floor]['mid_boss_step'] ?? null;
+
+        return is_numeric($step) ? (int) $step : null;
+    }
+
+    public static function isMidBossStep(int $floor, int $step): bool
+    {
+        $midBossStep = self::midBossStep($floor);
+
+        return $midBossStep !== null && $step === $midBossStep;
+    }
+
+    public static function midBossEventCode(int $floor): ?string
+    {
+        $floors = config('game.dungeon.floors', []);
+        $code = $floors[$floor]['mid_boss_event_code'] ?? null;
+
+        return is_string($code) && $code !== '' ? $code : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function midBossEnemyCodes(int $floor): array
+    {
+        $floors = config('game.dungeon.floors', []);
+        $codes = $floors[$floor]['mid_boss_enemy_codes'] ?? [];
+
+        if (! is_array($codes)) {
+            return [];
+        }
+
+        return array_values(array_filter($codes, fn ($code) => is_string($code) && $code !== ''));
+    }
+
     /**
      * @return list<array{from: int, to: int, codes: list<string>, count_min?: int, count_max?: int}>
      */

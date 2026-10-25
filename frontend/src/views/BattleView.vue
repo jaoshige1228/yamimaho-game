@@ -28,9 +28,16 @@ const {
   isBgmPaused,
 } = useAppAudio();
 
-const battleBgmTrack = computed(() =>
-  route.query.boss === '1' || state.value?.meta?.boss ? 'boss' : 'battle',
-);
+const battleBgmTrack = computed(() => {
+  if (
+    route.query.mid_boss === '1'
+    || state.value?.meta?.mid_boss
+    || state.value?.meta?.bgm === 'broken'
+  ) {
+    return 'broken';
+  }
+  return route.query.boss === '1' || state.value?.meta?.boss ? 'boss' : 'battle';
+});
 
 const busy = ref(false);
 const targetMode = ref(null);
@@ -77,7 +84,8 @@ const canShowFlee = computed(
   () =>
     isDungeonBattle.value &&
     state.value?.meta?.can_flee !== false &&
-    route.query.boss !== '1',
+    route.query.boss !== '1' &&
+    route.query.mid_boss !== '1',
 );
 
 const canFlee = computed(

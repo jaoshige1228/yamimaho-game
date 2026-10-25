@@ -8,6 +8,7 @@ use App\Http\Controllers\DungeonHealController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\ResetController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\TestBattleController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('demo.player')->group(function (): void {
@@ -40,4 +41,10 @@ Route::middleware(['demo.player', 'non.production'])->prefix('admins')->group(fu
     Route::post('/grant-exp', [AdminController::class, 'grantExp']);
     Route::get('/dungeon-settings', [AdminController::class, 'dungeonSettingsShow']);
     Route::post('/dungeon-settings', [AdminController::class, 'dungeonSettings']);
+});
+
+Route::middleware(['demo.player', 'non.production'])->prefix('test_battles')->group(function (): void {
+    Route::get('/status', [TestBattleController::class, 'status']);
+    Route::get('/catalog', [TestBattleController::class, 'catalog']);
+    Route::post('/start', [TestBattleController::class, 'start']);
 });

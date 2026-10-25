@@ -67,6 +67,10 @@ class DungeonHealService
             throw new \InvalidArgumentException('対象が見つかりません。');
         }
 
+        if ($caster->hp <= 0) {
+            throw new \InvalidArgumentException('戦闘不能のキャラクターは魔法を使えません。');
+        }
+
         $masterCode = $caster->characterMaster->code;
         $spellIds = $this->masters->spellIdsForCharacter($masterCode);
         if (! in_array($spellId, $spellIds, true)) {
@@ -129,7 +133,8 @@ class DungeonHealService
                     'description' => $spell['description'] ?? '',
                     'mp_cost' => (int) ($spell['mp_cost'] ?? 0),
                     'effect' => $effect,
-                    'affordable' => $character->mp >= (int) ($spell['mp_cost'] ?? 0),
+                    'affordable' => $character->hp > 0
+                        && $character->mp >= (int) ($spell['mp_cost'] ?? 0),
                 ];
             }
         }

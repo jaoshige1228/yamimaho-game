@@ -68,10 +68,45 @@ class BattleEngineDamageTest extends TestCase
         $method = new \ReflectionMethod(BattleEngine::class, 'calcDamage');
         $method->setAccessible(true);
 
-        $damage = $method->invoke($engine, $attacker, $defender, 'mag', 1.07);
+        $damage = $method->invoke($engine, $attacker, $defender, 'mag', 1.07, 'magical');
 
         // (16 - 3) * 1.0 * 1.07 = 13.91 -> floor 13
         $this->assertSame(13, $damage);
+    }
+
+    public function test_enemy_uses_pdef_for_physical_and_mdef_for_magical(): void
+    {
+        $engine = new BattleEngine(
+            factory: new BattleFactory,
+            damageRoll: static fn (): float => 1.0,
+        );
+
+        $attacker = [
+            'side' => 'ally',
+            'str' => 20,
+            'mag' => 20,
+            'def' => 5,
+            'buffs' => [],
+        ];
+        $defender = [
+            'side' => 'enemy',
+            'str' => 10,
+            'mag' => 10,
+            'pdef' => 40,
+            'mdef' => 4,
+            'buffs' => [],
+        ];
+
+        $method = new \ReflectionMethod(BattleEngine::class, 'calcDamage');
+        $method->setAccessible(true);
+
+        $physical = $method->invoke($engine, $attacker, $defender, 'str', 1.0, 'physical');
+        $magical = $method->invoke($engine, $attacker, $defender, 'mag', 1.0, 'magical');
+
+        // (20 - 40/2) * 1.0 = 0 -> min 1
+        $this->assertSame(1, $physical);
+        // (20 - 4/2) * 1.0 = 18
+        $this->assertSame(18, $magical);
     }
 
     public function test_damage_is_at_least_one(): void

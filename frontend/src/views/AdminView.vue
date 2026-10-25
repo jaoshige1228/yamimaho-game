@@ -3,16 +3,22 @@ import { onMounted, ref } from 'vue';
 import { api } from '../api';
 
 const loading = ref(true);
-const submitting = ref(false);
 const available = ref(false);
-const error = ref('');
-const message = ref('');
+const initError = ref('');
+
 const expInput = ref(50);
+const expSubmitting = ref(false);
+const expError = ref('');
+const expMessage = ref('');
 const party = ref([]);
 const lastResults = ref([]);
+
 const skipBattles = ref(false);
 const forceDialogueEvents = ref(false);
 const resetProgress = ref(false);
+const dungeonSubmitting = ref(false);
+const dungeonError = ref('');
+const dungeonMessage = ref('');
 const dungeonStatus = ref({
   floor: 1,
   step: 0,
@@ -41,7 +47,7 @@ async function loadDungeonSettings() {
 
 async function init() {
   loading.value = true;
-  error.value = '';
+  initError.value = '';
   try {
     await api('/admins/status', { method: 'GET' });
     available.value = true;
@@ -49,7 +55,7 @@ async function init() {
   } catch (e) {
     available.value = false;
     if (e.status !== 404) {
-      error.value = e.message;
+      initError.value = e.message;
     }
   } finally {
     loading.value = false;
@@ -59,32 +65,33 @@ async function init() {
 async function grantExp() {
   const exp = Number(expInput.value);
   if (!Number.isFinite(exp) || exp < 1) {
-    error.value = '1 以上の数値を入力してください';
+    expError.value = '1 以上の数値を入力してください';
+    expMessage.value = '';
     return;
   }
 
-  submitting.value = true;
-  error.value = '';
-  message.value = '';
+  expSubmitting.value = true;
+  expError.value = '';
+  expMessage.value = '';
   try {
     const data = await api('/admins/grant-exp', {
       method: 'POST',
       body: JSON.stringify({ exp }),
     });
-    message.value = data.message ?? '経験値を配りました';
+    expMessage.value = data.message ?? '経験値を配りました';
     lastResults.value = data.characters ?? [];
     await loadParty();
   } catch (e) {
-    error.value = e.message;
+    expError.value = e.message;
   } finally {
-    submitting.value = false;
+    expSubmitting.value = false;
   }
 }
 
 async function applyDungeonSettings() {
-  submitting.value = true;
-  error.value = '';
-  message.value = '';
+  dungeonSubmitting.value = true;
+  dungeonError.value = '';
+  dungeonMessage.value = '';
   try {
     const data = await api('/admins/dungeon-settings', {
       method: 'POST',
@@ -94,7 +101,7 @@ async function applyDungeonSettings() {
         reset_progress: resetProgress.value,
       }),
     });
-    message.value = data.message ?? 'ダンジョン設定を反映しました';
+    dungeonMessage.value = data.message ?? 'ダンジョン設定を反映しました';
     skipBattles.value = Boolean(data.skip_battles);
     forceDialogueEvents.value = Boolean(data.force_dialogue_events);
     dungeonStatus.value = {
@@ -106,9 +113,9 @@ async function applyDungeonSettings() {
     };
     resetProgress.value = false;
   } catch (e) {
-    error.value = e.message;
+    dungeonError.value = e.message;
   } finally {
-    submitting.value = false;
+    dungeonSubmitting.value = false;
   }
 }
 
@@ -122,32 +129,39 @@ onMounted(() => init());
     <section v-else-if="!available" class="admin-panel blocked">
       <h2>利用できません</h2>
       <p>このページは本番環境ではアクセスできません。</p>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="initError" class="error">{{ initError }}</p>
     </section>
 
     <template v-else>
       <section class="admin-panel">
         <h2>経験値配布</h2>
         <p class="desc">パーティー全員に同じ経験値を配り、レベルアップ処理を実行します。</p>
-        <form class="exp-form" @submit.prevent="grantExp">
+        <div class="exp-form">
           <label class="field">
             <span>経験値</span>
-            <input v-model.number="expInput" type="number" min="1" step="1" required />
+            <input
+              v-model.number="expInput"
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              @keydown.enter.prevent="grantExp"
+            />
           </label>
-          <button type="submit" class="btn-primary" :disabled="submitting">
-            {{ submitting ? '処理中…' : '決定' }}
+          <button type="button" class="btn-primary" :disabled="expSubmitting" @click="grantExp">
+            {{ expSubmitting ? '処理中…' : '経験値を配る' }}
           </button>
-        </form>
-        <p v-if="message" class="success">{{ message }}</p>
-        <p v-if="error" class="error">{{ error }}</p>
+        </div>
+        <p v-if="expMessage" class="success">{{ expMessage }}</p>
+        <p v-if="expError" class="error">{{ expError }}</p>
       </section>
 
       <section class="admin-panel">
         <h2>ダンジョン設定</h2>
         <p class="desc">
-          デモユーザーの探索進行を調整します。敵無しモードは永続、探索リセットは「適用」時のみ深さを 0 に戻します。
+          デモユーザーの探索進行を調整します。敵無しモードは永続、探索リセットは「設定を適用」時のみ深さを 0 に戻します。
         </p>
-        <form class="dungeon-form" @submit.prevent="applyDungeonSettings">
+        <div class="dungeon-form">
           <label class="check">
             <input v-model="skipBattles" type="checkbox" />
             <span>ダンジョン敵無しモード（戦闘抽選をスキップ）</span>
@@ -165,10 +179,17 @@ onMounted(() => init());
             解放 {{ dungeonStatus.unlocked_floor }}層まで /
             挑戦可能 {{ dungeonStatus.playable_floor }}層まで
           </p>
-          <button type="submit" class="btn-primary" :disabled="submitting">
-            {{ submitting ? '処理中…' : '適用' }}
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="dungeonSubmitting"
+            @click="applyDungeonSettings"
+          >
+            {{ dungeonSubmitting ? '処理中…' : '設定を適用' }}
           </button>
-        </form>
+        </div>
+        <p v-if="dungeonMessage" class="success">{{ dungeonMessage }}</p>
+        <p v-if="dungeonError" class="error">{{ dungeonError }}</p>
       </section>
 
       <section v-if="lastResults.length" class="admin-panel">

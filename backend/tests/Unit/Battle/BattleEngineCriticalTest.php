@@ -33,7 +33,7 @@ class BattleEngineCriticalTest extends TestCase
         $method = new \ReflectionMethod(BattleEngine::class, 'calcDamageWithCritical');
         $method->setAccessible(true);
 
-        $result = $method->invoke($engine, $attacker, $defender, 'str', 1.0);
+        $result = $method->invoke($engine, $attacker, $defender, 'str', 1.0, 'physical');
 
         $this->assertTrue($result['critical']);
         $this->assertSame(20, $result['damage']);

@@ -62,6 +62,7 @@ class MasterDataSeeder extends Seeder
                 ['code' => $row['code']],
                 [
                     'name' => $row['name'],
+                    'second_name' => (string) ($row['second_name'] ?? ''),
                     'sprite' => $row['sprite'],
                     'hp' => (int) $row['hp'],
                     'mp' => (int) $row['mp'],
@@ -93,6 +94,8 @@ class MasterDataSeeder extends Seeder
                     'str' => (int) $row['str'],
                     'mag' => (int) $row['mag'],
                     'def' => (int) $row['def'],
+                    'pdef' => (int) ($row['pdef'] ?? $row['def']),
+                    'mdef' => (int) ($row['mdef'] ?? $row['def']),
                     'spd' => (int) $row['spd'],
                     'know' => (int) $row['know'],
                     'spirit' => (int) $row['spirit'],

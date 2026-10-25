@@ -962,7 +962,7 @@ class DungeonExplorationApiTest extends TestCase
         }
 
         $this->assertNotNull($done, 'イベントが完了すること');
-        $this->assertStringContainsString('マジ=ウマ=イ', $transcript);
+        $this->assertStringContainsString('マジウマ=イ', $transcript);
         $this->assertStringContainsString('ジジィすぎない', $transcript);
         $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
     }
@@ -1029,17 +1029,216 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
     }
 
-    public function test_advance_is_rejected_while_exploration_session_active(): void
+    public function test_sketchy_plant_substitutes_family_name(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'sketchy_plant',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'sketchy_plant');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $done = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                $done = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($done, 'イベントが完了すること');
+        $this->assertStringContainsString('カレイドくん', $transcript);
+        $this->assertStringContainsString('え、なんで', $transcript);
+        $this->assertStringNotContainsString('{PC2のファミリーネーム}', $transcript);
+        $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
+    }
+
+    public function test_smile_water_substitutes_party_member_names(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'smile_water',
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $service = app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class);
+
+        $start = $service->startEvent($user, 1, 1, 'smile_water');
+        $sessionId = $start['session_id'];
+        $transcript = json_encode($start, JSON_UNESCAPED_UNICODE);
+
+        $done = null;
+        for ($i = 0; $i < 40; $i++) {
+            $step = $service->continue($user, $sessionId);
+            $transcript .= json_encode($step, JSON_UNESCAPED_UNICODE);
+            if (($step['segment']['kind'] ?? '') === 'complete') {
+                $done = $step;
+                break;
+            }
+        }
+
+        $this->assertNotNull($done, 'イベントが完了すること');
+        $this->assertStringContainsString('ヒルユキ、水飲むか', $transcript);
+        $this->assertStringContainsString('ど、どうしたイルミ', $transcript);
+        $this->assertStringNotContainsString('{PC4}', $transcript);
+        $this->assertStringNotContainsString('{PC1}', $transcript);
+        $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
+    }
+
+    public function test_floor2_mid_boss_intro_has_npc_speakers_and_starts_two_enemy_battle(): void
+    {
+        config(['game.dungeon.test_force' => null]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        \App\Models\UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 19, 'in_dungeon' => false],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 2])->assertOk();
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $start->assertJsonPath('event', 'exploration');
+        $start->assertJsonPath('step', 20);
+        $start->assertJsonPath('segment.kind', 'story');
+        $start->assertJsonPath('segment.lines.0.speaker_name', 'グース');
+        $start->assertJsonPath('segment.lines.0.speaker_sprite', 'npc_gusu');
+        $start->assertJsonPath('segment.lines.1.speaker_name', 'カース');
+
+        $sessionId = $start->json('session_id');
+        $battle = $this->postJson('/api/dungeon/exploration/continue', [
+            'session_id' => $sessionId,
+        ])->assertOk();
+
+        $battle->assertJsonPath('event', 'battle');
+        $battle->assertJsonPath('mid_boss_encounter', true);
+        $battle->assertJsonPath('exploration_session_id', $sessionId);
+        $battle->assertJsonMissing(['boss_encounter' => true]);
+        $battle->assertJsonPath('state.meta.mid_boss', true);
+        $battle->assertJsonPath('state.meta.boss', false);
+        $battle->assertJsonPath('state.meta.bgm', 'broken');
+
+        $enemies = collect($battle->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertSame(2, $enemies->count());
+        $this->assertEqualsCanonicalizing(
+            ['npc_kasu', 'npc_gusu'],
+            $enemies->pluck('master_code')->all(),
+        );
+    }
+
+    public function test_floor2_mid_boss_victory_resumes_outro_without_floor_clear(): void
+    {
+        config(['game.dungeon.test_force' => null]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        \App\Models\UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 19, 'in_dungeon' => false],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 2])->assertOk();
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $sessionId = $start->json('session_id');
+
+        $battle = $this->postJson('/api/dungeon/exploration/continue', [
+            'session_id' => $sessionId,
+        ])->assertOk();
+
+        $battleId = $battle->json('battle_id');
+        $battleState = \App\Models\BattleState::query()->findOrFail($battleId);
+        $state = $battleState->state;
+        foreach (collect($state['units'])->where('side', 'enemy') as $enemy) {
+            $state['units'][$enemy['id']]['hp'] = 1;
+        }
+        $battleState->state = $state;
+        $battleState->save();
+
+        $events = [];
+        $maxTurns = 400;
+        while (($state['status'] ?? '') === 'active' && $maxTurns-- > 0) {
+            if ($state['awaiting_input'] ?? false) {
+                $enemy = collect($state['units'])
+                    ->where('side', 'enemy')
+                    ->where('alive', true)
+                    ->sortBy('hp')
+                    ->first();
+                if ($enemy === null) {
+                    break;
+                }
+
+                $response = $this->postJson("/api/battles/{$battleId}/actions", [
+                    'action' => 'punch',
+                    'target_id' => $enemy['id'],
+                ])->assertOk();
+                $state = $response->json('state');
+                $events = $response->json('events');
+                continue;
+            }
+
+            $state = $this->getJson("/api/battles/{$battleId}")->json('state');
+        }
+
+        $this->assertSame('victory', $state['status']);
+        $this->assertFalse(
+            collect($events)->contains(
+                fn (array $event): bool => ($event['type'] ?? '') === 'dungeon_floor_cleared',
+            ),
+        );
+
+        $session = DungeonExplorationSession::query()->find($sessionId);
+        $this->assertNotNull($session);
+        $this->assertSame('outro1', $session->current_node_key);
+
+        $this->getJson('/api/dungeon')
+            ->assertOk()
+            ->assertJsonPath('exploration_session_id', $sessionId);
+
+        $outro = $this->postJson('/api/dungeon/exploration/continue', [
+            'session_id' => $sessionId,
+        ])->assertOk();
+
+        $outro->assertJsonPath('segment.kind', 'story');
+        $outro->assertJsonPath('segment.lines.0.speaker_name', 'グース');
+        $this->assertStringContainsString(
+            '覚えてろ',
+            json_encode($outro->json('segment'), JSON_UNESCAPED_UNICODE),
+        );
+
+        $progress = \App\Models\UserDungeonProgress::query()->where('user_id', $user->id)->first();
+        $this->assertSame(20, (int) $progress->step);
+        $this->assertTrue((bool) $progress->in_dungeon);
+    }
+
+    public function test_advance_abandons_stale_exploration_session_and_proceeds(): void
     {
         config([
             'game.dungeon.test_force' => 'exploration',
             'game.dungeon.test_event_code' => 'trap_arrow',
         ]);
 
-        $this->postJson('/api/dungeon/advance')->assertOk();
+        $this->postJson('/api/dungeon/enter')->assertOk();
 
-        $this->postJson('/api/dungeon/advance')
-            ->assertStatus(409);
+        $first = $this->postJson('/api/dungeon/advance')->assertOk();
+        $first->assertJsonPath('event', 'exploration');
+        $sessionId = $first->json('session_id');
+        $this->assertNotEmpty($sessionId);
+
+        $this->assertSame(1, DungeonExplorationSession::query()->count());
+
+        $second = $this->postJson('/api/dungeon/advance')->assertOk();
+        $second->assertJsonPath('event', 'exploration');
+
+        $this->assertSame(1, DungeonExplorationSession::query()->count());
+        $this->assertNotSame($sessionId, $second->json('session_id'));
+        $this->assertSame(2, (int) $second->json('step'));
     }
 
     /**

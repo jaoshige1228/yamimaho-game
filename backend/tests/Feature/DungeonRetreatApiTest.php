@@ -20,7 +20,7 @@ class DungeonRetreatApiTest extends TestCase
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
     }
 
-    public function test_retreat_reduces_gold_and_keeps_dungeon_progress(): void
+    public function test_retreat_reduces_gold_and_resets_step(): void
     {
         $user = $this->demoUser();
         $user->forceFill(['gold' => 100])->save();
@@ -45,7 +45,7 @@ class DungeonRetreatApiTest extends TestCase
         $response = $this->postJson('/api/dungeon/retreat')->assertOk();
 
         $response->assertJsonPath('gold', 90);
-        $response->assertJsonPath('step', 7);
+        $response->assertJsonPath('step', 0);
         $response->assertJsonPath('floor', 1);
         $this->assertSame(0, DungeonExplorationSession::query()->where('user_id', $user->id)->count());
         $this->assertSame(90, (int) $user->fresh()->gold);

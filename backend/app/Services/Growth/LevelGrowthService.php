@@ -12,15 +12,14 @@ class LevelGrowthService
 
     private const MP_PER_LEVEL = 5;
 
-    private const MAG_DEF_MULTIPLIER = 1.2;
+    private const MAG_PER_LEVEL = 1;
+
+    private const DEF_PER_LEVEL = 1;
 
     private const FLAT_STAT_PER_LEVEL = 2;
 
     /** @var list<string> */
     private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];
-
-    /** @var list<string> */
-    private const MULTIPLY_STATS = ['mag', 'def'];
 
     public function __construct(
         private readonly LevelTableProvider $levels = new LevelTableProvider,
@@ -65,9 +64,8 @@ class LevelGrowthService
         $stats['hp'] = (int) ceil($stats['hp'] * self::HP_MULTIPLIER);
         $stats['mp'] += self::MP_PER_LEVEL;
 
-        foreach (self::MULTIPLY_STATS as $key) {
-            $stats[$key] = (int) ceil($stats[$key] * self::MAG_DEF_MULTIPLIER);
-        }
+        $stats['mag'] += self::MAG_PER_LEVEL;
+        $stats['def'] += self::DEF_PER_LEVEL;
 
         foreach (self::FLAT_STATS as $key) {
             $stats[$key] += self::FLAT_STAT_PER_LEVEL;

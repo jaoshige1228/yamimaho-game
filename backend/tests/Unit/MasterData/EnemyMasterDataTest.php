@@ -19,7 +19,7 @@ class EnemyMasterDataTest extends TestCase
         $snake = $provider->findEnemy('snake');
 
         $this->assertSame(20, $bat['exp_reward']);
-        $this->assertSame(30, $snake['exp_reward']);
+        $this->assertSame(35, $snake['exp_reward']);
     }
 
     public function test_enemy_masters_load_exp_reward_from_db(): void
@@ -47,8 +47,8 @@ class EnemyMasterDataTest extends TestCase
         $batFloor2 = $provider->findEnemy('bat', 2);
 
         $this->assertSame(50, $batFloor1['hp']);
-        $this->assertSame(300, $batFloor2['hp']);
+        $this->assertSame(135, $batFloor2['hp']);
         $this->assertSame(20, $batFloor1['exp_reward']);
-        $this->assertSame(100, $batFloor2['exp_reward']);
+        $this->assertSame(40, $batFloor2['exp_reward']);
     }
 }

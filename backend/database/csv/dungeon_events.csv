@@ -27,3 +27,4 @@ floor,code,name,weight,event_type,start_node_key,skip_epilogue
 2,sphinx_quiz,なぞなぞスフィンクス,5,sphinx_quiz,intro,0
 2,pitfall,落とし穴,5,stat_check_random_target,intro,0
 2,ghost_possession,幽霊の取り憑き,5,spirit_check_random_target,react,0
+2,floor2_mid_boss,グースとカース,0,mid_boss,line1,1

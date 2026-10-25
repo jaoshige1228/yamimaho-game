@@ -22,9 +22,15 @@ class BattleSimulator
     public function runUntilEnd(
         BattleActionStrategy $strategy,
         int $maxPlayerTurns = 500,
+        ?array $initialState = null,
     ): array {
-        $bootstrap = $this->orchestrator->createBattle();
-        $state = $bootstrap['state'];
+        if ($initialState === null) {
+            $bootstrap = $this->orchestrator->createBattle();
+            $state = $bootstrap['state'];
+        } else {
+            $state = $initialState;
+        }
+
         $playerTurns = 0;
         $totalSteps = 0;
 
@@ -69,5 +75,84 @@ class BattleSimulator
         }
 
         return $results;
+    }
+
+    /**
+     * @return array{
+     *   label: string,
+     *   result: string,
+     *   player_turns: int,
+     *   min_player_turns: int|null,
+     *   max_player_turns: int|null,
+     *   within_target: bool|null
+     * }
+     */
+    public function runScenario(
+        BalanceScenario $scenario,
+        BattleActionStrategy $strategy,
+    ): array {
+        $bootstrap = $this->orchestrator->createScenarioBattle(
+            $scenario->party,
+            $scenario->enemies,
+            $scenario->label,
+        );
+        $run = $this->runUntilEnd($strategy, initialState: $bootstrap['state']);
+
+        $withinTarget = null;
+        if ($scenario->minPlayerTurns !== null && $scenario->maxPlayerTurns !== null) {
+            $withinTarget = $run['result'] === 'victory'
+                && $run['player_turns'] >= $scenario->minPlayerTurns
+                && $run['player_turns'] <= $scenario->maxPlayerTurns;
+        }
+
+        return [
+            'label' => $scenario->label,
+            'result' => $run['result'],
+            'player_turns' => $run['player_turns'],
+            'min_player_turns' => $scenario->minPlayerTurns,
+            'max_player_turns' => $scenario->maxPlayerTurns,
+            'within_target' => $withinTarget,
+        ];
+    }
+
+    /**
+     * @return list<array{
+     *   label: string,
+     *   result: string,
+     *   player_turns: int,
+     *   min_player_turns: int|null,
+     *   max_player_turns: int|null,
+     *   within_target: bool|null
+     * }>
+     */
+    public function runScenarioMatrix(
+        BattleActionStrategy $strategy,
+        ?array $scenarios = null,
+    ): array {
+        $scenarios ??= BalanceScenario::defaults();
+        $rows = [];
+
+        foreach ($scenarios as $scenario) {
+            $rows[] = $this->runScenario($scenario, $strategy);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{string, string|int|bool|null}>
+     */
+    public function formatTtkTable(array $rows): array
+    {
+        return array_map(static fn (array $row): array => [
+            'label' => $row['label'],
+            'result' => $row['result'],
+            'player_turns' => $row['player_turns'],
+            'target' => $row['min_player_turns'] !== null
+                ? "{$row['min_player_turns']}-{$row['max_player_turns']}"
+                : '-',
+            'ok' => $row['within_target'],
+        ], $rows);
     }
 }

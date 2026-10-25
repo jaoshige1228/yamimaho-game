@@ -7,6 +7,7 @@ use App\Models\CharacterMaster;
 use App\Models\User;
 use App\Models\UserCharacter;
 use App\Models\WeaponMaster;
+use App\Services\Growth\LevelGrowthService;
 use App\Services\Player\EquipmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -27,29 +28,30 @@ class EquipmentServiceTest extends TestCase
         $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
         $weapon = WeaponMaster::query()->where('code', 'staff_basic')->firstOrFail();
         $armor = ArmorMaster::query()->where('code', 'robe_basic')->firstOrFail();
+        $stats = (new LevelGrowthService)->statsForLevel($master, 1);
 
         $character = UserCharacter::query()->create([
             'user_id' => $user->id,
             'character_master_id' => $master->id,
             'level' => 1,
             'exp' => 0,
-            'hp' => 100,
-            'mp' => 45,
-            'str' => 14,
-            'mag' => 14,
-            'def' => 9,
-            'spd' => 12,
-            'know' => 10,
-            'spirit' => 10,
+            'hp' => $stats['hp'],
+            'mp' => $stats['mp'],
+            'str' => $stats['str'],
+            'mag' => $stats['mag'],
+            'def' => $stats['def'],
+            'spd' => $stats['spd'],
+            'know' => $stats['know'],
+            'spirit' => $stats['spirit'],
             'weapon_master_id' => $weapon->id,
             'armor_master_id' => $armor->id,
         ]);
 
-        $stats = (new EquipmentService)->effectiveCombatStats($character);
+        $combat = (new EquipmentService)->effectiveCombatStats($character);
 
-        $this->assertSame(15, $stats['mag']);
-        $this->assertSame(10, $stats['def']);
-        $this->assertSame('staff_basic', $stats['weapon']['code']);
-        $this->assertSame('robe_basic', $stats['armor']['code']);
+        $this->assertSame($stats['mag'] + $weapon->mag_bonus, $combat['mag']);
+        $this->assertSame($stats['def'] + $armor->def_bonus, $combat['def']);
+        $this->assertSame('staff_basic', $combat['weapon']['code']);
+        $this->assertSame('robe_basic', $combat['armor']['code']);
     }
 }

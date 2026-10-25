@@ -2,9 +2,11 @@
 
 namespace App\Services\MasterData;
 
+use App\Models\ArmorMaster;
 use App\Models\CharacterMaster;
 use App\Models\EnemyMaster;
 use App\Models\SpellMaster;
+use App\Models\WeaponMaster;
 use Illuminate\Support\Facades\Schema;
 
 class MasterDataProvider
@@ -23,6 +25,12 @@ class MasterDataProvider
 
     /** @var array<string, list<array<string, mixed>>>|null */
     private ?array $enemySkillCache = null;
+
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $weaponCache = null;
+
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $armorCache = null;
 
     /**
      * @return array<string, mixed>
@@ -68,6 +76,34 @@ class MasterDataProvider
 
         if (! isset($all[$code])) {
             throw new \InvalidArgumentException("Spell master not found: {$code}");
+        }
+
+        return $all[$code];
+    }
+
+    /**
+     * @return array{code: string, name: string, mag_bonus: int, description: string|null}
+     */
+    public function findWeapon(string $code): array
+    {
+        $all = $this->weaponMasters();
+
+        if (! isset($all[$code])) {
+            throw new \InvalidArgumentException("Weapon master not found: {$code}");
+        }
+
+        return $all[$code];
+    }
+
+    /**
+     * @return array{code: string, name: string, def_bonus: int, description: string|null}
+     */
+    public function findArmor(string $code): array
+    {
+        $all = $this->armorMasters();
+
+        if (! isset($all[$code])) {
+            throw new \InvalidArgumentException("Armor master not found: {$code}");
         }
 
         return $all[$code];
@@ -244,6 +280,120 @@ class MasterDataProvider
     }
 
     /**
+     * @return array<string, array{code: string, name: string, mag_bonus: int, description: string|null}>
+     */
+    private function weaponMasters(): array
+    {
+        if ($this->weaponCache === null) {
+            if ($this->hasWeaponMastersTable() && WeaponMaster::query()->exists()) {
+                $this->weaponCache = $this->loadWeaponsFromDb();
+            } else {
+                $this->weaponCache = $this->loadWeaponsFromCsv();
+            }
+        }
+
+        return $this->weaponCache;
+    }
+
+    /**
+     * @return array<string, array{code: string, name: string, def_bonus: int, description: string|null}>
+     */
+    private function armorMasters(): array
+    {
+        if ($this->armorCache === null) {
+            if ($this->hasArmorMastersTable() && ArmorMaster::query()->exists()) {
+                $this->armorCache = $this->loadArmorsFromDb();
+            } else {
+                $this->armorCache = $this->loadArmorsFromCsv();
+            }
+        }
+
+        return $this->armorCache;
+    }
+
+    /**
+     * @return array<string, array{code: string, name: string, mag_bonus: int, description: string|null}>
+     */
+    private function loadWeaponsFromDb(): array
+    {
+        $masters = [];
+        WeaponMaster::query()->get()->each(function (WeaponMaster $weapon) use (&$masters): void {
+            $masters[$weapon->code] = [
+                'code' => $weapon->code,
+                'name' => $weapon->name,
+                'mag_bonus' => $weapon->mag_bonus,
+                'description' => $weapon->description,
+            ];
+        });
+
+        return $masters;
+    }
+
+    /**
+     * @return array<string, array{code: string, name: string, def_bonus: int, description: string|null}>
+     */
+    private function loadArmorsFromDb(): array
+    {
+        $masters = [];
+        ArmorMaster::query()->get()->each(function (ArmorMaster $armor) use (&$masters): void {
+            $masters[$armor->code] = [
+                'code' => $armor->code,
+                'name' => $armor->name,
+                'def_bonus' => $armor->def_bonus,
+                'description' => $armor->description,
+            ];
+        });
+
+        return $masters;
+    }
+
+    /**
+     * @return array<string, array{code: string, name: string, mag_bonus: int, description: string|null}>
+     */
+    private function loadWeaponsFromCsv(): array
+    {
+        $masters = [];
+        foreach (CsvMasterReader::read('weapon_masters.csv') as $row) {
+            $masters[$row['code']] = [
+                'code' => (string) $row['code'],
+                'name' => (string) $row['name'],
+                'mag_bonus' => (int) $row['mag_bonus'],
+                'description' => ($row['description'] ?? '') !== '' ? (string) $row['description'] : null,
+            ];
+        }
+
+        return $masters;
+    }
+
+    /**
+     * @return array<string, array{code: string, name: string, def_bonus: int, description: string|null}>
+     */
+    private function loadArmorsFromCsv(): array
+    {
+        $masters = [];
+        foreach (CsvMasterReader::read('armor_masters.csv') as $row) {
+            $masters[$row['code']] = [
+                'code' => (string) $row['code'],
+                'name' => (string) $row['name'],
+                'def_bonus' => (int) $row['def_bonus'],
+                'description' => ($row['description'] ?? '') !== '' ? (string) $row['description'] : null,
+            ];
+        }
+
+        return $masters;
+    }
+
+    private function hasWeaponMastersTable(): bool
+    {
+        return Schema::hasTable('weapon_masters');
+    }
+
+    private function hasArmorMastersTable(): bool
+    {
+        return Schema::hasTable('armor_masters');
+    }
+
+    /**
      * @return array<string, array<string, mixed>>
      */
     private function loadCharactersFromCsv(): array
@@ -334,12 +484,15 @@ class MasterDataProvider
         return [
             'code' => (string) $row['code'],
             'name' => (string) $row['name'],
+            'second_name' => (string) ($row['second_name'] ?? ''),
             'sprite' => (string) $row['sprite'],
             'hp' => (int) $row['hp'],
             'mp' => (int) ($row['mp'] ?? 0),
             'str' => (int) $row['str'],
             'mag' => (int) $row['mag'],
             'def' => (int) $row['def'],
+            'pdef' => (int) ($row['pdef'] ?? $row['def']),
+            'mdef' => (int) ($row['mdef'] ?? $row['def']),
             'spd' => (int) $row['spd'],
             'know' => (int) $row['know'],
             'spirit' => (int) $row['spirit'],

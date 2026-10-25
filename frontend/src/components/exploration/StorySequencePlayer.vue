@@ -29,7 +29,15 @@ const currentMode = computed(() => {
 });
 
 const characterInfo = computed(() => {
-  const code = currentLine.value?.character;
+  const line = currentLine.value;
+  if (line?.speaker_name && line?.speaker_sprite) {
+    return {
+      name: line.speaker_name,
+      sprite: line.speaker_sprite,
+    };
+  }
+
+  const code = line?.character;
   if (!code) {
     return { name: 'イルミ', sprite: 'PC1' };
   }

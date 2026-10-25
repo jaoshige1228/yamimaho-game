@@ -108,4 +108,86 @@ class BattleEngineEnemySkillTest extends TestCase
         $this->assertLessThan(50, $result['state']['units']['pc1']['hp']);
         $this->assertLessThan(50, $result['state']['units']['pc2']['hp']);
     }
+
+    public function test_enemy_spell_hits_player_party(): void
+    {
+        $picker = new class extends EnemySkillPicker
+        {
+            public function pick(string $enemyCode): array
+            {
+                return [
+                    'skill_code' => 'pc3_fire_shot',
+                    'label' => '炎弾',
+                    'action_type' => 'spell',
+                    'target_type' => '',
+                    'coefficient' => 0.0,
+                ];
+            }
+        };
+
+        $engine = new BattleEngine(
+            enemySkillPicker: $picker,
+            damageRoll: static fn (): float => 1.0,
+            hitRoll: static fn (): int => 100,
+            critRoll: static fn (): int => 100,
+        );
+
+        $state = [
+            'status' => 'active',
+            'current_actor' => 'enemy_1',
+            'awaiting_input' => false,
+            'turn_order' => ['enemy_1', 'pc1'],
+            'turn_index' => 0,
+            'units' => [
+                'enemy_1' => [
+                    'id' => 'enemy_1',
+                    'name' => 'カース',
+                    'side' => 'enemy',
+                    'master_code' => 'npc_kasu',
+                    'hp' => 800,
+                    'max_hp' => 800,
+                    'str' => 120,
+                    'mag' => 22,
+                    'def' => 60,
+                    'spd' => 40,
+                    'crit_rate' => 1,
+                    'evasion_rate' => 1,
+                    'damage_shield' => false,
+                    'alive' => true,
+                    'buffs' => [],
+                    'statuses' => [],
+                    'spells' => [],
+                ],
+                'pc1' => [
+                    'id' => 'pc1',
+                    'name' => 'PC1',
+                    'side' => 'ally',
+                    'hp' => 100,
+                    'max_hp' => 100,
+                    'str' => 10,
+                    'mag' => 10,
+                    'def' => 5,
+                    'spd' => 10,
+                    'crit_rate' => 5,
+                    'evasion_rate' => 5,
+                    'damage_shield' => false,
+                    'alive' => true,
+                    'buffs' => [],
+                    'statuses' => [],
+                    'spells' => [],
+                ],
+            ],
+            'log' => [],
+        ];
+
+        $result = $engine->runEnemyTurnsUntilPlayer($state);
+
+        $this->assertLessThan(100, $result['state']['units']['pc1']['hp']);
+        $this->assertTrue(
+            collect($result['events'])->contains(
+                fn (array $e) => ($e['type'] ?? '') === 'announce'
+                    && str_contains((string) ($e['text'] ?? ''), '炎弾'),
+            ),
+        );
+    }
 }

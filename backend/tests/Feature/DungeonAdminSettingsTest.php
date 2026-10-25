@@ -108,4 +108,16 @@ class DungeonAdminSettingsTest extends TestCase
                 'step' => 4,
             ]);
     }
+
+    public function test_dungeon_settings_defaults_missing_boolean_fields_to_false(): void
+    {
+        $this->postJson('/api/admins/dungeon-settings', [
+            'skip_battles' => true,
+        ])
+            ->assertOk()
+            ->assertJson([
+                'skip_battles' => true,
+                'force_dialogue_events' => false,
+            ]);
+    }
 }

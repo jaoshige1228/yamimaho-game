@@ -97,6 +97,10 @@ async function resetProgress() {
       {{ resetting ? 'リセット中…' : 'リセット' }}
     </button>
     <p class="reset-hint">成長・戦闘記録・ダンジョン探索をすべて消して最初からやり直します</p>
+    <nav class="dev-links" aria-label="開発用リンク">
+      <router-link to="/admins">/admins</router-link>
+      <router-link to="/test_battles">/test_battles</router-link>
+    </nav>
     <p v-if="error" class="error">{{ error }}</p>
   </div>
 </template>
@@ -200,6 +204,19 @@ h1 {
   font-size: 0.72rem;
   line-height: 1.45;
   color: #8a7aa8;
+}
+.dev-links {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.25rem auto 0;
+  max-width: 280px;
+  font-size: 0.78rem;
+}
+.dev-links a {
+  color: #9d8cff;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 .error {
   margin-top: 1rem;

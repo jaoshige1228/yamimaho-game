@@ -3,6 +3,7 @@
 namespace App\Services\Battle;
 
 use App\Models\User;
+use App\Models\DungeonExplorationSession;
 use App\Services\Dungeon\DungeonProgressService;
 use App\Services\Player\PartyGoldService;
 use App\Services\Player\UserCharacterService;
@@ -42,6 +43,19 @@ class BattleOrchestrator
     public function createBattleForUser(User $user, array $enemyList, array $meta = []): array
     {
         $state = $this->factory->createForUserWithEnemies($user, $enemyList, $meta);
+
+        return $this->engine->runEnemyTurnsUntilPlayer($state);
+    }
+
+    /**
+     * @return array{state: array<string, mixed>, events: list<array<string, mixed>>}
+     */
+    public function createScenarioBattle(
+        array $partySlots,
+        array $enemyList,
+        string $logMessage = 'シミュレーション戦闘',
+    ): array {
+        $state = $this->factory->createScenario($partySlots, $enemyList, $logMessage);
 
         return $this->engine->runEnemyTurnsUntilPlayer($state);
     }
@@ -119,6 +133,12 @@ class BattleOrchestrator
         if ($status === 'victory') {
             $events = array_merge($events, $this->rewards->applyVictoryRewards($state, $user));
 
+            if ($isDungeon && ($meta['mid_boss'] ?? false)) {
+                $this->resumeExplorationAfterMidBoss($user, $meta);
+
+                return $events;
+            }
+
             if ($isDungeon && ($meta['boss'] ?? false)) {
                 $floor = (int) ($meta['floor'] ?? 1);
                 $events[] = $this->dungeonProgress->onBossVictory($user, $floor);
@@ -127,8 +147,11 @@ class BattleOrchestrator
             return $events;
         }
 
-        if (($state['status'] ?? '') === 'defeat') {
+        if ($status === 'defeat') {
             if ($isDungeon) {
+                if ($meta['mid_boss'] ?? false) {
+                    DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
+                }
                 $this->characters->restorePartyToFull($user);
                 $this->dungeonProgress->reset($user);
             } else {
@@ -137,6 +160,29 @@ class BattleOrchestrator
         }
 
         return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function resumeExplorationAfterMidBoss(User $user, array $meta): void
+    {
+        $sessionId = $meta['resume_session_id'] ?? null;
+        $nodeKey = $meta['post_battle_node'] ?? null;
+        if (! is_string($sessionId) || $sessionId === '' || ! is_string($nodeKey) || $nodeKey === '') {
+            return;
+        }
+
+        $session = DungeonExplorationSession::query()->find($sessionId);
+        if ($session === null || (int) $session->user_id !== (int) $user->id) {
+            return;
+        }
+
+        $context = $session->context ?? [];
+        unset($context['awaiting_battle']);
+        $session->context = $context;
+        $session->current_node_key = $nodeKey;
+        $session->save();
     }
 
     /**

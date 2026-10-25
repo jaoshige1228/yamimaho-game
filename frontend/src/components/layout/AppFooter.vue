@@ -11,10 +11,21 @@ const homeDisabled = computed(
   () => player.inDungeon || Boolean(player.activeBattleId),
 );
 
+const dungeonEnabled = computed(
+  () => player.inDungeon && !player.activeBattleId,
+);
+
 function goHub() {
   if (homeDisabled.value) return;
   if (route.name !== 'hub') {
     router.push({ name: 'hub' });
+  }
+}
+
+function goDungeon() {
+  if (!dungeonEnabled.value) return;
+  if (route.name !== 'dungeon') {
+    router.push({ name: 'dungeon' });
   }
 }
 
@@ -39,9 +50,16 @@ function goStatus() {
       <span class="label">ホーム</span>
     </button>
 
-    <button type="button" class="footer-btn placeholder" aria-label="未定" disabled>
-      <span class="icon" aria-hidden="true">◇</span>
-      <span class="label">—</span>
+    <button
+      type="button"
+      class="footer-btn"
+      :class="{ disabled: !dungeonEnabled, placeholder: !dungeonEnabled }"
+      :aria-label="dungeonEnabled ? 'ダンジョンへ' : '未定'"
+      :disabled="!dungeonEnabled"
+      @click="goDungeon"
+    >
+      <span class="icon" aria-hidden="true">{{ dungeonEnabled ? '▣' : '◇' }}</span>
+      <span class="label">{{ dungeonEnabled ? 'ダンジョン' : '—' }}</span>
     </button>
 
     <button type="button" class="footer-btn" aria-label="ステータス" @click="goStatus">

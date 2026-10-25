@@ -11,6 +11,15 @@ class AdminDungeonSettingsRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'skip_battles' => filter_var($this->input('skip_battles', false), FILTER_VALIDATE_BOOLEAN),
+            'force_dialogue_events' => filter_var($this->input('force_dialogue_events', false), FILTER_VALIDATE_BOOLEAN),
+            'reset_progress' => filter_var($this->input('reset_progress', false), FILTER_VALIDATE_BOOLEAN),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */

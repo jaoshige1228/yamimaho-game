@@ -154,7 +154,7 @@ sphinx_quiz,react2,dialogue,,random_ally,く、くる！,く、くる！,く、�
 sphinx_quiz,quiz_pick1,chance_branch,,,,,,,,30,,,quiz_a_question,quiz_pick2,
 sphinx_quiz,quiz_pick2,chance_branch,,,,,,,,43,,,quiz_b_question,quiz_c_question,
 sphinx_quiz,quiz_a_question,narration,スフィンクス「悪い魔法使いが、王様を動物に変えました。角が２本で尻尾しっぽが１本。さて、この動物とは何でしょうか？」,,,,,,,,,,,,quiz_a_choose
-sphinx_quiz,quiz_a_choose,party_choice,知力判定　誰が回答する？,,,,,,,,,,quiz_a_preview,,
+sphinx_quiz,quiz_a_choose,party_choice,"知力判定　誰が回答する？",,,,,,,,,,quiz_a_preview,,
 sphinx_quiz,quiz_a_preview,narration,{chosen_name}は脳みそをフル回転させた！（成功率{success_rate}%）,,,,,,,,,,,,quiz_a_roll
 sphinx_quiz,quiz_a_roll,stat_check,,,,,,,know,4,,,quiz_a_success_d,quiz_a_fail_d,
 sphinx_quiz,quiz_a_success_d,dialogue,,chosen,簡単ね。答えは「羊」よ！,貴様ぁ……余裕だぞ。答えは「羊」だ！,はは、簡単だな。答えは「羊」だ,わかった……！答えは「羊」ね,,,,,,,quiz_a_spit
@@ -172,7 +172,7 @@ sphinx_quiz,quiz_a_fail_dmg,apply_damage_chosen,,,,,,,,,100,,,,quiz_a_fail_screa
 sphinx_quiz,quiz_a_fail_scream,dialogue,,chosen,ぎゃーー！,ぎゃーー！,ぎゃーー！,ぎゃーー！,,,,,,,quiz_a_fail_end_narr
 sphinx_quiz,quiz_a_fail_end_narr,narration,スフィンクスはそれきり動かなくなった。一応先へは進めるようだ……。,,,,,,,,,,,,end
 sphinx_quiz,quiz_b_question,narration,スフィンクス「魔法学校で一番人気の授業なのに、誰もノートを取らない授業はなに？」,,,,,,,,,,,,quiz_b_choose
-sphinx_quiz,quiz_b_choose,party_choice,知力判定　誰が回答する？,,,,,,,,,,quiz_b_preview,,
+sphinx_quiz,quiz_b_choose,party_choice,"知力判定　誰が回答する？",,,,,,,,,,quiz_b_preview,,
 sphinx_quiz,quiz_b_preview,narration,{chosen_name}は脳みそをフル回転させた！（成功率{success_rate}%）,,,,,,,,,,,,quiz_b_roll
 sphinx_quiz,quiz_b_roll,stat_check,,,,,,,know,4,,,quiz_b_success_d,quiz_b_fail_d,
 sphinx_quiz,quiz_b_success_d,dialogue,,chosen,「消える魔法の授業」ね。ノートも消えてしまうから,「消える魔法の授業」だな。ノートも消えてしまうから,「消える魔法の授業」だな。ノートも消えてしまうから,「消える魔法の授業」。ノートも消えてしまうから,,,,,,,quiz_b_spit
@@ -191,7 +191,7 @@ sphinx_quiz,quiz_b_fail_dmg,apply_damage_chosen,,,,,,,,,100,,,,quiz_b_fail_screa
 sphinx_quiz,quiz_b_fail_scream,dialogue,,chosen,ぎゃーー！,ぎゃーー！,ぎゃーー！,ぎゃーー！,,,,,,,quiz_b_fail_end_narr
 sphinx_quiz,quiz_b_fail_end_narr,narration,スフィンクスはそれきり動かなくなった。一応先へは進めるようだ……。,,,,,,,,,,,,end
 sphinx_quiz,quiz_c_question,narration,スフィンクス「魔女が三度のご飯に食べる軽食といえば？」,,,,,,,,,,,,quiz_c_choose
-sphinx_quiz,quiz_c_choose,party_choice,知力判定　誰が回答する？,,,,,,,,,,quiz_c_preview,,
+sphinx_quiz,quiz_c_choose,party_choice,"知力判定　誰が回答する？",,,,,,,,,,quiz_c_preview,,
 sphinx_quiz,quiz_c_preview,narration,{chosen_name}は脳みそをフル回転させた！（成功率{success_rate}%）,,,,,,,,,,,,quiz_c_roll
 sphinx_quiz,quiz_c_roll,stat_check,,,,,,,know,4,,,quiz_c_success_d,quiz_c_fail_d,
 sphinx_quiz,quiz_c_success_d,dialogue,,chosen,「サンドイッチ」ね。三度とウィッチだから,「サンドイッチ」だな。三度とウィッチだから,「サンドイッチ」だな。三度とウィッチだから,「サンドイッチ」。三度とウィッチだから,,,,,,,quiz_c_spit
@@ -236,13 +236,13 @@ stumble_near_fall,line3,dialogue,,fixed:pc4,,,,お、落っこちるところだ
 stumble_near_fall,line4,dialogue,,fixed:pc1,まったく、気をつけなさいよね！,,,,,,,,,,line5
 stumble_near_fall,line5,dialogue,,fixed:pc4,,,,あ……ご、ごめんね……,,,,,,,line6
 stumble_near_fall,line6,dialogue,,fixed:pc4,,,,……………………,,,,,,,line7
-stumble_near_fall,line7,dialogue,,fixed:pc1,…………ちょ、ちょっと強く言い過ぎたかしら……,,,,,,,,,,line8
+stumble_near_fall,line7,dialogue,,fixed:pc1,（…………ちょ、ちょっと強く言い過ぎたかしら……）,,,,,,,,,,line8
 stumble_near_fall,line8,dialogue,,fixed:pc4,,,,……………………,,,,,,,line9
 stumble_near_fall,line9,dialogue,,fixed:pc1,……………………,,,,,,,,,,line10
-stumble_near_fall,line10,dialogue,,fixed:pc2,,なんだこの空気は……草木がしおれている！,,,,,,,,,line11
+stumble_near_fall,line10,dialogue,,fixed:pc2,,なんだこの空気は……草木がしおれているぞ！,,,,,,,,,line11
 stumble_near_fall,line11,dialogue,,fixed:pc3,,,やれやれ……,,,,,,,,end
 stumble_near_fall,end,end,,,,,,,,,,,,,
-maj_umai_leaf,line1,dialogue,,fixed:pc2,,……お。マジ=ウマ=イの葉だ。\nこいつからはいいハーブティーが作れるぞ,,,,,,,,,line2
+maj_umai_leaf,line1,dialogue,,fixed:pc2,,……お。マジウマ=イの葉だ。\nこいつからはいいハーブティーが作れるぞ,,,,,,,,,line2
 maj_umai_leaf,line2,dialogue,,fixed:pc1,いいわね。摘んでいきましょう,,,,,,,,,,line3
 maj_umai_leaf,line3,dialogue,,fixed:pc2,,あぁ。しかも腰痛、リウマチ、物忘れによく効く,,,,,,,,,line4
 maj_umai_leaf,line4,dialogue,,fixed:pc1,ジジィすぎない？,,,,,,,,,,end
@@ -264,3 +264,39 @@ music_talk,line6,dialogue,,fixed:pc1,見た目で判断しないでよ,,,,,,,,,,
 music_talk,line7,dialogue,,fixed:pc1,弾けるけど,,,,,,,,,,line8
 music_talk,line8,dialogue,,fixed:pc4,,,,弾けるんだ……,,,,,,,end
 music_talk,end,end,,,,,,,,,,,,,
+sketchy_plant,line1,dialogue,,fixed:pc4,,,,{PC2のファミリーネーム}くん……こないだの肥料、調子どう？,,,,,,,line2
+sketchy_plant,line2,dialogue,,fixed:pc2,,ああ、すこぶる良いぞ。あれはすごいな。\nお花さんたちも喜びのダンスを踊っている……ような気がする,,,,,,,,,line3
+sketchy_plant,line3,dialogue,,fixed:pc4,,,,そ、そっか……よかった。配合の比率をちょっとだけ変えてみたんだよね,,,,,,,line4
+sketchy_plant,line4,dialogue,,fixed:pc2,,土であそこまで変わるとはな。侮れない,,,,,,,,,line5
+sketchy_plant,line5,dialogue,,fixed:pc4,,,,ちなみに、何を育ててるの？,,,,,,,line6
+sketchy_plant,line6,dialogue,,fixed:pc2,,………………,,,,,,,,,line7
+sketchy_plant,line7,dialogue,,fixed:pc2,,おっと、先を急ごう,,,,,,,,,line8
+sketchy_plant,line8,dialogue,,fixed:pc4,,,,え、なんで……？こわ……,,,,,,,end
+sketchy_plant,end,end,,,,,,,,,,,,,
+cat_teaser,line1,dialogue,,fixed:pc4,,,,あ……猫じゃらし,,,,,,,line2
+cat_teaser,line2,dialogue,,fixed:pc2,,エノコログサ（狗尾草、学名：Setaria viridis）だな。イネ科エノコログサ属の植物で、一年生草本であり、ブラシのように長い穂の形が独特な雑草だ,,,,,,,,,line3
+cat_teaser,line3,dialogue,,fixed:pc4,,,,あ、うん……,,,,,,,end
+cat_teaser,end,end,,,,,,,,,,,,,
+class_grumbling,line1,dialogue,,fixed:pc1,ここ最近、平民への愚痴を漏らすゾネ生が増えているような気がするわ,,,,,,,,,,line2
+class_grumbling,line2,dialogue,,fixed:pc2,,聞くところによると、ダンジョンの攻略においてはモンド生の方が先行気味らしいぞ,,,,,,,,,line3
+class_grumbling,line3,dialogue,,fixed:pc2,,どうでもいいが、やはり戦場の厳しさは温室育ちの奴らに堪えるんだろう,,,,,,,,,line4
+class_grumbling,line4,dialogue,,fixed:pc1,ふうん。文句言ってる暇があるなら、さっさと戦闘力を磨いて欲しいものね,,,,,,,,,,end
+class_grumbling,end,end,,,,,,,,,,,,,
+smile_water,line1,dialogue,,fixed:pc4,,,,ふぅ……,,,,,,,line2
+smile_water,line2,dialogue,,fixed:pc3,,,{PC4}、水飲むか？,,,,,,,,line3
+smile_water,line3,dialogue,,fixed:pc4,,,,あ……ありがとう,,,,,,,line4
+smile_water,line4,dialogue,,fixed:pc3,,,いいんだ。このあたり熱くて、喉乾くよな！,,,,,,,,line5
+smile_water,line5,dialogue,,fixed:pc1,（あの純朴な笑顔はどこから……？）,,,,,,,,,,line6
+smile_water,line6,dialogue,,fixed:pc1,…………,,,,,,,,,,line7
+smile_water,line7,dialogue,,fixed:pc1,…………ﾆﾁｬｧ……,,,,,,,,,,line8
+smile_water,line8,dialogue,,fixed:pc2,,ど、どうした{PC1}！まさか、呪われたか！？,,,,,,,,,line9
+smile_water,line9,dialogue,,fixed:pc1,…………,,,,,,,,,,end
+smile_water,end,end,,,,,,,,,,,,,
+floor2_mid_boss,line1,dialogue,おいおい、変人4人組じゃねぇか！,npc:gusu,,,,,,,,,,,line2
+floor2_mid_boss,line2,dialogue,お前らなんかがダンジョンに挑んで大丈夫なのかぁ？,npc:kasu,,,,,,,,,,,line3
+floor2_mid_boss,line3,dialogue,いや大丈夫じゃねぇな！お前らなんかが持ってても無駄なアイテムや武器……俺達によこしやがれ！,npc:gusu,,,,,,,,,,,line4
+floor2_mid_boss,line4,dialogue,よこしやがれ！,npc:kasu,,,,,,,,,,,to_battle
+floor2_mid_boss,to_battle,start_battle,,,,,,,,,,,outro1,,
+floor2_mid_boss,outro1,dialogue,ち、ちっくしょー！覚えてろ！,npc:gusu,,,,,,,,,,,outro2
+floor2_mid_boss,outro2,dialogue,覚えてろ！,npc:kasu,,,,,,,,,,,end
+floor2_mid_boss,end,end,,,,,,,,,,,,,

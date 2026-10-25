@@ -29,7 +29,7 @@ class ShopApiTest extends TestCase
             'code' => 'staff_advanced',
         ])->assertOk();
 
-        $this->assertSame(200, $response->json('gold'));
+        $this->assertSame(800, $response->json('gold'));
         $this->assertContains('staff_advanced', $response->json('catalog.characters.0.owned_weapon_codes'));
     }
 }

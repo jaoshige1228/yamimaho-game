@@ -66,7 +66,7 @@ class BattleApiTest extends TestCase
         $this->assertSame(1, $enemies->count());
         $this->assertSame('inu_moe', $enemies->first()['master_code']);
         $this->assertSame(10, $enemies->first()['level']);
-        $this->assertSame(400, $enemies->first()['max_hp']);
+        $this->assertSame(380, $enemies->first()['max_hp']);
     }
 
     public function test_kick_action_is_accepted(): void

@@ -103,6 +103,28 @@ class DungeonFloorApiTest extends TestCase
         $response->assertJsonPath('step', 41);
     }
 
+    public function test_floor_two_mid_boss_triggers_exploration_at_step_20(): void
+    {
+        config(['game.dungeon.test_force' => null]);
+
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 19, 'in_dungeon' => false],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 2])->assertOk();
+
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'exploration');
+        $response->assertJsonPath('step', 20);
+        $response->assertJsonPath('segment.kind', 'story');
+        $this->assertDatabaseHas('dungeon_exploration_sessions', [
+            'user_id' => $user->id,
+            'event_code' => 'floor2_mid_boss',
+        ]);
+    }
+
     public function test_boss_victory_unlocks_floor_two_and_floor_two_is_enterable(): void
     {
         $user = $this->demoUser();

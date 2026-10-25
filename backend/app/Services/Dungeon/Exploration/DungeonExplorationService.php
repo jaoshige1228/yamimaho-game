@@ -19,6 +19,11 @@ class DungeonExplorationService
         private readonly ExplorationBattleLauncher $battleLauncher = new ExplorationBattleLauncher,
     ) {}
 
+    public function abandonActiveSession(User $user): void
+    {
+        $this->clearSessions($user);
+    }
+
     public function hasActiveSession(User $user): bool
     {
         return DungeonExplorationSession::query()
@@ -185,6 +190,34 @@ class DungeonExplorationService
         $kind = $segment['kind'] ?? '';
 
         if ($kind === 'battle') {
+            if ((bool) ($segment['mid_boss'] ?? false)) {
+                $session = DungeonExplorationSession::query()
+                    ->where('user_id', $user->id)
+                    ->first();
+
+                if ($session !== null) {
+                    $context = $session->context ?? [];
+                    $context['awaiting_battle'] = true;
+                    $session->context = $context;
+                    $session->save();
+                }
+
+                /** @var list<string> $enemyCodes */
+                $enemyCodes = $segment['enemy_codes'] ?? [];
+
+                return array_merge(
+                    $this->battleLauncher->startMidBossBattle(
+                        $user,
+                        $floor,
+                        $step,
+                        $enemyCodes,
+                        (string) ($segment['post_battle_node'] ?? ''),
+                        $session?->id,
+                    ),
+                    ['party' => $this->partyPayload($user)],
+                );
+            }
+
             $this->clearSessions($user);
             $enemyCode = (string) ($segment['enemy_code'] ?? 'inu_moe');
 

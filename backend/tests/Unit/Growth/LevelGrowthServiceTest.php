@@ -27,22 +27,7 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame(166, $levels->expToNextLevel(3));
     }
 
-    public function test_stats_use_ceil_on_level_up(): void
-    {
-        $this->seed(\Database\Seeders\MasterDataSeeder::class);
-
-        $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
-        $growth = new LevelGrowthService;
-
-        $lv1 = $growth->statsForLevel($master, 1);
-        $lv2 = $growth->statsForLevel($master, 2);
-
-        $this->assertSame((int) ceil($lv1['mag'] * 1.2), $lv2['mag']);
-        $this->assertSame($lv1['mp'] + 5, $lv2['mp']);
-        $this->assertSame($lv1['vit'] + 2, $lv2['vit']);
-    }
-
-    public function test_stats_multiply_from_previous_level(): void
+    public function test_mag_and_def_gain_one_per_level(): void
     {
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
 
@@ -53,10 +38,12 @@ class LevelGrowthServiceTest extends TestCase
         $lv2 = $growth->statsForLevel($master, 2);
         $lv3 = $growth->statsForLevel($master, 3);
 
-        $this->assertSame((int) ceil($lv1['mag'] * 1.2), $lv2['mag']);
-        $this->assertSame((int) ceil($lv2['mag'] * 1.2), $lv3['mag']);
-        $this->assertSame((int) ceil($lv1['def'] * 1.2), $lv2['def']);
-        $this->assertSame((int) ceil($lv2['def'] * 1.2), $lv3['def']);
+        $this->assertSame($lv1['mag'] + 1, $lv2['mag']);
+        $this->assertSame($lv2['mag'] + 1, $lv3['mag']);
+        $this->assertSame($lv1['def'] + 1, $lv2['def']);
+        $this->assertSame($lv2['def'] + 1, $lv3['def']);
+        $this->assertSame($lv1['mp'] + 5, $lv2['mp']);
+        $this->assertSame($lv1['vit'] + 2, $lv2['vit']);
     }
 
     public function test_stats_scale_with_level(): void

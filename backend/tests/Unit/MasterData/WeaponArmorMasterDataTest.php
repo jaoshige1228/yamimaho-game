@@ -25,7 +25,7 @@ class WeaponArmorMasterDataTest extends TestCase
         $this->assertNotEmpty($rows);
         $this->assertSame('robe_basic', $rows[0]['code']);
         $this->assertSame('基本のローブ', $rows[0]['name']);
-        $this->assertSame('1', $rows[0]['def_bonus']);
+        $this->assertSame('2', $rows[0]['def_bonus']);
         $this->assertStringContainsString('イケてる', $rows[0]['description']);
     }
 
@@ -38,6 +38,24 @@ class WeaponArmorMasterDataTest extends TestCase
             $this->assertNotNull($row);
             $this->assertSame('staff_basic', $row['default_weapon']);
             $this->assertSame('robe_basic', $row['default_armor']);
+        }
+    }
+
+    public function test_character_masters_include_second_name(): void
+    {
+        $rows = CsvMasterReader::read('character_masters.csv');
+
+        $expected = [
+            'pc1' => 'シナノガワ',
+            'pc2' => 'カレイド',
+            'pc3' => 'ウメキダ',
+            'pc4' => 'アカリヤ',
+        ];
+
+        foreach ($expected as $code => $secondName) {
+            $row = collect($rows)->firstWhere('code', $code);
+            $this->assertNotNull($row);
+            $this->assertSame($secondName, $row['second_name']);
         }
     }
 }

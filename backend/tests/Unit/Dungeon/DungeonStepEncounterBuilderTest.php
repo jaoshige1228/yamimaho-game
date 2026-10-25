@@ -24,7 +24,7 @@ class DungeonStepEncounterBuilderTest extends TestCase
     {
         for ($i = 0; $i < 20; $i++) {
             $enemies = $this->builder->build(1, 5);
-            $this->assertGreaterThanOrEqual(2, count($enemies));
+            $this->assertGreaterThanOrEqual(1, count($enemies));
             $this->assertLessThanOrEqual(3, count($enemies));
             foreach ($enemies as $enemy) {
                 $this->assertSame('bat', $enemy['master_code']);

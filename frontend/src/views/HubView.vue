@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api';
 import ScenePanel from '../components/exploration/ScenePanel.vue';
@@ -9,56 +9,26 @@ import '../styles/hub-screen.css';
 import '../styles/exploration.css';
 import { publicAssetUrl } from '../utils/publicAssetUrl.js';
 
-const hubBgSrc = publicAssetUrl('/assets/bg/home.jpg');
+const hubBgSrc = publicAssetUrl('/assets/bg/home.webp');
 
 const router = useRouter();
 const player = usePlayerStore();
 const loading = ref(true);
-const enteringFloor = ref(null);
 const error = ref('');
 const party = ref([]);
-const unlockedFloor = ref(1);
-const playableFloor = ref(1);
-
-const enterableFloors = computed(() => {
-  const max = Math.min(unlockedFloor.value, playableFloor.value);
-  return Array.from({ length: max }, (_, index) => index + 1);
-});
 
 async function loadHubData() {
   loading.value = true;
   error.value = '';
   try {
-    const [partyData, dungeonData] = await Promise.all([
-      api('/player/party', { method: 'GET' }),
-      api('/dungeon', { method: 'GET' }),
-    ]);
+    const partyData = await api('/player/party', { method: 'GET' });
     party.value = partyData.characters ?? [];
     if (partyData.gold != null) player.setGold(partyData.gold);
     if (partyData.items != null) player.setItems(partyData.items);
-    unlockedFloor.value = dungeonData.unlocked_floor ?? 1;
-    playableFloor.value = dungeonData.playable_floor ?? 1;
   } catch (e) {
     error.value = e.message;
   } finally {
     loading.value = false;
-  }
-}
-
-async function enterDungeon(floor) {
-  enteringFloor.value = floor;
-  error.value = '';
-  try {
-    await api('/dungeon/enter', {
-      method: 'POST',
-      body: JSON.stringify({ floor }),
-    });
-    await player.fetchNavigation();
-    router.push({ name: 'dungeon' });
-  } catch (e) {
-    error.value = e.message;
-  } finally {
-    enteringFloor.value = null;
   }
 }
 
@@ -70,15 +40,8 @@ onMounted(() => loadHubData());
     <div class="exploration-body">
       <ScenePanel :image-src="hubBgSrc" :loading="loading">
         <div v-if="!loading" class="hub-actions">
-          <button
-            v-for="floor in enterableFloors"
-            :key="floor"
-            type="button"
-            class="hub-enter-btn"
-            :disabled="enteringFloor !== null"
-            @click="enterDungeon(floor)"
-          >
-            {{ enteringFloor === floor ? '入場中…' : `${floor}層に潜る` }}
+          <button type="button" class="hub-enter-btn" @click="router.push({ name: 'dungeon-enter' })">
+            ダンジョンに潜る
           </button>
           <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'shop' })">
             武具屋へ

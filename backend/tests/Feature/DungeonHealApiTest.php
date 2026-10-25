@@ -45,4 +45,38 @@ class DungeonHealApiTest extends TestCase
         $pc1 = collect($response->json('party'))->firstWhere('id', 'pc1');
         $this->assertGreaterThan(10, $pc1['hp']);
     }
+
+    public function test_dead_caster_cannot_heal_with_spell(): void
+    {
+        $this->postJson('/api/battles/demo')->assertOk();
+        BattleState::query()->delete();
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $caster = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))
+            ->firstOrFail();
+        $target = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc2'))
+            ->firstOrFail();
+
+        $caster->update(['hp' => 0, 'mp' => 30]);
+        $target->update(['hp' => 10]);
+
+        $options = $this->getJson('/api/dungeon/heal/options')->assertOk();
+        $casterSpells = collect($options->json('spells'))
+            ->where('caster_slot_id', 'pc1');
+        $this->assertNotEmpty($casterSpells);
+        $this->assertTrue($casterSpells->every(fn (array $spell) => $spell['affordable'] === false));
+
+        $this->postJson('/api/dungeon/heal', [
+            'mode' => 'spell',
+            'caster_slot_id' => 'pc1',
+            'spell_id' => $casterSpells->first()['id'],
+            'target_slot_id' => 'pc2',
+        ])->assertStatus(422)
+            ->assertJsonPath('message', '戦闘不能のキャラクターは魔法を使えません。');
+    }
 }

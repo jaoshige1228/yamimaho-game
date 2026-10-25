@@ -18,6 +18,8 @@ class EnemyMaster extends Model
         'str',
         'mag',
         'def',
+        'pdef',
+        'mdef',
         'spd',
         'know',
         'spirit',

@@ -53,6 +53,9 @@ class DungeonProgressService
     public function statusPayload(User $user): array
     {
         $record = $this->findOrCreate($user);
+        $session = DungeonExplorationSession::query()
+            ->where('user_id', $user->id)
+            ->first();
 
         return [
             'floor' => (int) $record->floor,
@@ -63,6 +66,7 @@ class DungeonProgressService
             'boss_step' => DungeonFloorConfig::bossStep((int) $record->floor),
             'gold' => $this->gold->getGold($user),
             'in_dungeon' => (bool) $record->in_dungeon,
+            'exploration_session_id' => $session?->id,
         ];
     }
 
@@ -85,6 +89,7 @@ class DungeonProgressService
         $this->gold->applyRetreatPenalty($user);
         $this->characters->restorePartyToFull($user);
         $record = $this->findOrCreate($user);
+        $record->step = 0;
         $record->in_dungeon = false;
         $record->save();
         $user->refresh();

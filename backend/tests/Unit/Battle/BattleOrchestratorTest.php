@@ -66,7 +66,7 @@ class BattleOrchestratorTest extends TestCase
     public function test_enemy_phase_runs_after_last_ally_without_player_input(): void
     {
         $orch = $this->orchestrator();
-        $state = $orch->createBattle()['state'];
+        $state = $orch->createBattle(null, 'demo_boss')['state'];
         $allies = $this->allyTurnOrder($state);
 
         foreach (array_slice($allies, 0, -1) as $allyId) {

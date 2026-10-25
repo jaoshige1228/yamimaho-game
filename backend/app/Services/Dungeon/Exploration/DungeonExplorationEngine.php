@@ -19,6 +19,12 @@ class DungeonExplorationEngine
 {
     private const EPILOGUE_TEXT = '一行は先に進むことにした';
 
+    /** @var array<string, array{name: string, sprite: string}> */
+    private const NPC_SPEAKERS = [
+        'gusu' => ['name' => 'グース', 'sprite' => 'npc_gusu'],
+        'kasu' => ['name' => 'カース', 'sprite' => 'npc_kasu'],
+    ];
+
     public function __construct(
         private readonly DungeonEventCatalog $catalog = new DungeonEventCatalog,
         private readonly PartyExplorationDamageService $damage = new PartyExplorationDamageService,
@@ -125,8 +131,40 @@ class DungeonExplorationEngine
             }
 
             if ($node->node_type === 'start_battle') {
+                if ($lines !== []) {
+                    $session->current_node_key = $nodeKey;
+                    $session->save();
+
+                    return [
+                        'segment' => ['kind' => 'story', 'lines' => $lines],
+                        'next_node' => $nodeKey,
+                        'complete' => false,
+                    ];
+                }
+
+                $postBattleNode = (string) ($node->next_on_success ?: '');
+                if ($postBattleNode !== '') {
+                    $context['post_battle_node'] = $postBattleNode;
+                }
+                $session->context = $context;
                 $session->current_node_key = $nodeKey;
                 $session->save();
+
+                $eventFloor = (int) $session->floor_at_start;
+                $midBossEventCode = DungeonFloorConfig::midBossEventCode($eventFloor);
+                if ($midBossEventCode !== null && $session->event_code === $midBossEventCode) {
+                    return [
+                        'segment' => [
+                            'kind' => 'battle',
+                            'mid_boss' => true,
+                            'enemy_codes' => DungeonFloorConfig::midBossEnemyCodes($eventFloor),
+                            'post_battle_node' => $postBattleNode,
+                            'boss' => false,
+                        ],
+                        'next_node' => null,
+                        'complete' => true,
+                    ];
+                }
 
                 return [
                     'segment' => [
@@ -289,6 +327,30 @@ class DungeonExplorationEngine
             $session->current_node_key = $nodeKey;
             $session->save();
 
+            $run = $this->runUntilSegment($session, $user);
+            if ($run['complete']) {
+                return ['segment' => $run['segment'], 'complete' => true];
+            }
+
+            $session->current_node_key = $run['next_node'];
+            $session->save();
+
+            return ['segment' => $run['segment'], 'complete' => false];
+        }
+
+        if ($node->node_type === 'start_battle') {
+            $run = $this->runUntilSegment($session, $user);
+            if ($run['complete']) {
+                return ['segment' => $run['segment'], 'complete' => true];
+            }
+
+            $session->current_node_key = $run['next_node'];
+            $session->save();
+
+            return ['segment' => $run['segment'], 'complete' => false];
+        }
+
+        if (in_array($node->node_type, ['dialogue', 'narration'], true)) {
             $run = $this->runUntilSegment($session, $user);
             if ($run['complete']) {
                 return ['segment' => $run['segment'], 'complete' => true];
@@ -1084,6 +1146,25 @@ class DungeonExplorationEngine
         }
 
         if ($node->node_type === 'dialogue') {
+            $speakerRole = (string) $node->speaker_role;
+            if (str_starts_with($speakerRole, 'npc:')) {
+                $npcKey = substr($speakerRole, 4);
+                $npc = self::NPC_SPEAKERS[$npcKey] ?? null;
+                $text = trim((string) $node->text);
+                if ($npc === null || $text === '') {
+                    return null;
+                }
+
+                return [
+                    'type' => 'dialogue',
+                    'character' => $npc['sprite'],
+                    'speaker_name' => $npc['name'],
+                    'speaker_sprite' => $npc['sprite'],
+                    'text' => $this->interpolate($text, $user, $context),
+                    'sfx' => $node->sfx ?: null,
+                ];
+            }
+
             $slot = $this->resolveSpeakerSlot($user, $node, $context);
             if ($slot === null) {
                 return null;
@@ -1139,6 +1220,7 @@ class DungeonExplorationEngine
 
         foreach (['PC1' => 'pc1', 'PC2' => 'pc2', 'PC3' => 'pc3', 'PC4' => 'pc4'] as $placeholder => $slot) {
             $replacements['{'.$placeholder.'}'] = $this->nameForSlot($user, $slot);
+            $replacements['{'.$placeholder.'のファミリーネーム}'] = $this->secondNameForSlot($user, $slot);
         }
 
         $text = str_replace(array_keys($replacements), array_values($replacements), $text);
@@ -1177,6 +1259,19 @@ class DungeonExplorationEngine
         $character = $party->get($slotId);
 
         return $character?->characterMaster->name ?? '???';
+    }
+
+    private function secondNameForSlot(User $user, string $slotId): string
+    {
+        if ($slotId === '') {
+            return '???';
+        }
+
+        $party = $this->characters->partyInSlotOrder($user);
+        /** @var UserCharacter|null $character */
+        $character = $party->get($slotId);
+
+        return $character?->characterMaster->second_name ?? '???';
     }
 
     /**

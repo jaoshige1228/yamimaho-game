@@ -3,7 +3,7 @@ import BuffIcons from './BuffIcons.vue';
 import UnitBars from './UnitBars.vue';
 import { useLongPress } from '../../composables/useLongPress';
 import { enemySpriteAssetKey } from '../../utils/enemySprite';
-import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
+import { characterSpriteUrls, publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   units: { type: Array, required: true },
@@ -38,7 +38,11 @@ const emit = defineEmits(['select', 'show-stats']);
 const longPress = useLongPress((unit) => emit('show-stats', unit));
 
 function spriteUrl(unit) {
-  return publicAssetUrl(`/assets/enemies/${enemySpriteAssetKey(unit)}.png`);
+  const key = enemySpriteAssetKey(unit);
+  if (key.startsWith('npc_')) {
+    return characterSpriteUrls(key).webp;
+  }
+  return publicAssetUrl(`/assets/enemies/${key}.png`);
 }
 
 function canSelect(unit) {

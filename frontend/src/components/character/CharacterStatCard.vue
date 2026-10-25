@@ -10,15 +10,31 @@ const props = defineProps({
   wide: { type: Boolean, default: false },
 });
 
-const statRows = [
-  { key: 'str', label: '筋力' },
-  { key: 'mag', label: '魔力' },
-  { key: 'def', label: '防御' },
-  { key: 'spd', label: '素早' },
-  { key: 'know', label: '知力' },
-  { key: 'spirit', label: '精神' },
-  { key: 'vit', label: '体力' },
-];
+const statRows = computed(() => {
+  const commonTail = [
+    { key: 'spd', label: '素早' },
+    { key: 'know', label: '知力' },
+    { key: 'spirit', label: '精神' },
+    { key: 'vit', label: '体力' },
+  ];
+
+  if (props.unit.side === 'enemy') {
+    return [
+      { key: 'str', label: '筋力' },
+      { key: 'mag', label: '魔力' },
+      { key: 'pdef', label: '物理防御' },
+      { key: 'mdef', label: '魔法防御' },
+      ...commonTail,
+    ];
+  }
+
+  return [
+    { key: 'str', label: '筋力' },
+    { key: 'mag', label: '魔力' },
+    { key: 'def', label: '防御' },
+    ...commonTail,
+  ];
+});
 
 const spriteUrl = computed(() => {
   const folder = props.unit.side === 'enemy' ? 'enemies' : 'characters';

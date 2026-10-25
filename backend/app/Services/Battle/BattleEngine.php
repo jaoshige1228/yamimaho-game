@@ -161,6 +161,28 @@ class BattleEngine
             );
         }
 
+        if ($actionType === 'spell') {
+            $spellId = (string) $skill['skill_code'];
+            $spell = $this->factory->findSpell($spellId);
+            $targets = $this->resolveEnemySpellTargets($spell, $state['units'], $actorId);
+            if ($targets === []) {
+                return $events;
+            }
+
+            $events[] = $this->announceEvent(
+                $actorId,
+                "{$actor['name']}は{$spell['label']}を唱えた！",
+                isset($spell['element']) && $spell['element'] !== '' ? (string) $spell['element'] : null,
+                isset($spell['effect']) && $spell['effect'] !== '' ? (string) $spell['effect'] : null,
+            );
+
+            foreach ($targets as $tid) {
+                $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
+            }
+
+            return $events;
+        }
+
         throw new InvalidArgumentException("不明な敵行動です: {$actionType}");
     }
 
@@ -329,7 +351,7 @@ class BattleEngine
         switch ($spell['effect']) {
             case 'damage':
                 $coefficient = (float) ($spell['coefficient'] ?? 1.0);
-                $damageResult = $this->calcDamageWithCritical($actor, $target, 'mag', $coefficient);
+                $damageResult = $this->calcDamageWithCritical($actor, $target, 'mag', $coefficient, 'magical');
                 $events = array_merge(
                     $events,
                     $this->applyDamage($state, $actorId, $targetId, $damageResult['damage'], $spell['element'] ?? null, $damageResult['critical']),
@@ -434,7 +456,7 @@ class BattleEngine
             return [['type' => 'miss', 'actor' => $actorId, 'target' => $targetId]];
         }
 
-        $damageResult = $this->calcDamageWithCritical($actor, $target, 'str', $coefficient);
+        $damageResult = $this->calcDamageWithCritical($actor, $target, 'str', $coefficient, 'physical');
 
         return $this->applyDamage(
             $state,
@@ -507,27 +529,51 @@ class BattleEngine
      * @param  array<string, mixed>  $defender
      * @return array{damage: int, critical: bool}
      */
-    private function calcDamageWithCritical(array $attacker, array $defender, string $attackStat, float $coefficient): array
-    {
+    private function calcDamageWithCritical(
+        array $attacker,
+        array $defender,
+        string $attackStat,
+        float $coefficient,
+        string $defenseKind = 'physical',
+    ): array {
         $critical = $this->rollCritical($attacker);
         $defenderForCalc = $defender;
         if ($critical) {
-            $defenderForCalc = [...$defender, 'def' => 0, 'buffs' => []];
+            $defKey = $this->defenseStatKey($defender, $defenseKind);
+            $defenderForCalc = [...$defender, $defKey => 0, 'buffs' => []];
         }
 
-        $damage = $this->calcDamage($attacker, $defenderForCalc, $attackStat, $coefficient);
+        $damage = $this->calcDamage($attacker, $defenderForCalc, $attackStat, $coefficient, $defenseKind);
 
         return ['damage' => $damage, 'critical' => $critical];
+    }
+
+    /**
+     * @param  array<string, mixed>  $defender
+     */
+    private function defenseStatKey(array $defender, string $defenseKind): string
+    {
+        if (($defender['side'] ?? '') === 'enemy') {
+            return $defenseKind === 'magical' ? 'mdef' : 'pdef';
+        }
+
+        return 'def';
     }
 
     /**
      * @param  array<string, mixed>  $attacker
      * @param  array<string, mixed>  $defender
      */
-    private function calcDamage(array $attacker, array $defender, string $attackStat, float $coefficient): int
-    {
+    private function calcDamage(
+        array $attacker,
+        array $defender,
+        string $attackStat,
+        float $coefficient,
+        string $defenseKind = 'physical',
+    ): int {
         $attack = $this->effectiveStat($attacker, $attackStat);
-        $def = $this->effectiveStat($defender, 'def');
+        $defStat = $this->defenseStatKey($defender, $defenseKind);
+        $def = $this->effectiveStat($defender, $defStat);
         $roll = $this->rollDamageMultiplier();
         $raw = ($attack - ($def / 2)) * $roll * $coefficient;
 
@@ -550,6 +596,10 @@ class BattleEngine
     {
         $base = (float) ($unit[$stat] ?? 0);
 
+        if ($base === 0.0 && in_array($stat, ['pdef', 'mdef'], true)) {
+            $base = (float) ($unit['def'] ?? 0);
+        }
+
         foreach ($unit['buffs'] as $key => $turns) {
             if ($turns <= 0) {
                 continue;
@@ -558,7 +608,10 @@ class BattleEngine
             if (($buff['type'] ?? '') === 'evasion_set') {
                 continue;
             }
-            if (($buff['stat'] ?? '') === $stat) {
+            $buffStat = (string) ($buff['stat'] ?? '');
+            $applies = $buffStat === $stat
+                || ($buffStat === 'def' && in_array($stat, ['def', 'pdef', 'mdef'], true));
+            if ($applies) {
                 $base *= (float) $buff['multiplier'];
             }
         }
@@ -675,6 +728,67 @@ class BattleEngine
             'ally_all' => array_keys(array_filter($units, fn ($u) => $u['side'] === 'ally' && $u['alive'])),
             default => throw new InvalidArgumentException("不明な敵ターゲット種別です: {$targetType}"),
         };
+    }
+
+    /**
+     * 敵が spell_masters の魔法を唱えるときのターゲット（プレイヤー視点の target_type を敵視点に変換）。
+     *
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, array<string, mixed>>  $units
+     * @return list<string>
+     */
+    private function resolveEnemySpellTargets(array $spell, array $units, string $actorId): array
+    {
+        $targetType = (string) ($spell['target_type'] ?? 'enemy_single');
+        $effect = (string) ($spell['effect'] ?? '');
+
+        if ($targetType === 'enemy_all') {
+            return array_keys(array_filter(
+                $units,
+                fn ($u) => ($u['side'] ?? '') === 'ally' && ($u['alive'] ?? false),
+            ));
+        }
+
+        if ($targetType === 'enemy_single') {
+            $candidates = array_keys(array_filter(
+                $units,
+                fn ($u) => ($u['side'] ?? '') === 'ally' && ($u['alive'] ?? false),
+            ));
+            if ($candidates === []) {
+                return [];
+            }
+
+            return [$candidates[array_rand($candidates)]];
+        }
+
+        if ($targetType === 'ally_all') {
+            return array_keys(array_filter(
+                $units,
+                fn ($u) => ($u['side'] ?? '') === 'enemy' && ($u['alive'] ?? false),
+            ));
+        }
+
+        if ($targetType === 'ally_single') {
+            if ($effect === 'revive_chance') {
+                $candidates = array_keys(array_filter(
+                    $units,
+                    fn ($u) => ($u['side'] ?? '') === 'enemy' && ! ($u['alive'] ?? true),
+                ));
+            } else {
+                $candidates = array_keys(array_filter(
+                    $units,
+                    fn ($u) => ($u['side'] ?? '') === 'enemy' && ($u['alive'] ?? false),
+                ));
+            }
+
+            if ($candidates === []) {
+                return [];
+            }
+
+            return [$candidates[array_rand($candidates)]];
+        }
+
+        return [];
     }
 
     /**
@@ -857,6 +971,8 @@ class BattleEngine
             'str' => $unit['str'] ?? null,
             'mag' => $unit['mag'] ?? null,
             'def' => $unit['def'] ?? null,
+            'pdef' => $unit['pdef'] ?? null,
+            'mdef' => $unit['mdef'] ?? null,
             'spd' => $unit['spd'] ?? null,
         ];
     }

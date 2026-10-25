@@ -4,16 +4,29 @@ namespace App\Console\Commands;
 
 use App\Services\Battle\BattleSimulator;
 use App\Services\Battle\Strategies\AggressivePunchStrategy;
+use App\Services\Battle\Strategies\PrimarySpellStrategy;
 use Illuminate\Console\Command;
 
 class BattleSimulateCommand extends Command
 {
-    protected $signature = 'battle:simulate {--runs=10 : 実行する戦闘数}';
+    protected $signature = 'battle:simulate
+                            {--runs=10 : 実行する戦闘数}
+                            {--matrix : Lv×装備×敵の TTK 検証表を出力}';
 
     protected $description = 'バックエンドのみで戦闘を自動進行し、勝敗の分布を表示（バランス検証用）';
 
     public function handle(BattleSimulator $simulator): int
     {
+        if ($this->option('matrix')) {
+            $rows = $simulator->runScenarioMatrix(new PrimarySpellStrategy);
+            $this->table(
+                ['label', 'result', 'player_turns', 'target', 'ok'],
+                $simulator->formatTtkTable($rows),
+            );
+
+            return self::SUCCESS;
+        }
+
         $runs = max(1, (int) $this->option('runs'));
         $strategy = new AggressivePunchStrategy;
 

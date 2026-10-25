@@ -15,7 +15,7 @@ import '../styles/exploration.css';
 import { publicAssetUrl } from '../utils/publicAssetUrl.js';
 import { useAppAudio } from '../composables/useAppAudio.js';
 
-const dungeonBgSrc = publicAssetUrl('/assets/bg/dungeon1.jpg');
+const dungeonBgSrc = publicAssetUrl('/assets/bg/dungeon1.webp');
 
 const router = useRouter();
 const { playSe, unlock } = useAppAudio();
@@ -135,9 +135,36 @@ function playStatCheckResultSe(segment) {
   }
 }
 
+function launchExplorationBattle(data) {
+  if (data.mid_boss_encounter && (data.exploration_session_id || data.session_id)) {
+    explorationSessionId.value = data.exploration_session_id ?? data.session_id ?? explorationSessionId.value;
+  } else {
+    explorationSessionId.value = '';
+  }
+  choiceActive.value = false;
+  battle.battleId = data.battle_id;
+  battle.state = data.state;
+  battle.pendingEvents = data.events ?? [];
+  router.push({
+    name: 'battle',
+    params: { id: data.battle_id },
+    query: {
+      from: 'dungeon',
+      ...(data.boss_encounter ? { boss: '1' } : {}),
+      ...(data.mid_boss_encounter ? { mid_boss: '1' } : {}),
+    },
+  });
+}
+
 async function handleExplorationPayload(data) {
   applyDungeonStatus(data);
   applyExplorationParty(data);
+
+  if (data.event === 'battle' && data.battle_id) {
+    unlock();
+    launchExplorationBattle(data);
+    return;
+  }
 
   const segment = data.segment;
   if (!segment) {
@@ -154,23 +181,6 @@ async function handleExplorationPayload(data) {
     explorationSessionId.value = '';
     choiceActive.value = false;
     await loadParty();
-    return;
-  }
-
-  if (segment.kind === 'battle' && data.battle_id) {
-    explorationSessionId.value = '';
-    choiceActive.value = false;
-    battle.battleId = data.battle_id;
-    battle.state = data.state;
-    battle.pendingEvents = data.events ?? [];
-    router.push({
-      name: 'battle',
-      params: { id: data.battle_id },
-      query: {
-        from: 'dungeon',
-        ...(data.boss_encounter ? { boss: '1' } : {}),
-      },
-    });
     return;
   }
 
@@ -305,6 +315,9 @@ async function loadStatus() {
   try {
     const data = await api('/dungeon', { method: 'GET' });
     applyDungeonStatus(data);
+    if (data.exploration_session_id) {
+      explorationSessionId.value = data.exploration_session_id;
+    }
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -330,18 +343,8 @@ async function advance() {
 
     if (data.event === 'battle') {
       step.value = data.step ?? step.value;
-      battle.battleId = data.battle_id;
-      battle.state = data.state;
-      battle.pendingEvents = data.events ?? [];
       keepAdvanceLocked = true;
-      router.push({
-        name: 'battle',
-        params: { id: data.battle_id },
-        query: {
-          from: 'dungeon',
-          ...(data.boss_encounter ? { boss: '1' } : {}),
-        },
-      });
+      launchExplorationBattle(data);
       return;
     }
 
@@ -372,6 +375,9 @@ async function advance() {
 
 onMounted(async () => {
   await Promise.all([loadStatus(), loadParty()]);
+  if (explorationSessionId.value) {
+    await continueExploration();
+  }
 });
 </script>
 

@@ -37,6 +37,41 @@ class BattleFactory
     }
 
     /**
+     * バランス検証用: 指定レベル・装備・敵構成で戦闘状態を生成する。
+     *
+     * @param  array<string, array{master_code: string, level: int, weapon?: string|null, armor?: string|null}>  $partySlots
+     * @param  list<array<string, string|int>>  $enemyList
+     * @return array<string, mixed>
+     */
+    public function createScenario(
+        array $partySlots,
+        array $enemyList,
+        string $logMessage = 'シミュレーション戦闘',
+    ): array {
+        $units = [];
+
+        foreach ($partySlots as $slotId => $meta) {
+            $masterCode = $meta['master_code'];
+            $level = max(1, (int) ($meta['level'] ?? 1));
+            $weaponCode = $meta['weapon'] ?? null;
+            $armorCode = $meta['armor'] ?? null;
+            $spells = $this->masters->spellIdsForCharacter($masterCode);
+            $units[$slotId] = $this->makeScenarioUnit(
+                $slotId,
+                $masterCode,
+                $level,
+                is_string($weaponCode) ? $weaponCode : null,
+                is_string($armorCode) ? $armorCode : null,
+                $spells,
+            );
+        }
+
+        $this->appendEnemiesFromList($units, $enemyList);
+
+        return $this->finalizeNewBattle($units, $logMessage);
+    }
+
+    /**
      * @param  list<array<string, string>>  $enemyList
      * @param  array<string, mixed>  $meta
      */
@@ -103,6 +138,83 @@ class BattleFactory
         }
 
         $this->appendEnemiesFromList($units, $enemyList);
+    }
+
+    /**
+     * @param  list<string>  $spells
+     * @return array<string, mixed>
+     */
+    private function makeScenarioUnit(
+        string $slotId,
+        string $masterCode,
+        int $level,
+        ?string $weaponCode,
+        ?string $armorCode,
+        array $spells = [],
+    ): array {
+        $masterRow = $this->masters->findCharacter($masterCode);
+        $master = $this->characterMasterFromRow($masterRow);
+        $stats = $this->growth->statsForLevel($master, $level);
+
+        $weapon = $weaponCode !== null ? $this->masters->findWeapon($weaponCode) : null;
+        $armor = $armorCode !== null ? $this->masters->findArmor($armorCode) : null;
+        $magBonus = $weapon['mag_bonus'] ?? 0;
+        $defBonus = $armor['def_bonus'] ?? 0;
+
+        return [
+            'id' => $slotId,
+            'side' => 'ally',
+            'name' => $masterRow['name'],
+            'sprite' => $masterRow['sprite'],
+            'master_code' => $masterCode,
+            'user_character_id' => null,
+            'level' => $level,
+            'exp' => 0,
+            'hp' => $stats['hp'],
+            'max_hp' => $stats['hp'],
+            'mp' => $stats['mp'],
+            'max_mp' => $stats['mp'],
+            'str' => $stats['str'],
+            'mag' => $stats['mag'] + $magBonus,
+            'def' => $stats['def'] + $defBonus,
+            'spd' => $stats['spd'],
+            'know' => $stats['know'],
+            'spirit' => $stats['spirit'],
+            'vit' => $stats['vit'],
+            'weapon' => $weapon,
+            'armor' => $armor,
+            'alive' => true,
+            'evasion_rate' => (int) config('battle.ally_defaults.evasion_rate', 5),
+            'crit_rate' => (int) config('battle.ally_defaults.crit_rate', 5),
+            'damage_shield' => false,
+            'buffs' => [],
+            'statuses' => [],
+            'spells' => $spells,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function characterMasterFromRow(array $row): CharacterMaster
+    {
+        $master = new CharacterMaster;
+        $master->forceFill([
+            'code' => $row['code'],
+            'name' => $row['name'],
+            'sprite' => $row['sprite'],
+            'hp' => $row['hp'],
+            'mp' => $row['mp'],
+            'str' => $row['str'],
+            'mag' => $row['mag'],
+            'def' => $row['def'],
+            'spd' => $row['spd'],
+            'know' => $row['know'],
+            'spirit' => $row['spirit'],
+            'vit' => $row['vit'],
+        ]);
+
+        return $master;
     }
 
     /**
@@ -239,7 +351,8 @@ class BattleFactory
             'max_mp' => $master['mp'],
             'str' => $master['str'],
             'mag' => $master['mag'],
-            'def' => $master['def'],
+            'pdef' => (int) ($master['pdef'] ?? $master['def']),
+            'mdef' => (int) ($master['mdef'] ?? $master['def']),
             'spd' => $master['spd'],
             'know' => $master['know'],
             'spirit' => $master['spirit'],
