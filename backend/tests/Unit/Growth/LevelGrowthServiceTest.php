@@ -47,7 +47,7 @@ class LevelGrowthServiceTest extends TestCase
         ];
 
         for ($level = 1; $level <= 5; $level++) {
-            // Lv4 に上がるときだけ別の上昇値（GROWTH_BY_REACHED_LEVEL）なので、通常の増分の確認から除く
+            // Lv4 に上がるときだけ別の上昇値（GROWTH_BY_REACHED_LEVEL）なので、通常の増分の確認から除く（ここは Lv6 まで。Lv7・Lv12 以降も別の上昇値）
             if ($level + 1 === 4) {
                 continue;
             }
@@ -77,12 +77,13 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame($master->str + 2, $lv3['str']);
         $this->assertSame($master->spd + 2, $lv3['spd']);
 
-        // Lv2〜20 の19回のうち、Lv4 到達の1回だけ上昇値が大きい（HP+20・MP+6・魔力防御+4・他+3）
-        $this->assertSame($master->hp + 18 * 10 + 20, $lv20['hp']);
-        $this->assertSame($master->mp + 18 * 3 + 6, $lv20['mp']);
-        $this->assertSame($master->mag + 18 * 2 + 4, $lv20['mag']);
-        $this->assertSame($master->def + 18 * 2 + 4, $lv20['def']);
-        $this->assertSame($master->vit + 18 * 1 + 3, $lv20['vit']);
+        // Lv2〜20 の19回の内訳: 通常 8回（Lv2,3,5,6,8,9,10,11）+ Lv4（HP+20 MP+6 魔力防御+4 他+3）
+        // + Lv7（他+3、ほかは通常）+ Lv12〜20 の9回（HP+15 MP+5 魔力防御+4 他+2）
+        $this->assertSame($master->hp + 8 * 10 + 20 + 10 + 9 * 15, $lv20['hp']);
+        $this->assertSame($master->mp + 8 * 3 + 6 + 3 + 9 * 5, $lv20['mp']);
+        $this->assertSame($master->mag + 8 * 2 + 4 + 2 + 9 * 4, $lv20['mag']);
+        $this->assertSame($master->def + 8 * 2 + 4 + 2 + 9 * 4, $lv20['def']);
+        $this->assertSame($master->vit + 8 * 1 + 3 + 3 + 9 * 2, $lv20['vit']);
     }
 
     public function test_grant_exp_levels_up_character(): void

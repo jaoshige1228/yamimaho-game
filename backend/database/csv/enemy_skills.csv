@@ -1,7 +1,7 @@
 enemy_code,skill_code,label,weight,action_type,target_type,coefficient
 inu_moe,attack,攻撃,34,punch,ally_single,1.0
-inu_moe,flame_bite,炎のキバ,33,physical_single,ally_single,1.2
-inu_moe,flame_breath,火炎放射,33,physical_all,ally_all,0.8
+inu_moe,flame_bite,炎のキバ,33,physical_single,ally_single,1.4
+inu_moe,flame_breath,火炎放射,33,physical_all,ally_all,0.9
 npc_kasu,pc3_fire_shot,炎弾,33,spell,,
 npc_kasu,pc3_fire_burst,爆破,33,spell,,
 npc_kasu,pc3_fire_wave,火炎波及,34,spell,,

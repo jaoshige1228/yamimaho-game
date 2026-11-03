@@ -142,7 +142,7 @@
   bottom: 0;
   z-index: 0;
   width: clamp(9rem, 48%, 12.5rem);
-  height: calc(100% + 0.5rem);
+  height: calc(100% + 2rem);
   overflow: hidden;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(

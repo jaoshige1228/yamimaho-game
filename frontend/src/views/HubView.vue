@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api';
 import ScenePanel from '../components/exploration/ScenePanel.vue';
+import AdviceCat from '../components/hub/AdviceCat.vue';
 import HubPartyFooter from '../components/hub/HubPartyFooter.vue';
 import { usePlayerStore } from '../stores/player';
 import '../styles/hub-screen.css';
@@ -39,6 +40,7 @@ onMounted(() => loadHubData());
   <div class="hub-screen">
     <div class="exploration-body">
       <ScenePanel :image-src="hubBgSrc" :loading="loading">
+        <AdviceCat v-if="!loading" />
         <div v-if="!loading" class="hub-actions">
           <button type="button" class="hub-enter-btn" @click="router.push({ name: 'dungeon-enter' })">
             ダンジョンに潜る

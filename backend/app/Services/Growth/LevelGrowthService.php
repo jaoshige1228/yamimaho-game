@@ -14,7 +14,13 @@ class LevelGrowthService
     /** 特定のレベルに上がるときだけ使う上昇値（キー = 到達レベル） */
     private const GROWTH_BY_REACHED_LEVEL = [
         4 => ['hp' => 20, 'mp' => 6, 'mag' => 4, 'def' => 4, 'flat' => 3],
+        7 => [...self::DEFAULT_GROWTH, 'flat' => 3],
     ];
+
+    /** このレベル以上に上がるときは、常にこの上昇値を使う */
+    private const LATE_GROWTH_FROM_LEVEL = 12;
+
+    private const LATE_GROWTH = ['hp' => 15, 'mp' => 5, 'mag' => 4, 'def' => 4, 'flat' => 2];
 
     /** @var list<string> */
     private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];
@@ -60,7 +66,7 @@ class LevelGrowthService
      */
     private function applyOneLevelGrowth(array &$stats, int $reachedLevel): void
     {
-        $growth = self::GROWTH_BY_REACHED_LEVEL[$reachedLevel] ?? self::DEFAULT_GROWTH;
+        $growth = $this->growthForReachedLevel($reachedLevel);
 
         $stats['hp'] += $growth['hp'];
         $stats['mp'] += $growth['mp'];
@@ -71,6 +77,18 @@ class LevelGrowthService
         foreach (self::FLAT_STATS as $key) {
             $stats[$key] += $growth['flat'];
         }
+    }
+
+    /**
+     * @return array{hp: int, mp: int, mag: int, def: int, flat: int}
+     */
+    private function growthForReachedLevel(int $reachedLevel): array
+    {
+        if ($reachedLevel >= self::LATE_GROWTH_FROM_LEVEL) {
+            return self::LATE_GROWTH;
+        }
+
+        return self::GROWTH_BY_REACHED_LEVEL[$reachedLevel] ?? self::DEFAULT_GROWTH;
     }
 
     /**

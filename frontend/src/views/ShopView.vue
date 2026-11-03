@@ -10,6 +10,7 @@ const player = usePlayerStore();
 const loading = ref(true);
 const buying = ref(false);
 const error = ref('');
+const notice = ref('');
 const catalog = ref(null);
 const selectedSlot = ref('pc1');
 
@@ -33,6 +34,7 @@ async function loadCatalog() {
 async function buy(kind, code) {
   buying.value = true;
   error.value = '';
+  notice.value = '';
   try {
     const data = await api('/shop/equipment/buy', {
       method: 'POST',
@@ -43,6 +45,7 @@ async function buy(kind, code) {
       }),
     });
     catalog.value = data.catalog;
+    notice.value = data.message ?? '';
     if (data.gold != null) player.setGold(data.gold);
   } catch (e) {
     error.value = e.message;
@@ -57,6 +60,12 @@ function isOwned(kind, code) {
   return kind === 'weapon'
     ? c.owned_weapon_codes?.includes(code)
     : c.owned_armor_codes?.includes(code);
+}
+
+function isEquipped(kind, code) {
+  const c = selectedCharacter.value;
+  if (!c) return false;
+  return (kind === 'weapon' ? c.equipped_weapon : c.equipped_armor)?.code === code;
 }
 
 function canBuy(item) {
@@ -78,6 +87,7 @@ onMounted(loadCatalog);
     <p v-else-if="error" class="hub-screen-error">{{ error }}</p>
 
     <template v-else-if="catalog">
+      <p v-if="notice" class="shop-notice">{{ notice }}</p>
       <div class="slot-tabs">
         <button
           v-for="c in catalog.characters"
@@ -107,7 +117,7 @@ onMounted(loadCatalog);
               class="shop-btn owned"
               disabled
             >
-              所持済
+              {{ isEquipped('weapon', item.code) ? '装備中' : '所持済' }}
             </button>
             <button
               v-else
@@ -138,7 +148,7 @@ onMounted(loadCatalog);
               class="shop-btn owned"
               disabled
             >
-              所持済
+              {{ isEquipped('armor', item.code) ? '装備中' : '所持済' }}
             </button>
             <button
               v-else
@@ -177,6 +187,11 @@ onMounted(loadCatalog);
   font-size: 0.85rem;
   color: #ffd98a;
   font-weight: 700;
+}
+.shop-notice {
+  margin: 0.5rem 1rem 0;
+  font-size: 0.78rem;
+  color: #ffd98a;
 }
 .slot-tabs {
   display: grid;

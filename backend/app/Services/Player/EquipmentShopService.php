@@ -4,6 +4,7 @@ namespace App\Services\Player;
 
 use App\Models\ArmorMaster;
 use App\Models\User;
+use App\Models\UserCharacter;
 use App\Models\WeaponMaster;
 
 class EquipmentShopService
@@ -91,9 +92,11 @@ class EquipmentShopService
 
             $this->gold->spendGold($user, (int) $weapon->price);
             $this->ownership->grantWeapon($character, $weapon);
+            $equipped = $this->equipWeaponIfStronger($character, $weapon);
 
             return [
-                'message' => "{$character->characterMaster->name}が{$weapon->name}を購入した。",
+                'message' => "{$character->characterMaster->name}が{$weapon->name}を購入".($equipped ? 'し、装備した。' : 'した。'),
+                'equipped' => $equipped,
                 'gold' => $this->gold->getGold($user->fresh()),
                 'catalog' => $this->catalog($user->fresh()),
             ];
@@ -110,14 +113,52 @@ class EquipmentShopService
 
             $this->gold->spendGold($user, (int) $armor->price);
             $this->ownership->grantArmor($character, $armor);
+            $equipped = $this->equipArmorIfStronger($character, $armor);
 
             return [
-                'message' => "{$character->characterMaster->name}が{$armor->name}を購入した。",
+                'message' => "{$character->characterMaster->name}が{$armor->name}を購入".($equipped ? 'し、装備した。' : 'した。'),
+                'equipped' => $equipped,
                 'gold' => $this->gold->getGold($user->fresh()),
                 'catalog' => $this->catalog($user->fresh()),
             ];
         }
 
         throw new \InvalidArgumentException('種別が不正です。');
+    }
+
+    /**
+     * 買った武器が装備中のものより強い（装備なしを含む）ときだけ、そのまま装備する。
+     * 魔力ボーナスが同じ・低いときは今の装備を変えない。
+     */
+    private function equipWeaponIfStronger(UserCharacter $character, WeaponMaster $weapon): bool
+    {
+        $character->loadMissing('weapon');
+        if ($character->weapon !== null && $weapon->mag_bonus <= $character->weapon->mag_bonus) {
+            return false;
+        }
+
+        $character->weapon_master_id = $weapon->id;
+        $character->save();
+        $character->setRelation('weapon', $weapon);
+
+        return true;
+    }
+
+    /**
+     * 買った防具が装備中のものより強い（装備なしを含む）ときだけ、そのまま装備する。
+     * 防御ボーナスが同じ・低いときは今の装備を変えない。
+     */
+    private function equipArmorIfStronger(UserCharacter $character, ArmorMaster $armor): bool
+    {
+        $character->loadMissing('armor');
+        if ($character->armor !== null && $armor->def_bonus <= $character->armor->def_bonus) {
+            return false;
+        }
+
+        $character->armor_master_id = $armor->id;
+        $character->save();
+        $character->setRelation('armor', $armor);
+
+        return true;
     }
 }
