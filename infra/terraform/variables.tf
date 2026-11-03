@@ -31,6 +31,18 @@ variable "lightsail_instance_bundle_id" {
   default     = "small_3_0"
 }
 
+variable "lightsail_db_name" {
+  type        = string
+  description = "Lightsail DB のリソース名。null なら <project_name>-db。DB が unknown 状態で壊れたときの作り直しなど、名前を変えたい場合だけ指定する"
+  default     = null
+}
+
+variable "lightsail_db_blueprint_id" {
+  type        = string
+  description = "Lightsail DB のブループリント ID。一覧は aws lightsail get-relational-database-blueprints で確認する"
+  default     = "mysql_8_0"
+}
+
 variable "lightsail_db_bundle_id" {
   type        = string
   description = "Lightsail database bundle (e.g. micro_2_0)"

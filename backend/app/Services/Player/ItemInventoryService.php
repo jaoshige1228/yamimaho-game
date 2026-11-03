@@ -11,13 +11,17 @@ class ItemInventoryService
 {
     /** @var array<string, int> */
     private const STARTER_ITEMS = [
-        'potion_hp_s' => 4,
-        'potion_mp_s' => 4,
+        'potion_hp_s' => 0,
+        'potion_mp_s' => 0,
     ];
 
     public function grantStarterItems(User $user): void
     {
         foreach (self::STARTER_ITEMS as $code => $quantity) {
+            if ($quantity <= 0) {
+                continue;
+            }
+
             $item = ItemMaster::query()->where('code', $code)->first();
             if ($item === null) {
                 continue;
