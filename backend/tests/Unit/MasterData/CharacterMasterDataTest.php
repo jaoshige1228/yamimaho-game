@@ -15,10 +15,10 @@ class CharacterMasterDataTest extends TestCase
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
 
         $expected = [
-            'pc1' => 'シナノガワ',
-            'pc2' => 'カレイド',
-            'pc3' => 'ウメキダ',
-            'pc4' => 'アカリヤ',
+            'pc1' => 'ラグナブルー',
+            'pc2' => 'リーフノート',
+            'pc3' => 'アーガイル',
+            'pc4' => 'ウィットロック',
         ];
 
         foreach ($expected as $code => $secondName) {

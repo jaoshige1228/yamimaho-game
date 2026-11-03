@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS = {
 
 /** 音源マスター（スライダー倍率とは別） */
 const BGM_MASTER_GAIN = 0.10;
-const SE_MASTER_GAIN = 1.45;
+const SE_MASTER_GAIN = 1.2;
 /** cursor のみ追加ブースト */
 const SE_KEY_GAIN = {
   cursor: 1.5,

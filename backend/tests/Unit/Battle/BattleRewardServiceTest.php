@@ -34,7 +34,7 @@ class BattleRewardServiceTest extends TestCase
                 'pc1' => [
                     'id' => 'pc1',
                     'side' => 'ally',
-                    'name' => 'イルミ',
+                    'name' => 'サフィリア',
                     'alive' => true,
                     'hp' => 50,
                     'mp' => 20,
@@ -88,7 +88,7 @@ class BattleRewardServiceTest extends TestCase
                 'pc1' => [
                     'id' => 'pc1',
                     'side' => 'ally',
-                    'name' => 'イルミ',
+                    'name' => 'サフィリア',
                     'alive' => true,
                     'hp' => 10,
                     'mp' => 10,
@@ -97,7 +97,7 @@ class BattleRewardServiceTest extends TestCase
                 'pc2' => [
                     'id' => 'pc2',
                     'side' => 'ally',
-                    'name' => 'ヨウ',
+                    'name' => 'ガルデ',
                     'alive' => false,
                     'hp' => 0,
                     'mp' => 0,

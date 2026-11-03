@@ -132,11 +132,12 @@ class BattleEngine
             ? "{$actor['name']}の攻撃！"
             : "{$actor['name']}の{$skill['label']}！";
 
-        $events = [$this->announceEvent($actorId, $announceText)];
-
         $targetType = (string) $skill['target_type'];
         $coefficient = (float) $skill['coefficient'];
         $actionType = (string) $skill['action_type'];
+
+        // 魔法は「〜は〜を唱えた！」だけを告知する（技名の告知と重なるため出さない）
+        $events = $actionType === 'spell' ? [] : [$this->announceEvent($actorId, $announceText)];
 
         if ($targetType === 'ally_all') {
             foreach ($this->resolveEnemySkillTargets('ally_all', $state['units']) as $tid) {
@@ -165,10 +166,8 @@ class BattleEngine
             $spellId = (string) $skill['skill_code'];
             $spell = $this->factory->findSpell($spellId);
             $targets = $this->resolveEnemySpellTargets($spell, $state['units'], $actorId);
-            if ($targets === []) {
-                return $events;
-            }
 
+            // 対象がなく不発でも、詠唱した事実は告知する（無言のターンにしない）
             $events[] = $this->announceEvent(
                 $actorId,
                 "{$actor['name']}は{$spell['label']}を唱えた！",

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\UserCharacter;
 use App\Models\UserDungeonProgress;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -201,6 +202,65 @@ class DungeonFloorApiTest extends TestCase
         $this->getJson('/api/player/navigation')
             ->assertOk()
             ->assertJsonPath('in_dungeon', false);
+    }
+
+    public function test_boss_battle_victory_restores_party_hp_and_mp_to_full(): void
+    {
+        $this->postJson('/api/battles/demo')->assertOk();
+        $user = $this->demoUser();
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
+
+        $orchestrator = app(\App\Services\Battle\BattleOrchestrator::class);
+        $result = $orchestrator->createBattleForUser($user, [[
+            'slot' => 'enemy_1',
+            'master_code' => 'inu_moe',
+            'floor' => 1,
+            'name' => 'イフリーヌ',
+            'sprite' => 'inu_moe',
+        ]], [
+            'source' => 'dungeon',
+            'floor' => 1,
+            'step' => 3,
+            'boss' => true,
+            'can_flee' => false,
+        ]);
+
+        // 満身創痍で撃破する: 全員 HP10・MP5、うち 1 人（手番でない味方）は戦闘不能
+        $state = $result['state'];
+        $koSlot = collect($state['units'])
+            ->where('side', 'ally')
+            ->pluck('id')
+            ->first(fn (string $id) => $id !== $state['current_actor']);
+        foreach ($state['units'] as $id => $unit) {
+            if ($unit['side'] !== 'ally') {
+                continue;
+            }
+            $state['units'][$id]['hp'] = $id === $koSlot ? 0 : 10;
+            $state['units'][$id]['mp'] = 5;
+            $state['units'][$id]['alive'] = $id !== $koSlot;
+        }
+        UserCharacter::query()
+            ->whereKey($state['units'][$koSlot]['user_character_id'])
+            ->update(['hp' => 0]);
+        $state['units']['enemy_1']['hp'] = 1;
+
+        $action = $orchestrator->submitPlayerAction($state, 'punch', null, 'enemy_1', $user);
+
+        $this->assertSame('victory', $action['state']['status']);
+        $this->assertTrue(
+            collect($action['events'])->contains(
+                fn (array $event): bool => ($event['type'] ?? '') === 'dungeon_floor_cleared',
+            ),
+        );
+
+        // 待機画面が読む API で、レベルアップ後の最大値まで全回復していること
+        $party = $this->getJson('/api/player/party')->assertOk()->json('characters');
+        $this->assertCount(4, $party);
+        foreach ($party as $character) {
+            $this->assertSame($character['max_hp'], $character['hp'], "{$character['name']} の HP が全回復していること");
+            $this->assertSame($character['max_mp'], $character['mp'], "{$character['name']} の MP が全回復していること");
+            $this->assertTrue($character['alive'], "{$character['name']} が戦闘不能のままでないこと");
+        }
     }
 
     private function demoUser(): User

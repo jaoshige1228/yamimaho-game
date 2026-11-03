@@ -19,6 +19,9 @@ class DungeonExplorationEngine
 {
     private const EPILOGUE_TEXT = '一行は先に進むことにした';
 
+    /** {damage_amount} / {gold_amount} の展開で、後続の効果ノードを探す最大ノード数 */
+    private const EFFECT_AMOUNT_LOOKAHEAD = 8;
+
     /** @var array<string, array{name: string, sprite: string}> */
     private const NPC_SPEAKERS = [
         'gusu' => ['name' => 'グース', 'sprite' => 'npc_gusu'],
@@ -569,22 +572,32 @@ class DungeonExplorationEngine
         unset($context['pending_gold_amount'], $context['pending_damage_amount']);
 
         $nextKey = (string) ($node->next_default ?? '');
-        if ($nextKey === '') {
-            return;
-        }
 
-        try {
-            $next = $this->catalog->findNode($eventCode, $nextKey);
-        } catch (\InvalidArgumentException) {
-            return;
-        }
+        // 効果ノードまでセリフ・地の文だけが続く場合も、その量を {damage_amount} 等に展開できるよう先読みする
+        for ($depth = 0; $depth < self::EFFECT_AMOUNT_LOOKAHEAD && $nextKey !== ''; $depth++) {
+            try {
+                $next = $this->catalog->findNode($eventCode, $nextKey);
+            } catch (\InvalidArgumentException) {
+                return;
+            }
 
-        if ($next->node_type === 'grant_gold') {
-            $context['pending_gold_amount'] = (int) ($next->stat_multiplier ?? 0);
-        }
+            if ($next->node_type === 'grant_gold') {
+                $context['pending_gold_amount'] = (int) ($next->stat_multiplier ?? 0);
 
-        if (in_array($next->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)) {
-            $context['pending_damage_amount'] = (int) ($next->fixed_damage ?? 0);
+                return;
+            }
+
+            if (in_array($next->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)) {
+                $context['pending_damage_amount'] = (int) ($next->fixed_damage ?? 0);
+
+                return;
+            }
+
+            if (! in_array($next->node_type, ['narration', 'dialogue'], true)) {
+                return;
+            }
+
+            $nextKey = (string) ($next->next_default ?? '');
         }
     }
 
@@ -757,6 +770,15 @@ class DungeonExplorationEngine
      */
     private function buildStatCheckEachAllyLines(User $user, DungeonEventNode $node, array &$context, int $floor): array
     {
+        $attemptTemplate = trim((string) ($node->text ?? ''));
+        $successTemplate = trim((string) ($node->dialogue_pc1 ?? ''));
+        $failTemplate = trim((string) ($node->dialogue_pc2 ?? ''));
+        if ($attemptTemplate === '' || $successTemplate === '' || $failTemplate === '') {
+            throw new \InvalidArgumentException(
+                'stat_check_each_ally ノードに text（挑戦）・dialogue_pc1（成功）・dialogue_pc2（失敗）が必要です。',
+            );
+        }
+
         $attr = (string) ($node->stat_attr ?: 'spirit');
         $multiplier = (int) ($node->stat_multiplier ?? 3);
         $failDamage = (int) ($node->fixed_damage ?? 0);
@@ -771,28 +793,32 @@ class DungeonExplorationEngine
                 continue;
             }
 
-            $character->loadMissing('characterMaster');
-            $name = $character->characterMaster->name ?? '???';
             $rate = $this->successRateForSlot($user, $slotId, $attr, $multiplier, $floor);
+
+            // 判定中の味方を {name} として差し込む。event 全体の context は汚さない
+            $allyContext = array_merge($context, [
+                'chosen_slot' => $slotId,
+                'last_success_rate' => $rate,
+                'last_stat_check_label' => $label,
+                'pending_damage_amount' => $failDamage,
+            ]);
 
             $lines[] = [
                 'type' => 'narration',
-                'text' => "{$name}は水の中で冷静さを保とうとした！\n{$label}\n成功率：{$rate}%",
+                'text' => $this->interpolate($attemptTemplate, $user, $allyContext),
                 'sfx' => null,
             ];
 
             if ($this->rollSuccess($rate)) {
                 $lines[] = [
                     'type' => 'narration',
-                    'text' => "{$name}は落ち着いて水面から顔を出した！",
+                    'text' => $this->interpolate($successTemplate, $user, $allyContext),
                     'sfx' => null,
                 ];
             } else {
                 $failLine = [
                     'type' => 'narration',
-                    'text' => $failDamage > 0
-                        ? "{$name}はパニックに陥り水を飲んだ！\n{$failDamage}ダメージ！"
-                        : "{$name}はパニックに陥り水を飲んだ！",
+                    'text' => $this->interpolate($failTemplate, $user, $allyContext),
                     'sfx' => null,
                 ];
                 if ($failDamage > 0) {

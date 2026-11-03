@@ -79,7 +79,7 @@ class BattleEngineDebuffTest extends TestCase
             'units' => [
                 'pc2' => [
                     'id' => 'pc2',
-                    'name' => 'ヨウ',
+                    'name' => 'ガルデ',
                     'side' => 'ally',
                     'hp' => 100,
                     'max_hp' => 100,

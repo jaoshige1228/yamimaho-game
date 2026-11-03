@@ -191,6 +191,9 @@ class DungeonProgressService
         $record->in_dungeon = false;
         $record->save();
 
+        // 待機画面へ戻るので、撤退・敗北時と同様にパーティを全回復する（レベルアップ反映後の最大値）
+        $this->characters->restorePartyToFull($user);
+
         $nextFloor = $floor + 1;
         $nextPlayable = $nextFloor <= DungeonFloorConfig::playableFloor()
             && $nextFloor <= (int) $record->unlocked_floor;

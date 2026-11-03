@@ -32,7 +32,7 @@ class BattleOrchestrator
             ? $this->factory->createForUser($user, $enemyConfigKey)
             : $this->factory->createDemo($enemyConfigKey);
 
-        return $this->engine->runEnemyTurnsUntilPlayer($state);
+        return $this->finishIfEndedAtStart($this->engine->runEnemyTurnsUntilPlayer($state), $user);
     }
 
     /**
@@ -44,7 +44,28 @@ class BattleOrchestrator
     {
         $state = $this->factory->createForUserWithEnemies($user, $enemyList, $meta);
 
-        return $this->engine->runEnemyTurnsUntilPlayer($state);
+        return $this->finishIfEndedAtStart($this->engine->runEnemyTurnsUntilPlayer($state), $user);
+    }
+
+    /**
+     * 開始直後の敵フェーズで戦闘が終わった（先手の敵に全滅させられた）場合も、
+     * プレイヤーの行動で終わったときと同じ終了時の永続化を行う。
+     *
+     * @param  array{state: array<string, mixed>, events: list<array<string, mixed>>}  $result
+     * @return array{state: array<string, mixed>, events: list<array<string, mixed>>}
+     */
+    private function finishIfEndedAtStart(array $result, ?User $user): array
+    {
+        if ($user === null || ($result['state']['status'] ?? '') === 'active') {
+            return $result;
+        }
+
+        $result['events'] = array_merge(
+            $result['events'],
+            $this->applyEndOfBattlePersistence($result['state'], $user),
+        );
+
+        return $result;
     }
 
     /**

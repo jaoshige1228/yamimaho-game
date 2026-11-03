@@ -69,7 +69,7 @@ flash_flood,react1,dialogue,,random_ally,な、なに！？,なんだ？,な、�
 flash_flood,flood,narration,通路の奥から、大量の鉄砲水が押し寄せる！,,,,,,,,,,,,react2
 flash_flood,react2,dialogue,,random_ally,嘘でしょ！？,嘘だろ……！,マジか！,うそ……！,,,,,,,swallowed
 flash_flood,swallowed,narration,一行は水に飲まれた！,,,,,,,,,,,,spirit_checks
-flash_flood,spirit_checks,stat_check_each_ally,,,,,,,spirit,4,100,,,,fade_line
+flash_flood,spirit_checks,stat_check_each_ally,{name}は水の中で冷静さを保とうとした！\n{stat_check_label}\n成功率：{success_rate}%,,{name}は落ち着いて水面から顔を出した！,{name}はパニックに陥り水を飲んだ！\n{damage_amount}ダメージ！,,,spirit,4,100,,,,fade_line
 flash_flood,fade_line,narration,,,,,,,,,,screen_fade,,,reunion
 flash_flood,reunion,narration,数分後、一行はどうにか合流し、水浸しの地面の上で膝をついていた。,,,,,,,,,,,,breather
 flash_flood,breather,dialogue,,random_ally_store,ぜぇ、はぁ……,ぜぇ、はぁ……,ぜぇ、はぁ……,ぜぇ、はぁ……,,,,,,,comment
@@ -106,9 +106,9 @@ trapped_chest,preview,narration,{chosen_name}はトラップの解除を試み�
 trapped_chest,know_roll,stat_check,,,,,,,know,3,,,success_narr,fail_trap,
 trapped_chest,success_narr,narration,うまくいった！トラップを解除できたようだ！,,,,,,,,,,,,praise
 trapped_chest,praise,dialogue,,random_ally_except_chosen,あら、中々やるじゃない！,貴様ぁ……やるな！,すげえ！流石だな！,すごい……流石,,,,,,,loot_roll1
-trapped_chest,loot_roll1,chance_branch,,,,,,,,50,,,gold_path,item_path,
-trapped_chest,gold_path,grant_gold,,,,,,,,400,,,,,gold_msg
-trapped_chest,gold_msg,narration,{gold_amount}ゴールドを手に入れた！,,,,,,,,,,,,end
+trapped_chest,loot_roll1,chance_branch,,,,,,,,50,,,gold_msg,item_path,
+trapped_chest,gold_path,grant_gold,,,,,,,,400,,,,,end
+trapped_chest,gold_msg,narration,{gold_amount}ゴールドを手に入れた！,,,,,,,,,,,,gold_path
 trapped_chest,item_path,chance_branch,,,,,,,,60,,,hp_path,mp_path,
 trapped_chest,hp_path,grant_item,,,,,,,potion_hp_s,1,,,,,hp_msg
 trapped_chest,hp_msg,narration,HP回復薬を手に入れた！,,,,,,,,,,,,end
@@ -122,9 +122,9 @@ trapped_chest,fail_comment,dialogue,,random_ally_except_chosen,けほっ……�
 trapped_chest,end,end,,,,,,,,,,,,,
 safe_chest,found,narration,一行は宝箱を発見した！,,,,,,,,,,,,react
 safe_chest,react,dialogue,,random_ally,トラップは……ないわね。中身、もらっていきましょ！,トラップは……ないな。よし、中身をもらっていくぞ,トラップは……ないみたいだな。よし、中身をもらっていこう！,トラップは……ないみたい。中身、もらっていこう,,,,,,,loot_roll1
-safe_chest,loot_roll1,chance_branch,,,,,,,,50,,,gold_path,loot_roll2,
-safe_chest,gold_path,grant_gold,,,,,,,,200,,,,,gold_msg
-safe_chest,gold_msg,narration,{gold_amount}ゴールドを手に入れた！,,,,,,,,,,,,end
+safe_chest,loot_roll1,chance_branch,,,,,,,,50,,,gold_msg,loot_roll2,
+safe_chest,gold_path,grant_gold,,,,,,,,200,,,,,end
+safe_chest,gold_msg,narration,{gold_amount}ゴールドを手に入れた！,,,,,,,,,,,,gold_path
 safe_chest,loot_roll2,chance_branch,,,,,,,,60,,,hp_path,mp_path,
 safe_chest,hp_path,grant_item,,,,,,,potion_hp_s,1,,,,,hp_msg
 safe_chest,hp_msg,narration,HP回復薬を手に入れた！,,,,,,,,,,,,end

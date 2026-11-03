@@ -39,13 +39,13 @@ const characterInfo = computed(() => {
 
   const code = line?.character;
   if (!code) {
-    return { name: 'イルミ', sprite: 'PC1' };
+    return { name: 'サフィリア', sprite: 'PC1' };
   }
   const member = props.party.find(
     (u) => u.slot_id === code || u.id === code,
   );
   return {
-    name: member?.name ?? 'イルミ',
+    name: member?.name ?? 'サフィリア',
     sprite: member?.sprite ?? 'PC1',
   };
 });

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DungeonEventNode;
 use App\Models\DungeonExplorationSession;
 use App\Models\ItemMaster;
 use App\Models\User;
@@ -580,6 +581,148 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertNotSame($snapshotHp, $syncedHp, '失敗 sync 時点で HP 合計が snapshot と異なること');
     }
 
+    public function test_stat_check_each_ally_uses_texts_from_the_node_on_fail(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'flash_flood',
+            'game.dungeon.test_stat_success' => false,
+        ]);
+        $this->useCustomEachAllyTemplates();
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $lines = collect($this->collectExplorationLines($start, $start->json('session_id')));
+        $texts = $lines->pluck('text');
+
+        $this->assertSame(
+            4,
+            $texts->filter(fn ($t) => preg_match('/^.+が精神判定に挑む（\d+%）$/u', (string) $t) === 1)->count(),
+            '挑戦の行が CSV の text から生成されること',
+        );
+        $failLines = $lines->filter(fn ($line) => preg_match('/^.+は力尽きた！100$/u', (string) $line['text']) === 1);
+        $this->assertSame(4, $failLines->count(), '失敗の行が dialogue_pc2 から生成され {damage_amount} が展開されること');
+        $this->assertTrue(
+            $failLines->every(fn ($line) => ! empty($line['sync_party']) && is_array($line['party'] ?? null)),
+            '失敗行ごとに sync_party と party が付くこと',
+        );
+        $this->assertTrue(
+            $texts->doesntContain(fn ($t) => str_contains((string) $t, 'パニック') || str_contains((string) $t, '冷静さ')),
+            'エンジンに固定されていた水の描写が出ないこと',
+        );
+        $this->assertTrue($texts->doesntContain(fn ($t) => str_contains((string) $t, '{')), '未展開のプレースホルダが残らないこと');
+    }
+
+    public function test_stat_check_each_ally_uses_texts_from_the_node_on_success(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'flash_flood',
+            'game.dungeon.test_stat_success' => true,
+        ]);
+        $this->useCustomEachAllyTemplates();
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $beforeHp = (int) UserCharacter::query()->where('user_id', $user->id)->sum('hp');
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $texts = collect($this->collectExplorationLines($start, $start->json('session_id')))->pluck('text');
+
+        $this->assertSame(4, $texts->filter(fn ($t) => str_ends_with((string) $t, 'は持ちこたえた'))->count());
+        $this->assertTrue($texts->doesntContain(fn ($t) => str_contains((string) $t, '落ち着いて水面')));
+        $this->assertSame($beforeHp, (int) UserCharacter::query()->where('user_id', $user->id)->sum('hp'));
+    }
+
+    public function test_stat_check_each_ally_requires_texts_on_the_node(): void
+    {
+        DungeonEventNode::query()
+            ->where('event_code', 'flash_flood')
+            ->where('node_key', 'spirit_checks')
+            ->update(['dialogue_pc2' => null]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('stat_check_each_ally');
+
+        app(\App\Services\Dungeon\Exploration\DungeonExplorationService::class)
+            ->startEvent($user, 1, 1, 'flash_flood');
+    }
+
+    public function test_trapped_chest_gold_reward_is_shown_once(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'trapped_chest',
+            'game.dungeon.test_stat_success' => true,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $beforeGold = (int) $user->gold;
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $sessionId = $start->json('session_id');
+        $choice = $this->reachExplorationChoiceSegment($start, $sessionId);
+        $pick = $this->postJson('/api/dungeon/exploration/choose', [
+            'session_id' => $sessionId,
+            'slot_id' => $choice->json('segment.options.0.slot_id'),
+        ])->assertOk();
+
+        $texts = collect($this->collectExplorationLines($pick, $sessionId))->pluck('text');
+
+        $this->assertSame(
+            1,
+            $texts->filter(fn ($t) => str_contains((string) $t, '400ゴールド'))->count(),
+            'ゴールド量の表示は 1 回だけであること',
+        );
+        $success = $texts->first(fn ($t) => str_contains((string) $t, 'トラップを解除できた'));
+        $this->assertNotNull($success);
+        $this->assertStringNotContainsString('ゴールド', (string) $success, '解除成功の行に金額が混ざらないこと');
+        $this->assertSame($beforeGold + 400, (int) $user->fresh()->gold);
+    }
+
+    public function test_safe_chest_gold_reward_is_shown_once(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'safe_chest',
+            'game.dungeon.test_stat_success' => true,
+        ]);
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $beforeGold = (int) $user->gold;
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $texts = collect($this->collectExplorationLines($start, $start->json('session_id')))->pluck('text');
+
+        $this->assertSame(1, $texts->filter(fn ($t) => str_contains((string) $t, '200ゴールド'))->count());
+        $found = $texts->first(fn ($t) => str_contains((string) $t, '宝箱を発見した'));
+        $this->assertNotNull($found);
+        $this->assertStringNotContainsString('ゴールド', (string) $found, '宝箱を見つけた行に金額が混ざらないこと');
+        $this->assertSame($beforeGold + 200, (int) $user->fresh()->gold);
+    }
+
+    public function test_man_eating_plant_damage_amount_is_shown_once(): void
+    {
+        config([
+            'game.dungeon.test_force' => 'exploration',
+            'game.dungeon.test_event_code' => 'man_eating_plant',
+            'game.dungeon.test_stat_success' => false,
+        ]);
+
+        $start = $this->postJson('/api/dungeon/advance')->assertOk();
+        $texts = collect($this->collectExplorationLines($start, $start->json('session_id')))->pluck('text');
+
+        $swallow = $texts->first(fn ($t) => str_contains((string) $t, '飲み込まれ'));
+        $this->assertNotNull($swallow);
+        $this->assertSame(1, substr_count((string) $swallow, 'ダメージ'), 'ダメージ表記は 1 回だけであること');
+        $this->assertStringContainsString('150ダメージ', (string) $swallow);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<!\d)0ダメージ/u',
+            $texts->implode("\n"),
+            '量が決まる前の「0ダメージ」が出ないこと',
+        );
+    }
+
     public function test_man_eating_plant_str_fail_leaves_victim_at_one_hp(): void
     {
         config([
@@ -1022,8 +1165,8 @@ class DungeonExplorationApiTest extends TestCase
         }
 
         $this->assertNotNull($done, 'イベントが完了すること');
-        $this->assertStringContainsString('最近ヨウの演奏を聴いていないな', $transcript);
-        $this->assertStringContainsString('イルミはピアノな', $transcript);
+        $this->assertStringContainsString('最近ガルデの演奏を聴いていないな', $transcript);
+        $this->assertStringContainsString('サフィリアはピアノな', $transcript);
         $this->assertStringContainsString('弾けるんだ', $transcript);
         $this->assertStringNotContainsString('{PC2}', $transcript);
         $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
@@ -1054,7 +1197,7 @@ class DungeonExplorationApiTest extends TestCase
         }
 
         $this->assertNotNull($done, 'イベントが完了すること');
-        $this->assertStringContainsString('カレイドくん', $transcript);
+        $this->assertStringContainsString('リーフノートくん', $transcript);
         $this->assertStringContainsString('え、なんで', $transcript);
         $this->assertStringNotContainsString('{PC2のファミリーネーム}', $transcript);
         $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
@@ -1085,8 +1228,8 @@ class DungeonExplorationApiTest extends TestCase
         }
 
         $this->assertNotNull($done, 'イベントが完了すること');
-        $this->assertStringContainsString('ヒルユキ、水飲むか', $transcript);
-        $this->assertStringContainsString('ど、どうしたイルミ', $transcript);
+        $this->assertStringContainsString('シエナ、水飲むか', $transcript);
+        $this->assertStringContainsString('ど、どうしたサフィリア', $transcript);
         $this->assertStringNotContainsString('{PC4}', $transcript);
         $this->assertStringNotContainsString('{PC1}', $transcript);
         $this->assertStringNotContainsString(self::EPILOGUE_TEXT, $transcript);
@@ -1239,6 +1382,54 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertSame(1, DungeonExplorationSession::query()->count());
         $this->assertNotSame($sessionId, $second->json('session_id'));
         $this->assertSame(2, (int) $second->json('step'));
+    }
+
+    /**
+     * flash_flood の全員判定ノードを、エンジン既定ではなく CSV 由来の文言に差し替える。
+     */
+    private function useCustomEachAllyTemplates(): void
+    {
+        DungeonEventNode::query()
+            ->where('event_code', 'flash_flood')
+            ->where('node_key', 'spirit_checks')
+            ->update([
+                'text' => '{name}が{stat_check_label}に挑む（{success_rate}%）',
+                'dialogue_pc1' => '{name}は持ちこたえた',
+                'dialogue_pc2' => '{name}は力尽きた！{damage_amount}',
+            ]);
+    }
+
+    /**
+     * 開始応答から complete まで進め、表示された行をすべて集める。
+     * 選択が出たら先頭の選択肢を選ぶ。
+     *
+     * @param  \Illuminate\Testing\TestResponse  $start
+     * @return list<array<string, mixed>>
+     */
+    private function collectExplorationLines($start, string $sessionId): array
+    {
+        $lines = [];
+        $response = $start;
+
+        for ($i = 0; $i < 60; $i++) {
+            foreach ($response->json('segment.lines') ?? [] as $line) {
+                $lines[] = $line;
+            }
+
+            $kind = $response->json('segment.kind');
+            if ($kind === 'complete') {
+                return $lines;
+            }
+
+            $response = $kind === 'choice'
+                ? $this->postJson('/api/dungeon/exploration/choose', [
+                    'session_id' => $sessionId,
+                    'slot_id' => $response->json('segment.options.0.slot_id'),
+                ])->assertOk()
+                : $this->postJson('/api/dungeon/exploration/continue', ['session_id' => $sessionId])->assertOk();
+        }
+
+        $this->fail('探索イベントを完了できませんでした');
     }
 
     /**
