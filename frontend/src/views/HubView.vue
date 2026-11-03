@@ -46,9 +46,6 @@ onMounted(() => loadHubData());
           <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'shop' })">
             武具屋へ
           </button>
-          <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'equip' })">
-            装備を整える
-          </button>
           <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'items' })">
             持ち物を見る
           </button>

@@ -51,6 +51,31 @@ class BattleEngineKickTest extends TestCase
         $this->assertSame(22, $damage['value']);
     }
 
+    public function test_level_10_kick_uses_triple_coefficient(): void
+    {
+        $rolls = [1, 100];
+        $engine = new BattleEngine(
+            factory: new BattleFactory,
+            damageRoll: static fn (): float => 1.0,
+            hitRoll: static function () use (&$rolls): int {
+                return array_shift($rolls) ?? 100;
+            },
+            critRoll: static fn (): int => 100,
+        );
+
+        $state = $this->battleState();
+        $state['units']['pc1']['level'] = 10;
+        $state['units']['pc1']['str'] = 14;
+        $state['units']['enemy_1']['def'] = 6;
+
+        $result = $engine->applyPlayerAction($state, 'pc1', 'kick', null, 'enemy_1');
+        $damage = collect($result['events'])->firstWhere('type', 'damage');
+
+        $this->assertNotNull($damage);
+        // (14 - 3) * 3.0 = 33
+        $this->assertSame(33, $damage['value']);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -67,6 +92,7 @@ class BattleEngineKickTest extends TestCase
                     'id' => 'pc1',
                     'name' => 'PC1',
                     'side' => 'ally',
+                    'level' => 1,
                     'hp' => 50,
                     'max_hp' => 50,
                     'mp' => 20,

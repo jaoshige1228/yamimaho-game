@@ -8,15 +8,13 @@ use App\Services\MasterData\LevelTableProvider;
 
 class LevelGrowthService
 {
-    private const HP_MULTIPLIER = 1.1;
+    /** 1レベル上がるごとの上昇値（flat = 筋力・素早さ・知力・精神力・体力） */
+    private const DEFAULT_GROWTH = ['hp' => 10, 'mp' => 3, 'mag' => 2, 'def' => 2, 'flat' => 1];
 
-    private const MP_PER_LEVEL = 5;
-
-    private const MAG_PER_LEVEL = 1;
-
-    private const DEF_PER_LEVEL = 1;
-
-    private const FLAT_STAT_PER_LEVEL = 2;
+    /** 特定のレベルに上がるときだけ使う上昇値（キー = 到達レベル） */
+    private const GROWTH_BY_REACHED_LEVEL = [
+        4 => ['hp' => 20, 'mp' => 6, 'mag' => 4, 'def' => 4, 'flat' => 3],
+    ];
 
     /** @var list<string> */
     private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];
@@ -49,8 +47,8 @@ class LevelGrowthService
             'vit' => $master->vit,
         ];
 
-        for ($current = 1; $current < $level; $current++) {
-            $this->applyOneLevelGrowth($stats);
+        for ($reached = 2; $reached <= $level; $reached++) {
+            $this->applyOneLevelGrowth($stats, $reached);
         }
 
         return $stats;
@@ -58,17 +56,20 @@ class LevelGrowthService
 
     /**
      * @param  array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int, vit: int}  $stats
+     * @param  int  $reachedLevel  この成長で到達するレベル
      */
-    private function applyOneLevelGrowth(array &$stats): void
+    private function applyOneLevelGrowth(array &$stats, int $reachedLevel): void
     {
-        $stats['hp'] = (int) ceil($stats['hp'] * self::HP_MULTIPLIER);
-        $stats['mp'] += self::MP_PER_LEVEL;
+        $growth = self::GROWTH_BY_REACHED_LEVEL[$reachedLevel] ?? self::DEFAULT_GROWTH;
 
-        $stats['mag'] += self::MAG_PER_LEVEL;
-        $stats['def'] += self::DEF_PER_LEVEL;
+        $stats['hp'] += $growth['hp'];
+        $stats['mp'] += $growth['mp'];
+
+        $stats['mag'] += $growth['mag'];
+        $stats['def'] += $growth['def'];
 
         foreach (self::FLAT_STATS as $key) {
-            $stats[$key] += self::FLAT_STAT_PER_LEVEL;
+            $stats[$key] += $growth['flat'];
         }
     }
 

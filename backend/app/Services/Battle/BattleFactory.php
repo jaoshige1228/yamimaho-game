@@ -2,9 +2,11 @@
 
 namespace App\Services\Battle;
 
+use App\Models\ArmorMaster;
 use App\Models\CharacterMaster;
 use App\Models\User;
 use App\Models\UserCharacter;
+use App\Models\WeaponMaster;
 use App\Services\Growth\LevelGrowthService;
 use App\Services\MasterData\MasterDataProvider;
 use App\Services\Player\EquipmentService;
@@ -74,9 +76,14 @@ class BattleFactory
     /**
      * @param  list<array<string, string>>  $enemyList
      * @param  array<string, mixed>  $meta
+     * @param  array<string, array{weapon?: string|null, armor?: string|null}>  $equipmentOverrides  スロット ID => この戦闘だけ使う装備（所持の有無は問わない。キーなし=所持キャラの装備のまま、null=装備なし）
      */
-    public function createForUserWithEnemies(User $user, array $enemyList, array $meta = []): array
-    {
+    public function createForUserWithEnemies(
+        User $user,
+        array $enemyList,
+        array $meta = [],
+        array $equipmentOverrides = [],
+    ): array {
         $party = $this->userCharacters->ensureParty($user);
         $units = [];
 
@@ -85,6 +92,10 @@ class BattleFactory
             $character = $party->get($slotId);
             if ($character === null) {
                 continue;
+            }
+
+            if (isset($equipmentOverrides[$slotId])) {
+                $this->applyEquipmentOverride($character, $equipmentOverrides[$slotId]);
             }
 
             $master = $character->characterMaster;
@@ -99,6 +110,26 @@ class BattleFactory
         $state['meta'] = $meta;
 
         return $state;
+    }
+
+    /**
+     * 戦闘ユニットを作るためだけに、装備のリレーションを差し替える（DB には保存しない）。
+     *
+     * @param  array{weapon?: string|null, armor?: string|null}  $override
+     */
+    private function applyEquipmentOverride(UserCharacter $character, array $override): void
+    {
+        if (array_key_exists('weapon', $override)) {
+            $character->setRelation('weapon', $override['weapon'] === null
+                ? null
+                : WeaponMaster::query()->where('code', $override['weapon'])->firstOrFail());
+        }
+
+        if (array_key_exists('armor', $override)) {
+            $character->setRelation('armor', $override['armor'] === null
+                ? null
+                : ArmorMaster::query()->where('code', $override['armor'])->firstOrFail());
+        }
     }
 
     public function createForUser(User $user, string $enemyConfigKey = 'demo_enemies'): array

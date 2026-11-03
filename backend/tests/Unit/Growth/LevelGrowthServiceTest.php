@@ -27,23 +27,38 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame(166, $levels->expToNextLevel(3));
     }
 
-    public function test_mag_and_def_gain_one_per_level(): void
+    public function test_every_stat_grows_by_a_fixed_amount_per_level(): void
     {
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
 
         $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
         $growth = new LevelGrowthService;
 
-        $lv1 = $growth->statsForLevel($master, 1);
-        $lv2 = $growth->statsForLevel($master, 2);
-        $lv3 = $growth->statsForLevel($master, 3);
+        $perLevel = [
+            'hp' => 10,
+            'mp' => 3,
+            'mag' => 2,
+            'def' => 2,
+            'str' => 1,
+            'spd' => 1,
+            'know' => 1,
+            'spirit' => 1,
+            'vit' => 1,
+        ];
 
-        $this->assertSame($lv1['mag'] + 1, $lv2['mag']);
-        $this->assertSame($lv2['mag'] + 1, $lv3['mag']);
-        $this->assertSame($lv1['def'] + 1, $lv2['def']);
-        $this->assertSame($lv2['def'] + 1, $lv3['def']);
-        $this->assertSame($lv1['mp'] + 5, $lv2['mp']);
-        $this->assertSame($lv1['vit'] + 2, $lv2['vit']);
+        for ($level = 1; $level <= 5; $level++) {
+            // Lv4 に上がるときだけ別の上昇値（GROWTH_BY_REACHED_LEVEL）なので、通常の増分の確認から除く
+            if ($level + 1 === 4) {
+                continue;
+            }
+
+            $current = $growth->statsForLevel($master, $level);
+            $next = $growth->statsForLevel($master, $level + 1);
+
+            foreach ($perLevel as $stat => $amount) {
+                $this->assertSame($current[$stat] + $amount, $next[$stat], "Lv{$level}→Lv".($level + 1)." {$stat}");
+            }
+        }
     }
 
     public function test_stats_scale_with_level(): void
@@ -55,14 +70,19 @@ class LevelGrowthServiceTest extends TestCase
 
         $lv1 = $growth->statsForLevel($master, 1);
         $lv3 = $growth->statsForLevel($master, 3);
+        $lv20 = $growth->statsForLevel($master, 20);
 
         $this->assertSame($master->hp, $lv1['hp']);
-        $this->assertSame(
-            (int) ceil((int) ceil($master->hp * 1.1) * 1.1),
-            $lv3['hp'],
-        );
-        $this->assertSame($master->str + 4, $lv3['str']);
-        $this->assertSame($master->spd + 4, $lv3['spd']);
+        $this->assertSame($master->hp + 20, $lv3['hp']);
+        $this->assertSame($master->str + 2, $lv3['str']);
+        $this->assertSame($master->spd + 2, $lv3['spd']);
+
+        // Lv2〜20 の19回のうち、Lv4 到達の1回だけ上昇値が大きい（HP+20・MP+6・魔力防御+4・他+3）
+        $this->assertSame($master->hp + 18 * 10 + 20, $lv20['hp']);
+        $this->assertSame($master->mp + 18 * 3 + 6, $lv20['mp']);
+        $this->assertSame($master->mag + 18 * 2 + 4, $lv20['mag']);
+        $this->assertSame($master->def + 18 * 2 + 4, $lv20['def']);
+        $this->assertSame($master->vit + 18 * 1 + 3, $lv20['vit']);
     }
 
     public function test_grant_exp_levels_up_character(): void

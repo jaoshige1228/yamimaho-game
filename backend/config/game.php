@@ -38,10 +38,17 @@ return [
             'to' => 10,
             'codes' => ['bat'],
             'count_min' => 1,
-            'count_max' => 3,
+            'count_max' => 2,
           ],
           [
             'from' => 11,
+            'to' => 14,
+            'codes' => ['bat'],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+          [
+            'from' => 15,
             'to' => 20,
             'codes' => ['bat', 'snake'],
             'count_min' => 2,
@@ -49,6 +56,13 @@ return [
           ],
           [
             'from' => 21,
+            'to' => 25,
+            'codes' => ['bat', 'snake', 'beetle'],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+          [
+            'from' => 26,
             'to' => 30,
             'codes' => ['snake', 'beetle'],
             'count_min' => 2,

@@ -51,13 +51,11 @@ mysterious_presence,intro,narration,一同は異常な寒気を感じた。見�
 mysterious_presence,rift2,narration,裂けた空間の向こうでは、まさに異次元と言わんばかりに、不気味な斑模様がうごめいてる。,,,,,,,,,,,,react1
 mysterious_presence,react1,dialogue,,random_ally_store,な、なにこれ……,おい、なんだこれは,うわ、なんだこれ！,なに……これ……,,,,,,,react2
 mysterious_presence,react2,dialogue,,random_ally_except_reactor,も、物凄い魔力を感じるわ。向こうに何がいるのかしら……,とてつもない魔力を感じるな。一体何がいるんだ……？,すごい魔力を感じるぞ。あっちに何がいるんだ！？,ものすごい魔力を感じる……。一体……何がいるの……？,,,,,,,choose
-mysterious_presence,choose,binary_choice,空間の裂け目に、入りますか？,,はい,いいえ,,,,,,,enter1,decline1,
-mysterious_presence,enter1,narration,一行は互いに顔を見合わせる。\n覚悟を決め、裂け目の向こうへと足を踏み入れた。,,,,,,,,,,,,enter2
-mysterious_presence,enter2,narration,時空の歪みが一行の肉体を蝕む！\n{damage_amount}ダメージ！,,,,,,,,,,,,enter_dmg
-mysterious_presence,enter_dmg,apply_damage_party,,,,,,,,,2000,,,,enter_check
-mysterious_presence,enter_check,check_party_alive,,,,,,,,,,,enter_battle,enter_game_over,
+mysterious_presence,choose,binary_choice,空間の裂け目に、入りますか？,,はい,いいえ,,,,,,,level_check,decline1,
+mysterious_presence,level_check,check_party_level,,,,,,,,20,,,enter1,level_short,
+mysterious_presence,level_short,narration,しかし、どうしても足がすくんで動けなかった。\nこの先へ進むには、強さが足りないと確信するだろう,,,,,,,,,,,,end
+mysterious_presence,enter1,narration,一行は互いに顔を見合わせる。\n覚悟を決め、裂け目の向こうへと足を踏み入れた。,,,,,,,,,,,,enter_battle
 mysterious_presence,enter_battle,start_battle,,,,,,,,,,,,,inu_moe
-mysterious_presence,enter_game_over,game_over,,,,,,,,,,,,,
 mysterious_presence,decline1,narration,一行は互いに顔を見合わせる。\nこの先へ進むのは、あまりに自殺行為だ。,,,,,,,,,,,,end
 mysterious_presence,end,end,,,,,,,,,,,,,
 gold_pickup,react,dialogue,,target,あら？あれは……,ん？あれは……,ん？あれは……,あれは……,,,,,,,found

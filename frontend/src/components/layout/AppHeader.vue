@@ -9,6 +9,8 @@ const {
   settings: audioSettings,
   setBgmEnabled,
   setBgmVolume,
+  setSeVolume,
+  playSe,
   unlock,
 } = useAppAudio();
 
@@ -16,6 +18,12 @@ const title = computed(() => route.meta?.title ?? 'やみまほ');
 
 function onAudioInteraction() {
   unlock();
+}
+
+// 効果音の音量を決めるときに、実際の音で確かめられるようにする
+function onSeVolumeCommit() {
+  unlock();
+  playSe('damage');
 }
 </script>
 
@@ -28,8 +36,11 @@ function onAudioInteraction() {
         <AudioControls
           :bgm-enabled="audioSettings.bgmEnabled"
           :bgm-volume="audioSettings.bgmVolume"
+          :se-volume="audioSettings.seVolume"
           @update:bgm-enabled="setBgmEnabled"
           @update:bgm-volume="setBgmVolume"
+          @update:se-volume="setSeVolume"
+          @commit:se-volume="onSeVolumeCommit"
         />
       </div>
     </div>

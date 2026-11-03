@@ -38,11 +38,16 @@ class BattleOrchestrator
     /**
      * @param  list<array<string, string>>  $enemyList
      * @param  array<string, mixed>  $meta
+     * @param  array<string, array{weapon?: string|null, armor?: string|null}>  $equipmentOverrides  この戦闘だけ使う装備（テスト戦闘用）
      * @return array{state: array<string, mixed>, events: list<array<string, mixed>>}
      */
-    public function createBattleForUser(User $user, array $enemyList, array $meta = []): array
-    {
-        $state = $this->factory->createForUserWithEnemies($user, $enemyList, $meta);
+    public function createBattleForUser(
+        User $user,
+        array $enemyList,
+        array $meta = [],
+        array $equipmentOverrides = [],
+    ): array {
+        $state = $this->factory->createForUserWithEnemies($user, $enemyList, $meta, $equipmentOverrides);
 
         return $this->finishIfEndedAtStart($this->engine->runEnemyTurnsUntilPlayer($state), $user);
     }

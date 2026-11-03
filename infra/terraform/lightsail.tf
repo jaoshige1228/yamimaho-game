@@ -24,6 +24,14 @@ resource "aws_lightsail_static_ip_attachment" "app" {
 resource "aws_lightsail_instance_public_ports" "app" {
   instance_name = aws_lightsail_instance.app.name
 
+  # このリソースは開けるポート全体を置き換える。22 を書き忘れると SSH が閉じる
+  port_info {
+    protocol  = "tcp"
+    from_port = 22
+    to_port   = 22
+    cidrs     = ["0.0.0.0/0"]
+  }
+
   port_info {
     protocol  = "tcp"
     from_port = 80

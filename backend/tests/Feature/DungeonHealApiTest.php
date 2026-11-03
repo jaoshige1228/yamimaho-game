@@ -6,6 +6,7 @@ use App\Models\BattleState;
 use App\Models\User;
 use App\Models\UserCharacter;
 use App\Models\UserDungeonProgress;
+use App\Models\WeaponMaster;
 use App\Services\Player\ItemInventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -44,6 +45,38 @@ class DungeonHealApiTest extends TestCase
 
         $pc1 = collect($response->json('party'))->firstWhere('id', 'pc1');
         $this->assertGreaterThan(10, $pc1['hp']);
+    }
+
+    public function test_spell_heal_in_dungeon_includes_weapon_mag_bonus(): void
+    {
+        $this->postJson('/api/battles/demo')->assertOk();
+        BattleState::query()->delete();
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
+
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        $caster = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))
+            ->firstOrFail();
+        $target = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc3'))
+            ->firstOrFail();
+
+        $staff = WeaponMaster::query()->where('code', 'staff_master')->firstOrFail();
+        $caster->update(['mp' => 30, 'weapon_master_id' => $staff->id]);
+        $target->update(['hp' => 10]);
+
+        $this->postJson('/api/dungeon/heal', [
+            'mode' => 'spell',
+            'caster_slot_id' => 'pc1',
+            'spell_id' => 'pc1_heal_water',
+            'target_slot_id' => 'pc3',
+        ])->assertOk();
+
+        // 回復量 = (素の魔力 + 武器の魔力ボーナス) × 回復倍率
+        $expected = ((int) $caster->mag + (int) $staff->mag_bonus) * (int) config('battle.heal_mag_multiplier');
+        $this->assertSame(10 + $expected, (int) $target->fresh()->hp);
     }
 
     public function test_dead_caster_cannot_heal_with_spell(): void

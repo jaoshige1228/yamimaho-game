@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserCharacter;
 use App\Services\Growth\LevelGrowthService;
 use App\Services\MasterData\MasterDataProvider;
+use App\Services\Player\EquipmentService;
 use App\Services\Player\GameNavigationService;
 use App\Services\Player\ItemInventoryService;
 use App\Services\Player\UserCharacterService;
@@ -21,6 +22,7 @@ class DungeonHealService
         private readonly LevelGrowthService $growth = new LevelGrowthService,
         private readonly MasterDataProvider $masters = new MasterDataProvider,
         private readonly GameNavigationService $navigation = new GameNavigationService,
+        private readonly EquipmentService $equipment = new EquipmentService,
     ) {}
 
     /**
@@ -94,7 +96,8 @@ class DungeonHealService
                 'heal_mag' => $this->applyHpHeal(
                     $target,
                     $maxTarget['hp'],
-                    (int) floor((float) $caster->mag * 3),
+                    // 戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する
+                    (int) floor((float) $this->equipment->effectiveCombatStats($caster)['mag'] * (float) config('battle.heal_mag_multiplier')),
                 ),
                 'heal' => $this->applyHpHeal($target, $maxTarget['hp'], (int) ($spell['power'] ?? 0)),
                 'revive_chance' => $this->applyRevive($target, $maxTarget['hp'], (int) ($spell['power'] ?? 50)),

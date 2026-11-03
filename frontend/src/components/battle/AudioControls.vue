@@ -4,9 +4,15 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 const props = defineProps({
   bgmEnabled: { type: Boolean, default: false },
   bgmVolume: { type: Number, default: 0.25 },
+  seVolume: { type: Number, default: 0.3 },
 });
 
-const emit = defineEmits(['update:bgm-enabled', 'update:bgm-volume']);
+const emit = defineEmits([
+  'update:bgm-enabled',
+  'update:bgm-volume',
+  'update:se-volume',
+  'commit:se-volume',
+]);
 
 const expanded = ref(false);
 const toggleRef = ref(null);
@@ -19,6 +25,15 @@ function toggleBgm() {
 
 function onVolumeInput(event) {
   emit('update:bgm-volume', Number(event.target.value));
+}
+
+function onSeVolumeInput(event) {
+  emit('update:se-volume', Number(event.target.value));
+}
+
+// スライダーを離したとき（試し聴き用）
+function onSeVolumeCommit() {
+  emit('commit:se-volume');
 }
 
 function updatePanelPosition() {
@@ -84,7 +99,7 @@ onBeforeUnmount(() => {
       type="button"
       class="toggle-btn"
       :aria-expanded="expanded"
-      aria-label="BGMの設定"
+      aria-label="音の設定"
       @click.stop="togglePanel"
     >
       {{ bgmEnabled ? '♪' : '♪×' }}
@@ -99,7 +114,7 @@ onBeforeUnmount(() => {
           </button>
         </label>
         <label class="row volume">
-          <span>音量</span>
+          <span>BGM音量</span>
           <input
             type="range"
             min="0"
@@ -108,6 +123,19 @@ onBeforeUnmount(() => {
             :value="bgmVolume"
             :disabled="!bgmEnabled"
             @input="onVolumeInput"
+            @click.stop
+          />
+        </label>
+        <label class="row volume se-volume">
+          <span>効果音</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            :value="seVolume"
+            @input="onSeVolumeInput"
+            @change="onSeVolumeCommit"
             @click.stop
           />
         </label>
@@ -162,6 +190,11 @@ onBeforeUnmount(() => {
 }
 .audio-panel .row.volume {
   margin-top: 0.55rem;
+}
+.audio-panel .row.se-volume {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(157, 124, 255, 0.25);
 }
 .audio-panel .row span {
   flex-shrink: 0;

@@ -197,7 +197,7 @@ class BattleEngine
         if ($action === 'punch') {
             $targetSide = str_starts_with($actorId, 'enemy') ? 'ally_single' : 'enemy_single';
             $this->assertTarget($targetId, $targetSide, $state['units']);
-            $coefficient = (float) config('battle.common_actions.punch.coefficient', 1.0);
+            $coefficient = $this->physicalCoefficient($actor, 'punch');
             $events[] = $this->announceEvent($actorId, "{$actor['name']}のこぶし！");
 
             return array_merge(
@@ -208,7 +208,7 @@ class BattleEngine
 
         if ($action === 'kick') {
             $this->assertTarget($targetId, 'enemy_single', $state['units']);
-            $coefficient = (float) config('battle.common_actions.kick.coefficient', 2.0);
+            $coefficient = $this->physicalCoefficient($actor, 'kick');
             $hitRate = (int) config('battle.common_actions.kick.hit_rate', 50);
             $events[] = $this->announceEvent($actorId, "{$actor['name']}のキック！");
 
@@ -359,7 +359,7 @@ class BattleEngine
                 break;
 
             case 'heal_mag':
-                $amount = (int) floor((float) $actor['mag'] * 3);
+                $amount = (int) floor((float) $actor['mag'] * (float) config('battle.heal_mag_multiplier'));
                 $healed = min($amount, $target['max_hp'] - $target['hp']);
                 $target['hp'] += $healed;
                 $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];
@@ -557,6 +557,32 @@ class BattleEngine
         }
 
         return 'def';
+    }
+
+    /**
+     * 味方 Lv10 以降はこぶし 1.5 / キック 3.0。敵の物理技は従来どおり。
+     *
+     * @param  array<string, mixed>  $actor
+     */
+    private function physicalCoefficient(array $actor, string $action): float
+    {
+        $base = (float) config("battle.common_actions.{$action}.coefficient", $action === 'kick' ? 2.0 : 1.0);
+        $side = (string) ($actor['side'] ?? '');
+        $id = (string) ($actor['id'] ?? '');
+        $isAlly = $side === 'ally' || str_starts_with($id, 'pc');
+        if (! $isAlly) {
+            return $base;
+        }
+
+        $minLevel = (int) config('battle.physical_mastery.min_level', 10);
+        $level = (int) ($actor['level'] ?? 1);
+        if ($level < $minLevel) {
+            return $base;
+        }
+
+        $key = $action === 'kick' ? 'kick_coefficient' : 'punch_coefficient';
+
+        return (float) config("battle.physical_mastery.{$key}", $base);
     }
 
     /**
@@ -1004,9 +1030,14 @@ class BattleEngine
             ];
         }
 
+        $punch = config('battle.common_actions.punch');
+        $kick = config('battle.common_actions.kick');
+        $punch['coefficient'] = $this->physicalCoefficient($unit, 'punch');
+        $kick['coefficient'] = $this->physicalCoefficient($unit, 'kick');
+
         return [
-            'punch' => config('battle.common_actions.punch'),
-            'kick' => config('battle.common_actions.kick'),
+            'punch' => $punch,
+            'kick' => $kick,
             'spells' => $spells,
         ];
     }

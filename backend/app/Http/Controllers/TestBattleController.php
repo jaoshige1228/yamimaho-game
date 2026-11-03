@@ -25,7 +25,12 @@ class TestBattleController extends Controller
 
     public function catalog(): JsonResponse
     {
-        return response()->json($this->testBattles->catalog());
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        return response()->json($this->testBattles->catalog($user));
     }
 
     public function start(TestBattleStartRequest $request): JsonResponse
@@ -51,7 +56,12 @@ class TestBattleController extends Controller
         }
 
         $battleId = $this->factory->newBattleId();
-        $result = $this->orchestrator->createBattleForUser($user, $built['enemies'], $built['meta']);
+        $result = $this->orchestrator->createBattleForUser(
+            $user,
+            $built['enemies'],
+            $built['meta'],
+            $validated['equipment'] ?? [],
+        );
 
         BattleState::query()->create([
             'id' => $battleId,

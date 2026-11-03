@@ -4,6 +4,7 @@ namespace Tests\Unit\Dungeon;
 
 use App\Services\Dungeon\DungeonStepEncounterBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DungeonStepEncounterBuilderTest extends TestCase
@@ -20,45 +21,52 @@ class DungeonStepEncounterBuilderTest extends TestCase
         $this->builder = new DungeonStepEncounterBuilder;
     }
 
-    public function test_depth_1_to_10_spawns_only_bats(): void
+    /**
+     * @return array<string, array{0: int, 1: int, 2: list<string>, 3: int, 4: int}>
+     */
+    public static function floor1Bands(): array
     {
-        for ($i = 0; $i < 20; $i++) {
-            $enemies = $this->builder->build(1, 5);
-            $this->assertGreaterThanOrEqual(1, count($enemies));
-            $this->assertLessThanOrEqual(3, count($enemies));
-            foreach ($enemies as $enemy) {
-                $this->assertSame('bat', $enemy['master_code']);
-            }
-        }
+        return [
+            '1〜10 コーモリ1〜2体' => [1, 10, ['bat'], 1, 2],
+            '11〜14 コーモリ2〜3体' => [11, 14, ['bat'], 2, 3],
+            '15〜20 コーモリ/ヘビビ2〜3体' => [15, 20, ['bat', 'snake'], 2, 3],
+            '21〜25 コーモリ/ヘビビ/ムシプリンス2〜3体' => [21, 25, ['bat', 'snake', 'beetle'], 2, 3],
+            '26〜30 ヘビビ/ムシプリンス2〜3体' => [26, 30, ['snake', 'beetle'], 2, 3],
+        ];
     }
 
-    public function test_depth_11_to_20_spawns_snake_or_bat(): void
-    {
-        $codes = [];
-        for ($i = 0; $i < 30; $i++) {
-            foreach ($this->builder->build(1, 15) as $enemy) {
-                $codes[] = $enemy['master_code'];
+    /**
+     * @param  list<string>  $expectedCodes
+     */
+    #[DataProvider('floor1Bands')]
+    public function test_floor1_band_spawns_expected_enemies(
+        int $from,
+        int $to,
+        array $expectedCodes,
+        int $countMin,
+        int $countMax,
+    ): void {
+        $seenCodes = [];
+        $seenCounts = [];
+
+        for ($step = $from; $step <= $to; $step++) {
+            for ($i = 0; $i < 15; $i++) {
+                $enemies = $this->builder->build(1, $step);
+                $seenCounts[] = count($enemies);
+
+                $this->assertGreaterThanOrEqual($countMin, count($enemies), "step {$step}");
+                $this->assertLessThanOrEqual($countMax, count($enemies), "step {$step}");
+                foreach ($enemies as $enemy) {
+                    $this->assertContains($enemy['master_code'], $expectedCodes, "step {$step}");
+                    $seenCodes[] = $enemy['master_code'];
+                }
             }
         }
 
-        $this->assertContains('bat', $codes);
-        $this->assertContains('snake', $codes);
-        $this->assertNotContains('beetle', $codes);
-        $this->assertNotContains('inu_moe', $codes);
-    }
-
-    public function test_depth_21_to_30_spawns_snake_or_beetle(): void
-    {
-        $codes = [];
-        for ($i = 0; $i < 30; $i++) {
-            foreach ($this->builder->build(1, 25) as $enemy) {
-                $codes[] = $enemy['master_code'];
-            }
-        }
-
-        $this->assertContains('snake', $codes);
-        $this->assertContains('beetle', $codes);
-        $this->assertNotContains('bat', $codes);
+        // 帯の中の全種類が出て、出現数も下限・上限の両方が出ること
+        $this->assertEqualsCanonicalizing($expectedCodes, array_values(array_unique($seenCodes)));
+        $this->assertContains($countMin, $seenCounts);
+        $this->assertContains($countMax, $seenCounts);
     }
 
     public function test_boss_step_spawns_inu_moe(): void

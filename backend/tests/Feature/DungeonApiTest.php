@@ -46,15 +46,17 @@ class DungeonApiTest extends TestCase
         $response->assertJsonPath('step', 1);
 
         $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
-        $this->assertGreaterThanOrEqual(2, $enemies->count());
-        $this->assertLessThanOrEqual(3, $enemies->count());
+        // 深さ1〜10 はコーモリ1〜2体
+        $this->assertGreaterThanOrEqual(1, $enemies->count());
+        $this->assertLessThanOrEqual(2, $enemies->count());
         $this->assertTrue($enemies->every(fn (array $u) => $u['master_code'] === 'bat'));
         $this->assertTrue(
             $enemies->every(
                 fn (array $u) => $u['sprite'] === 'bat' && str_contains($u['name'], 'コーモリ'),
             ),
         );
-        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === 50));
+        $batHp = (int) \App\Models\EnemyMaster::query()->where('floor', 1)->where('code', 'bat')->value('hp');
+        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === $batHp));
     }
 
     public function test_floor_two_battle_uses_floor_two_enemy_stats(): void

@@ -26,6 +26,13 @@ return [
         ],
     ],
 
+    /** 味方 Lv10 以降のこぶし・キック倍率（全キャラ共通） */
+    'physical_mastery' => [
+        'min_level' => 10,
+        'punch_coefficient' => 1.5,
+        'kick_coefficient' => 3.0,
+    ],
+
     /** デモ戦闘の味方スロット → マスターコード */
     'demo_party' => [
         'pc1' => ['master_code' => 'pc1'],
@@ -45,6 +52,9 @@ return [
     'demo_boss' => [
         ['slot' => 'enemy_1', 'master_code' => 'inu_moe', 'name' => 'イフリーヌ'],
     ],
+
+    /** 回復魔法（effect=heal_mag）の回復量 = 詠唱者の魔力 × この値。戦闘中・探索中の両方で使う */
+    'heal_mag_multiplier' => 2,
 
     'buffs' => [
         'def_up' => ['stat' => 'def', 'multiplier' => 1.3, 'turns' => 3, 'icon' => 'def_up'],

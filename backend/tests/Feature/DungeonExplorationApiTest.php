@@ -443,7 +443,7 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertDatabaseHas('dungeon_event_nodes', [
             'event_code' => 'mysterious_presence',
             'node_key' => 'choose',
-            'next_on_success' => 'enter1',
+            'next_on_success' => 'level_check',
             'next_on_fail' => 'decline1',
         ]);
         $choice->assertJsonPath('segment.prompt', '空間の裂け目に、入りますか？');
@@ -470,7 +470,59 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertStringContainsString(self::EPILOGUE_TEXT, $transcript);
     }
 
-    public function test_mysterious_presence_yes_choice_advances_to_story(): void
+    public function test_mysterious_presence_yes_starts_boss_battle_when_whole_party_is_level_20_or_more(): void
+    {
+        UserCharacter::query()->update(['level' => 20]);
+        $hpBefore = UserCharacter::query()->orderBy('id')->pluck('hp')->all();
+
+        [$sessionId, $response] = $this->chooseYesInMysteriousPresence();
+
+        $transcript = '';
+        for ($i = 0; $i < 6 && $response->json('event') !== 'battle'; $i++) {
+            $transcript .= json_encode($response->json('segment'), JSON_UNESCAPED_UNICODE);
+            $response = $this->postJson('/api/dungeon/exploration/continue', ['session_id' => $sessionId])
+                ->assertOk();
+        }
+
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('boss_encounter', true);
+        $this->assertStringNotContainsString('足がすくんで', $transcript);
+        $this->assertSame($hpBefore, UserCharacter::query()->orderBy('id')->pluck('hp')->all());
+    }
+
+    public function test_mysterious_presence_yes_ends_without_battle_when_anyone_is_below_level_20(): void
+    {
+        UserCharacter::query()->update(['level' => 20]);
+        $weakest = UserCharacter::query()->orderBy('id')->firstOrFail();
+        $weakest->level = 19;
+        $weakest->save();
+        $hpBefore = UserCharacter::query()->orderBy('id')->pluck('hp')->all();
+
+        [$sessionId, $response] = $this->chooseYesInMysteriousPresence();
+
+        $response->assertJsonPath('segment.kind', 'story');
+        $transcript = json_encode($response->json('segment'), JSON_UNESCAPED_UNICODE);
+        for ($i = 0; $i < 10 && $response->json('segment.kind') !== 'complete'; $i++) {
+            $response = $this->postJson('/api/dungeon/exploration/continue', ['session_id' => $sessionId])
+                ->assertOk();
+            $this->assertNotSame('battle', $response->json('event'));
+            $this->assertNotSame('game_over', $response->json('segment.kind'));
+            $transcript .= json_encode($response->json('segment'), JSON_UNESCAPED_UNICODE);
+        }
+
+        $response->assertJsonPath('segment.kind', 'complete');
+        $this->assertStringContainsString('しかし、どうしても足がすくんで動けなかった。', $transcript);
+        $this->assertStringContainsString('この先へ進むには、強さが足りないと確信するだろう', $transcript);
+        $this->assertStringContainsString(self::EPILOGUE_TEXT, $transcript);
+        $this->assertSame($hpBefore, UserCharacter::query()->orderBy('id')->pluck('hp')->all());
+    }
+
+    /**
+     * 「謎の気配」を開始し、「空間の裂け目に、入りますか？」で「はい」を選ぶ。
+     *
+     * @return array{0: string, 1: \Illuminate\Testing\TestResponse}
+     */
+    private function chooseYesInMysteriousPresence(): array
     {
         config([
             'game.dungeon.test_force' => 'exploration',
@@ -479,15 +531,14 @@ class DungeonExplorationApiTest extends TestCase
 
         $start = $this->postJson('/api/dungeon/advance')->assertOk();
         $sessionId = $start->json('session_id');
-        $choice = $this->reachExplorationChoiceSegment($start, $sessionId);
+        $this->reachExplorationChoiceSegment($start, $sessionId);
 
         $afterYes = $this->postJson('/api/dungeon/exploration/choose', [
             'session_id' => $sessionId,
             'slot_id' => 'yes',
         ])->assertOk();
 
-        $this->assertNotSame('choice', $afterYes->json('segment.kind'));
-        $this->assertContains($afterYes->json('segment.kind'), ['story', 'battle', 'game_over']);
+        return [$sessionId, $afterYes];
     }
 
     public function test_gold_pickup_grants_fifty_gold(): void

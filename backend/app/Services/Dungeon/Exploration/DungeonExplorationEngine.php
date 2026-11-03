@@ -114,6 +114,11 @@ class DungeonExplorationEngine
                 continue;
             }
 
+            if ($node->node_type === 'check_party_level') {
+                $nodeKey = $this->executeCheckPartyLevel($user, $node);
+                continue;
+            }
+
             if ($node->node_type === 'stat_check_each_ally') {
                 $this->capturePartySnapshot($user, $context);
                 $lines = array_merge($lines, $this->buildStatCheckEachAllyLines($user, $node, $context, $floor));
@@ -734,6 +739,26 @@ class DungeonExplorationEngine
         return $this->damage->isPartyWiped($user)
             ? (string) ($node->next_on_fail ?: $node->next_default)
             : (string) ($node->next_on_success ?: $node->next_default);
+    }
+
+    /**
+     * パーティー全員が必要レベル（stat_multiplier）以上なら next_on_success、一人でも未満なら next_on_fail。
+     * HP に関係なく所持している全メンバーを対象にする。
+     */
+    private function executeCheckPartyLevel(User $user, DungeonEventNode $node): string
+    {
+        $requiredLevel = (int) ($node->stat_multiplier ?? 0);
+        if ($requiredLevel <= 0) {
+            throw new \InvalidArgumentException('check_party_level ノードに stat_multiplier（必要レベル）が必要です。');
+        }
+
+        $party = $this->characters->partyInSlotOrder($user);
+        $allReached = $party->isNotEmpty()
+            && $party->every(fn (UserCharacter $character) => (int) $character->level >= $requiredLevel);
+
+        return $allReached
+            ? (string) ($node->next_on_success ?: $node->next_default)
+            : (string) ($node->next_on_fail ?: $node->next_default);
     }
 
     private function executeGrantItem(User $user, DungeonEventNode $node): string
