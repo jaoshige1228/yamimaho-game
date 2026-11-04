@@ -43,11 +43,21 @@ class AdminApiTest extends TestCase
             ->assertJsonPath('characters.0.levels_gained', 3);
     }
 
-    public function test_admin_routes_are_hidden_in_production(): void
+    public function test_admin_routes_are_available_in_production_while_test_mode_is_on(): void
     {
         App::detectEnvironment(static fn (): string => 'production');
 
+        $this->assertTrue((bool) config('game.test_mode_enabled'), 'リリース前は既定でテストモードが有効');
+        $this->getJson('/api/admins/status')->assertOk();
+        $this->postJson('/api/admins/grant-exp', ['exp' => 50])->assertOk();
+    }
+
+    public function test_admin_routes_are_hidden_when_test_mode_is_off(): void
+    {
+        config(['game.test_mode_enabled' => false]);
+
         $this->getJson('/api/admins/status')->assertNotFound();
         $this->postJson('/api/admins/grant-exp', ['exp' => 50])->assertNotFound();
+        $this->getJson('/api/admins/dungeon-settings')->assertNotFound();
     }
 }

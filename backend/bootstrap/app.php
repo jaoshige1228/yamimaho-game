@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'demo.player' => \App\Http\Middleware\EnsureDemoPlayer::class,
-            'non.production' => \App\Http\Middleware\EnsureNonProduction::class,
+            'test.mode' => \App\Http\Middleware\EnsureTestModeEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

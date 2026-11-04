@@ -3,6 +3,12 @@
 return [
   'demo_user_email' => 'demo@yamimaho.local',
 
+  /**
+   * テストモード（/admins 管理画面・/test_battles テスト戦闘とその API）を使えるか。
+   * リリース前なので本番（APP_ENV=production）でも使える。リリースするときは環境変数 GAME_TEST_MODE=false にする（404 になる）。
+   */
+  'test_mode_enabled' => env('GAME_TEST_MODE', true),
+
   /** @deprecated 勝利時経験値は enemy_masters.exp_reward の合計を使用 */
   'exp_per_victory' => 40,
 

@@ -35,7 +35,7 @@ Route::middleware('demo.player')->group(function (): void {
     Route::post('/reset', [ResetController::class, 'reset']);
 });
 
-Route::middleware(['demo.player', 'non.production'])->prefix('admins')->group(function (): void {
+Route::middleware(['demo.player', 'test.mode'])->prefix('admins')->group(function (): void {
     Route::get('/status', [AdminController::class, 'status']);
     Route::get('/party', [AdminController::class, 'party']);
     Route::post('/grant-exp', [AdminController::class, 'grantExp']);
@@ -44,7 +44,7 @@ Route::middleware(['demo.player', 'non.production'])->prefix('admins')->group(fu
     Route::post('/dungeon-clear', [AdminController::class, 'dungeonClear']);
 });
 
-Route::middleware(['demo.player', 'non.production'])->prefix('test_battles')->group(function (): void {
+Route::middleware(['demo.player', 'test.mode'])->prefix('test_battles')->group(function (): void {
     Route::get('/status', [TestBattleController::class, 'status']);
     Route::get('/catalog', [TestBattleController::class, 'catalog']);
     Route::post('/start', [TestBattleController::class, 'start']);
