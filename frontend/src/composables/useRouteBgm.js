@@ -2,6 +2,7 @@ import { watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useBattleStore } from '../stores/battle';
 import { usePlayerStore } from '../stores/player';
+import { dungeonBgmTrack } from '../utils/dungeonTheme.js';
 import { useAppAudio } from './useAppAudio';
 
 function resolveBgmTrack(route, battleState, player) {
@@ -10,7 +11,7 @@ function resolveBgmTrack(route, battleState, player) {
     return 'home';
   }
   if (name === 'dungeon') {
-    return 'dungeon';
+    return dungeonBgmTrack(player.dungeonFloor);
   }
   if (name === 'status') {
     if (player.activeBattleId) {
@@ -25,7 +26,7 @@ function resolveBgmTrack(route, battleState, player) {
         route.query.boss === '1' || battleState?.meta?.boss === true;
       return isBoss ? 'boss' : 'battle';
     }
-    return player.inDungeon ? 'dungeon' : 'home';
+    return player.inDungeon ? dungeonBgmTrack(player.dungeonFloor) : 'home';
   }
   if (name === 'battle') {
     if (
@@ -73,6 +74,7 @@ export function useRouteBgm() {
       battle.state?.meta?.bgm,
       settings.value.bgmEnabled,
       player.inDungeon,
+      player.dungeonFloor,
       player.activeBattleId,
     ],
     () => {

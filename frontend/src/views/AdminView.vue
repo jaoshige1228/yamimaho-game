@@ -23,9 +23,24 @@ const dungeonStatus = ref({
   floor: 1,
   step: 0,
   unlocked_floor: 1,
+  cleared_floor: 0,
   max_floor: 3,
   playable_floor: 1,
 });
+const clearSubmitting = ref(false);
+const clearError = ref('');
+const clearMessage = ref('');
+
+function toDungeonStatus(data) {
+  return {
+    floor: data.floor ?? 1,
+    step: data.step ?? 0,
+    unlocked_floor: data.unlocked_floor ?? 1,
+    cleared_floor: data.cleared_floor ?? 0,
+    max_floor: data.max_floor ?? 3,
+    playable_floor: data.playable_floor ?? 1,
+  };
+}
 
 async function loadParty() {
   const data = await api('/admins/party', { method: 'GET' });
@@ -36,13 +51,7 @@ async function loadDungeonSettings() {
   const data = await api('/admins/dungeon-settings', { method: 'GET' });
   skipBattles.value = Boolean(data.skip_battles);
   forceDialogueEvents.value = Boolean(data.force_dialogue_events);
-  dungeonStatus.value = {
-    floor: data.floor ?? 1,
-    step: data.step ?? 0,
-    unlocked_floor: data.unlocked_floor ?? 1,
-    max_floor: data.max_floor ?? 3,
-    playable_floor: data.playable_floor ?? 1,
-  };
+  dungeonStatus.value = toDungeonStatus(data);
 }
 
 async function init() {
@@ -104,18 +113,35 @@ async function applyDungeonSettings() {
     dungeonMessage.value = data.message ?? 'ダンジョン設定を反映しました';
     skipBattles.value = Boolean(data.skip_battles);
     forceDialogueEvents.value = Boolean(data.force_dialogue_events);
-    dungeonStatus.value = {
-      floor: data.floor ?? 1,
-      step: data.step ?? 0,
-      unlocked_floor: data.unlocked_floor ?? 1,
-      max_floor: data.max_floor ?? 3,
-      playable_floor: data.playable_floor ?? 1,
-    };
+    dungeonStatus.value = toDungeonStatus(data);
     resetProgress.value = false;
   } catch (e) {
     dungeonError.value = e.message;
   } finally {
     dungeonSubmitting.value = false;
+  }
+}
+
+/** 指定した層をクリア済みにする。元に戻せないので、押す前に確認する */
+async function clearFloor(floor) {
+  if (!window.confirm(`${floor}層をクリア済みにします。元に戻せません。よろしいですか？`)) {
+    return;
+  }
+
+  clearSubmitting.value = true;
+  clearError.value = '';
+  clearMessage.value = '';
+  try {
+    const data = await api('/admins/dungeon-clear', {
+      method: 'POST',
+      body: JSON.stringify({ floor }),
+    });
+    clearMessage.value = data.message ?? `${floor}層をクリア済みにしました`;
+    dungeonStatus.value = toDungeonStatus(data);
+  } catch (e) {
+    clearError.value = e.message;
+  } finally {
+    clearSubmitting.value = false;
   }
 }
 
@@ -177,6 +203,7 @@ onMounted(() => init());
           <p class="muted">
             現在: {{ dungeonStatus.floor }}層 / 深さ {{ dungeonStatus.step }} /
             解放 {{ dungeonStatus.unlocked_floor }}層まで /
+            クリア済み {{ dungeonStatus.cleared_floor }}層まで /
             挑戦可能 {{ dungeonStatus.playable_floor }}層まで
           </p>
           <button
@@ -190,6 +217,33 @@ onMounted(() => init());
         </div>
         <p v-if="dungeonMessage" class="success">{{ dungeonMessage }}</p>
         <p v-if="dungeonError" class="error">{{ dungeonError }}</p>
+      </section>
+
+      <section class="admin-panel">
+        <h2>ダンジョンのクリア状況</h2>
+        <p class="desc">
+          指定した層をクリア済みにします（その層より浅い層もクリア済みになり、次の層が解放されます）。
+          元に戻す機能はありません。
+        </p>
+        <ul class="clear-list">
+          <li v-for="n in dungeonStatus.max_floor" :key="n">
+            <strong>{{ n }}層</strong>
+            <span class="clear-state" :class="{ done: dungeonStatus.cleared_floor >= n }">
+              {{ dungeonStatus.cleared_floor >= n ? 'クリア済み' : '未クリア' }}
+            </span>
+            <button
+              v-if="dungeonStatus.cleared_floor < n"
+              type="button"
+              class="btn-primary"
+              :disabled="clearSubmitting"
+              @click="clearFloor(n)"
+            >
+              クリア済みにする
+            </button>
+          </li>
+        </ul>
+        <p v-if="clearMessage" class="success">{{ clearMessage }}</p>
+        <p v-if="clearError" class="error">{{ clearError }}</p>
       </section>
 
       <section v-if="lastResults.length" class="admin-panel">
@@ -336,5 +390,37 @@ onMounted(() => init());
 }
 .party-list strong {
   min-width: 4.5rem;
+}
+.clear-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.clear-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+}
+.clear-list strong {
+  min-width: 2.5rem;
+}
+.clear-state {
+  flex: 1;
+  color: #8a7aa8;
+}
+.clear-state.done {
+  color: #9dffb8;
+}
+.clear-list .btn-primary {
+  min-height: 36px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
 }
 </style>

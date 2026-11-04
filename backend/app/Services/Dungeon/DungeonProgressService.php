@@ -29,6 +29,12 @@ class DungeonProgressService
         return (int) ($this->findOrCreate($user)->unlocked_floor ?? 1);
     }
 
+    /** クリア済みの最深層（0 = 未クリア） */
+    public function getClearedFloor(User $user): int
+    {
+        return (int) ($this->findOrCreate($user)->cleared_floor ?? 0);
+    }
+
     public function isFloorPlayable(User $user, int $floor): bool
     {
         if ($floor < 1 || $floor > DungeonFloorConfig::maxFloor()) {
@@ -61,6 +67,7 @@ class DungeonProgressService
             'floor' => (int) $record->floor,
             'step' => (int) $record->step,
             'unlocked_floor' => (int) $record->unlocked_floor,
+            'cleared_floor' => (int) $record->cleared_floor,
             'max_floor' => DungeonFloorConfig::maxFloor(),
             'playable_floor' => DungeonFloorConfig::playableFloor(),
             'boss_step' => DungeonFloorConfig::bossStep((int) $record->floor),
@@ -125,6 +132,7 @@ class DungeonProgressService
         $record->floor = 1;
         $record->step = 0;
         $record->unlocked_floor = 1;
+        $record->cleared_floor = 0;
         $record->skip_battle_encounters = false;
         $record->force_dialogue_events = false;
         $record->in_dungeon = false;
@@ -183,9 +191,7 @@ class DungeonProgressService
         $record = $this->findOrCreate($user);
         $maxFloor = DungeonFloorConfig::maxFloor();
 
-        if ($floor < $maxFloor) {
-            $record->unlocked_floor = max((int) $record->unlocked_floor, $floor + 1);
-        }
+        $this->applyFloorCleared($record, $floor);
 
         $record->step = 0;
         $record->in_dungeon = false;
@@ -210,6 +216,31 @@ class DungeonProgressService
         ];
     }
 
+    /**
+     * 管理画面用: 指定した層をクリア済みにする（元に戻す手段はない）。
+     * その層より浅い層もクリア済みになり、次の層が解放される。クリア済みの層を下げることはしない。
+     */
+    public function markFloorCleared(User $user, int $floor): void
+    {
+        if ($floor < 1 || $floor > DungeonFloorConfig::maxFloor()) {
+            throw new \InvalidArgumentException('その層は存在しません。');
+        }
+
+        $record = $this->findOrCreate($user);
+        $this->applyFloorCleared($record, $floor);
+        $record->save();
+    }
+
+    /** 層のクリアを記録し、次の層（最終層をクリアしたときは最終層まで）を解放する（保存は呼び出し側） */
+    private function applyFloorCleared(UserDungeonProgress $record, int $floor): void
+    {
+        $record->cleared_floor = max((int) $record->cleared_floor, $floor);
+        $record->unlocked_floor = max(
+            (int) $record->unlocked_floor,
+            min($floor + 1, DungeonFloorConfig::maxFloor()),
+        );
+    }
+
     private function findOrCreate(User $user): UserDungeonProgress
     {
         return UserDungeonProgress::query()->firstOrCreate(
@@ -217,6 +248,7 @@ class DungeonProgressService
             [
                 'floor' => 1,
                 'unlocked_floor' => 1,
+                'cleared_floor' => 0,
                 'step' => 0,
                 'skip_battle_encounters' => false,
                 'force_dialogue_events' => false,

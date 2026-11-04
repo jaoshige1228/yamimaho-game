@@ -12,10 +12,8 @@ import { useBattleStore } from '../stores/battle';
 import { usePlayerStore } from '../stores/player';
 import '../styles/hub-screen.css';
 import '../styles/exploration.css';
-import { publicAssetUrl } from '../utils/publicAssetUrl.js';
+import { dungeonBackgroundUrl } from '../utils/dungeonTheme.js';
 import { useAppAudio } from '../composables/useAppAudio.js';
-
-const dungeonBgSrc = publicAssetUrl('/assets/bg/dungeon1.webp');
 
 const router = useRouter();
 const { playSe, unlock } = useAppAudio();
@@ -26,7 +24,9 @@ const advancing = ref(false);
 const explorationBusy = ref(false);
 const error = ref('');
 const step = ref(0);
-const floor = ref(1);
+// ルーターが画面を開く前にナビゲーションを取得済みなので、読み込み中から正しい層の背景を出せる
+const floor = ref(player.dungeonFloor);
+const dungeonBgSrc = computed(() => dungeonBackgroundUrl(floor.value));
 const unlockedFloor = ref(1);
 const maxFloor = ref(3);
 const playableFloor = ref(1);
@@ -81,7 +81,10 @@ function onStorySyncParty(partialParty) {
 
 function applyDungeonStatus(data) {
   if (data.step != null) step.value = data.step;
-  if (data.floor != null) floor.value = data.floor;
+  if (data.floor != null) {
+    floor.value = data.floor;
+    player.setDungeonFloor(data.floor);
+  }
   if (data.unlocked_floor != null) unlockedFloor.value = data.unlocked_floor;
   if (data.max_floor != null) maxFloor.value = data.max_floor;
   if (data.playable_floor != null) playableFloor.value = data.playable_floor;

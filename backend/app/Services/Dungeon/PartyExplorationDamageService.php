@@ -81,8 +81,7 @@ class PartyExplorationDamageService
         $party = $this->characters->ensureParty($user);
 
         foreach ($party as $character) {
-            $master = $character->characterMaster;
-            $stats = $this->growth->statsForLevel($master, $character->level);
+            $stats = $this->growth->statsForCharacter($character);
 
             $character->hp = $stats['hp'];
             $character->mp = $stats['mp'];
@@ -96,8 +95,7 @@ class PartyExplorationDamageService
         $party = $this->characters->ensureParty($user);
 
         foreach ($party as $character) {
-            $master = $character->characterMaster;
-            $stats = $this->growth->statsForLevel($master, $character->level);
+            $stats = $this->growth->statsForCharacter($character);
             $maxHp = (int) $stats['hp'];
             $maxMp = (int) $stats['mp'];
             $hpGain = intdiv($maxHp * $percent, 100);

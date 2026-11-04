@@ -27,6 +27,13 @@ class DungeonEventNode extends Model
         'next_default',
     ];
 
+    /**
+     * 層ごとの上書き（dungeon_event_floor_overrides.csv）で stat_multiplier が差し替えられたか。
+     * true のときは、その値がその層で使う倍率そのものなので、層補正（stat_multiplier_scale）をかけない。
+     * DB の列ではなく、読み込んだ時にメモリ上で付けるフラグ。
+     */
+    public bool $statMultiplierOverridden = false;
+
     /** @return BelongsTo<DungeonEventMaster, $this> */
     public function event(): BelongsTo
     {

@@ -62,6 +62,9 @@ defineProps({
 .flash.flash-earth {
   animation-name: flashEarth;
 }
+.flash.flash-dark {
+  animation-name: flashDark;
+}
 .flash.flash-hit {
   animation-name: flashHit;
 }

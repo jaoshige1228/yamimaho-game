@@ -4,12 +4,12 @@
  */
 export function enemySpriteAssetKey(unit) {
   const sprite = unit?.sprite ?? '';
-  if (/^[a-z][a-z0-9_]*$/i.test(sprite)) {
+  if (/^[a-z0-9][a-z0-9_]*$/i.test(sprite)) {
     return sprite;
   }
 
   const code = unit?.master_code ?? '';
-  if (/^[a-z][a-z0-9_]*$/i.test(code)) {
+  if (/^[a-z0-9][a-z0-9_]*$/i.test(code)) {
     return code;
   }
 

@@ -14,6 +14,7 @@ const props = defineProps({
   supportEffectTarget: { type: Object, default: null },
   activeLunge: { type: String, default: null },
   floor1BossSprite: { type: Boolean, default: false },
+  fledIds: { type: Array, default: () => [] },
 });
 
 function supportEffectClass(unit) {
@@ -31,6 +32,11 @@ function displayHpFor(unit) {
 
 function isDisplayDead(unit) {
   return displayHpFor(unit) <= 0;
+}
+
+/** 逃げ出した敵（逃走の演出が済んだあとは画面から消す） */
+function isDisplayFled(unit) {
+  return props.fledIds.includes(unit.id);
 }
 
 const emit = defineEmits(['select', 'show-stats']);
@@ -70,6 +76,7 @@ function onSlotClick(unit) {
       :class="[
         {
           dead: isDisplayDead(unit),
+          fled: isDisplayFled(unit),
           selectable: canSelect(unit),
           shake: shakeTarget === unit.id,
           lunge: activeLunge === unit.id,
@@ -122,9 +129,15 @@ function onSlotClick(unit) {
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+  transition: opacity 0.45s ease, transform 0.45s ease;
 }
 .enemy-slot.dead {
   opacity: 0.3;
+}
+.enemy-slot.fled {
+  opacity: 0;
+  transform: translateX(18px);
+  pointer-events: none;
 }
 .enemy-slot.selectable {
   cursor: pointer;

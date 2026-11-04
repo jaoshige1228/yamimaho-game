@@ -4,6 +4,7 @@ import { publicAssetUrl } from '../utils/publicAssetUrl.js';
 const BGM_TRACKS = {
   home: publicAssetUrl('/assets/audio/bgm/home.mp3'),
   dungeon: publicAssetUrl('/assets/audio/bgm/Dim2.mp3'),
+  dungeon_floor2: publicAssetUrl('/assets/audio/bgm/dungeon.mp3'),
   battle: publicAssetUrl('/assets/audio/bgm/RetroRoman_Battle3.mp3'),
   boss: publicAssetUrl('/assets/audio/bgm/boss_battle_2.mp3'),
   broken: publicAssetUrl('/assets/audio/bgm/broken.mp3'),

@@ -75,8 +75,13 @@ class DungeonApiTest extends TestCase
         $response->assertJsonPath('event', 'battle');
         $response->assertJsonPath('floor', 2);
 
+        // 2 層の敵マスタ（floor=2 の行）の HP で出てくること
         $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
-        $this->assertTrue($enemies->every(fn (array $u) => (int) $u['max_hp'] === 135));
+        $this->assertNotEmpty($enemies);
+        $this->assertTrue($enemies->every(
+            fn (array $u) => (int) $u['max_hp'] === (int) \App\Models\EnemyMaster::query()
+                ->where('floor', 2)->where('code', $u['master_code'])->value('hp'),
+        ));
     }
 
     public function test_player_party_includes_sprite_and_max_stats(): void

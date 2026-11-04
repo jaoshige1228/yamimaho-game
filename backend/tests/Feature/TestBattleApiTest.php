@@ -68,6 +68,23 @@ class TestBattleApiTest extends TestCase
         );
     }
 
+    public function test_start_floor2_boss_spawns_dragon_with_two_cultists(): void
+    {
+        $response = $this->postJson('/api/test_battles/start', [
+            'preset' => 'floor2_boss',
+        ])->assertOk();
+
+        $response->assertJsonPath('boss_encounter', true);
+        $response->assertJsonPath('state.meta.boss', true);
+        $response->assertJsonPath('state.meta.floor', 2);
+
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertSame(['mahou', 'dragon', 'mahou'], $enemies->pluck('master_code')->all());
+        $this->assertSame(['邪教徒 A', 'エルドラゴン', '邪教徒 B'], $enemies->pluck('name')->all());
+        // 画像名が「2_」のように数字で始まっても、そのまま使われる（2_dragon.png など）
+        $this->assertSame(['2_mahou', '2_dragon', '2_mahou'], $enemies->pluck('sprite')->all());
+    }
+
     public function test_start_floor1_boss_sets_boss_encounter(): void
     {
         $response = $this->postJson('/api/test_battles/start', [

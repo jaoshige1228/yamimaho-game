@@ -53,12 +53,18 @@ const floatingDamages = ref([]);
 const floatingSupports = ref([]);
 const actionBanners = ref([]);
 const displayHp = ref({});
+/** 逃げて画面から消えた敵の ID（逃走イベントの再生に合わせて増える） */
+const fledIds = ref([]);
 /** @type {import('vue').Ref<'hidden' | 'entering' | 'ready'>} */
 const partyPhase = ref('hidden');
 const showResult = ref(false);
 const victoryRewards = ref([]);
 const goldGained = ref(0);
 const dungeonCleared = ref(false);
+/** 新しい魔法を覚えたときのメッセージ（イフリーヌ初回撃破など）。あるときは結果画面が「次へ」で 2 画面になる */
+const learnedSpellMessages = ref([]);
+/** @type {import('vue').Ref<'rewards' | 'learned'>} */
+const resultStep = ref('rewards');
 
 const state = computed(() => battle.state);
 const units = computed(() => state.value?.units ?? []);
@@ -106,6 +112,13 @@ const resultTitle = computed(() => {
   return '敗北…';
 });
 
+const showLearnedStep = computed(
+  () => learnedSpellMessages.value.length > 0 && resultStep.value === 'learned',
+);
+const showNextButton = computed(
+  () => learnedSpellMessages.value.length > 0 && resultStep.value === 'rewards',
+);
+
 const resultPrimaryLabel = computed(() => {
   if (dungeonCleared.value) {
     return '待機画面へ';
@@ -118,6 +131,15 @@ const resultPrimaryLabel = computed(() => {
   }
   return 'もう一度';
 });
+
+function resetResultPages() {
+  learnedSpellMessages.value = [];
+  resultStep.value = 'rewards';
+}
+
+function onResultNext() {
+  resultStep.value = 'learned';
+}
 
 function onResultPrimary() {
   if (isDungeonBattle.value) {
@@ -240,6 +262,9 @@ function flashKindForSpellAnnounce(ev) {
   }
 
   const effect = String(ev.spell_effect ?? '');
+  if (effect.includes('death')) {
+    return 'dark';
+  }
   if (effect.includes('heal')) {
     return 'heal';
   }
@@ -316,6 +341,11 @@ function syncDisplayHp(force = false) {
       displayHp.value[unit.id] = unit.hp;
     }
   }
+}
+
+/** 状態の「逃げた敵」を表示に反映する（イベント再生が終わったあと・再読み込み時に使う） */
+function syncFledDisplay() {
+  fledIds.value = units.value.filter((u) => u.fled).map((u) => u.id);
 }
 
 function snapshotDisplayHp() {
@@ -403,6 +433,10 @@ async function playEvents(events) {
       await delay(300);
       applyDisplayHpDelta(ev.target, -ev.value);
       shakeTarget.value = null;
+      if (ev.instant_death) {
+        showActionBanner('即死！');
+        await delay(500);
+      }
       await delay(120);
     }
     if (ev.type === 'shield_break') {
@@ -438,9 +472,15 @@ async function playEvents(events) {
       showActionBanner(`${unitName(ev.target)}が蘇生した！`);
       await delay(280);
     }
-    if (ev.type === 'revive_failed') {
+    if (ev.type === 'revive_failed' || ev.type === 'spell_failed') {
       showActionBanner('効果がなかった…');
       await delay(280);
+    }
+    if (ev.type === 'enemy_fled') {
+      if (!fledIds.value.includes(ev.actor)) {
+        fledIds.value = [...fledIds.value, ev.actor];
+      }
+      await delay(500);
     }
     if (ev.type === 'gold_gained') {
       goldGained.value += Number(ev.amount) || 0;
@@ -456,6 +496,9 @@ async function playEvents(events) {
     }
     if (ev.type === 'level_up') {
       victoryRewards.value.push(`${ev.name}が Lv${ev.level} になった！`);
+    }
+    if (ev.type === 'spells_learned') {
+      learnedSpellMessages.value = (ev.characters ?? []).map((c) => `${c.name}は新しい魔法を覚えた！`);
     }
     if (ev.type === 'dungeon_floor_cleared') {
       dungeonCleared.value = true;
@@ -508,12 +551,15 @@ async function initBattle() {
   closeModals();
   dungeonCleared.value = false;
   goldGained.value = 0;
+  fledIds.value = [];
+  resetResultPages();
   try {
     let startedNew = false;
     let playPartyEntrance = false;
     if (props.id) {
       if (battle.battleId !== props.id) {
         await battle.load(props.id);
+        syncFledDisplay();
         partyPhase.value = 'ready';
       } else {
         playPartyEntrance = true;
@@ -539,6 +585,7 @@ async function initBattle() {
     }
     await playEvents(events);
     syncDisplayHp(true);
+    syncFledDisplay();
   } catch (e) {
     battle.error = e.message;
     partyPhase.value = 'ready';
@@ -556,6 +603,7 @@ async function afterAction() {
     const events = battle.dequeueEvents();
     await playEvents(events);
     syncDisplayHp(true);
+    syncFledDisplay();
     if (state.value?.status === 'fled') {
       leaveBattleFled();
     }
@@ -645,6 +693,8 @@ async function retry() {
   showResult.value = false;
   victoryRewards.value = [];
   dungeonCleared.value = false;
+  fledIds.value = [];
+  resetResultPages();
   busy.value = true;
   try {
     await battle.startDemo();
@@ -658,6 +708,7 @@ async function retry() {
     }
     await playEvents(events);
     syncDisplayHp(true);
+    syncFledDisplay();
   } catch (e) {
     battle.error = e.message;
     partyPhase.value = 'ready';
@@ -675,6 +726,7 @@ function leaveBattle() {
   victoryRewards.value = [];
   dungeonCleared.value = false;
   goldGained.value = 0;
+  resetResultPages();
   battle.battleId = null;
   battle.state = null;
   battle.pendingEvents = [];
@@ -743,6 +795,7 @@ watch(
         :support-effect-target="supportEffectTarget"
         :active-enemy-lunge="activeEnemyLunge"
         :floor1-boss-sprite="floor1BossSprite"
+        :fled-ids="fledIds"
         :can-open-commands="canOpenCommands"
         @select-target="onSelectTarget"
         @open-commands="onOpenCommands"
@@ -778,16 +831,24 @@ watch(
 
     <div v-if="showResult" class="result-modal">
       <h2>{{ resultTitle }}</h2>
-      <ul v-if="victoryRewards.length || goldGained > 0" class="reward-list">
+      <ul v-if="showLearnedStep" class="reward-list">
+        <li v-for="(line, i) in learnedSpellMessages" :key="i">{{ line }}</li>
+      </ul>
+      <ul v-else-if="victoryRewards.length || goldGained > 0" class="reward-list">
         <li v-if="goldGained > 0">ゴールドを {{ goldGained }} 獲得した</li>
         <li v-for="(line, i) in victoryRewards" :key="i">{{ line }}</li>
       </ul>
-      <button type="button" class="btn-primary" @click="onResultPrimary">
-        {{ resultPrimaryLabel }}
+      <button v-if="showNextButton" type="button" class="btn-primary" @click="onResultNext">
+        次へ
       </button>
-      <button v-if="!isDungeonBattle" type="button" class="btn-ghost" @click="router.push('/')">
-        タイトルへ
-      </button>
+      <template v-else>
+        <button type="button" class="btn-primary" @click="onResultPrimary">
+          {{ resultPrimaryLabel }}
+        </button>
+        <button v-if="!isDungeonBattle" type="button" class="btn-ghost" @click="router.push('/')">
+          タイトルへ
+        </button>
+      </template>
     </div>
   </div>
 </template>

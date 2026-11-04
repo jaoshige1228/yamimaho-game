@@ -21,12 +21,10 @@ class DungeonStepEncounterBuilder
             (int) ($band['count_max'] ?? 3),
         );
 
-        /** @var list<string> $codes */
-        $codes = $band['codes'];
         $enemies = [];
 
         for ($i = 1; $i <= $count; $i++) {
-            $code = $codes[array_rand($codes)];
+            $code = $this->pickCode($band);
             $master = $this->findEnemyOnFloor($floor, $code);
             $enemies[] = [
                 'slot' => 'enemy_'.$i,
@@ -45,20 +43,60 @@ class DungeonStepEncounterBuilder
      */
     private function buildBoss(int $floor): array
     {
-        $code = (string) (DungeonFloorConfig::bossEnemyCode($floor) ?? 'inu_moe');
-        $master = $this->findEnemyOnFloor($floor, $code);
+        $codes = DungeonFloorConfig::bossEnemyCodes($floor);
+        if ($codes === []) {
+            throw new \RuntimeException("Boss enemies are not configured for floor {$floor}.");
+        }
 
-        return [[
-            'slot' => 'enemy_1',
-            'master_code' => $master->code,
-            'floor' => $floor,
-            'name' => $master->name,
-            'sprite' => $master->sprite,
-        ]];
+        // 同じ敵が複数いるときだけ A・B…を付ける（エルドラゴン＋邪教徒 A・B のように）
+        $totals = array_count_values($codes);
+        $seen = [];
+        $enemies = [];
+
+        foreach ($codes as $i => $code) {
+            $master = $this->findEnemyOnFloor($floor, $code);
+            $seen[$code] = ($seen[$code] ?? 0) + 1;
+
+            $enemies[] = [
+                'slot' => 'enemy_'.($i + 1),
+                'master_code' => $master->code,
+                'floor' => $floor,
+                'name' => $totals[$code] > 1 ? $master->name.' '.chr(64 + $seen[$code]) : $master->name,
+                'sprite' => $master->sprite,
+            ];
+        }
+
+        return $enemies;
     }
 
     /**
-     * @return array{codes: list<string>, count_min: int, count_max: int}
+     * 帯の中から敵 1 体ぶんの種類を選ぶ。weights があれば重み付き、なければ等確率。
+     *
+     * @param  array{codes: list<string>, weights: array<string, int>}  $band
+     */
+    private function pickCode(array $band): string
+    {
+        $codes = $band['codes'];
+        $weights = array_filter(
+            array_map(fn (string $code): int => max(0, (int) ($band['weights'][$code] ?? 0)), array_combine($codes, $codes)),
+        );
+        if ($weights === []) {
+            return $codes[array_rand($codes)];
+        }
+
+        $roll = random_int(1, array_sum($weights));
+        foreach ($weights as $code => $weight) {
+            $roll -= $weight;
+            if ($roll <= 0) {
+                return (string) $code;
+            }
+        }
+
+        return (string) array_key_last($weights);
+    }
+
+    /**
+     * @return array{codes: list<string>, weights: array<string, int>, count_min: int, count_max: int}
      */
     private function resolveBand(int $floor, int $step): array
     {
@@ -70,6 +108,7 @@ class DungeonStepEncounterBuilder
             if ($step >= $from && $step <= $to) {
                 return [
                     'codes' => array_values($band['codes'] ?? []),
+                    'weights' => is_array($band['weights'] ?? null) ? $band['weights'] : [],
                     'count_min' => (int) ($band['count_min'] ?? 2),
                     'count_max' => (int) ($band['count_max'] ?? 3),
                 ];

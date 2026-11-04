@@ -22,6 +22,7 @@ class UserCharacter extends Model
         'know',
         'spirit',
         'vit',
+        'max_mp_bonus',
         'weapon_master_id',
         'armor_master_id',
     ];

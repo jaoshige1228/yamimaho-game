@@ -93,6 +93,14 @@
     background: transparent;
   }
 }
+@keyframes flashDark {
+  0% {
+    background: rgba(40, 10, 70, 0.62);
+  }
+  100% {
+    background: transparent;
+  }
+}
 @keyframes flashHit {
   0% {
     background: rgba(255, 80, 80, 0.45);

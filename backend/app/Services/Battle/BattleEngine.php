@@ -128,6 +128,7 @@ class BattleEngine
     private function resolveEnemySkill(array &$state, string $actorId, array $skill): array
     {
         $actor = $state['units'][$actorId];
+        $skill = $this->swapUselessEnemyHeal($state['units'], $skill);
         $announceText = $skill['skill_code'] === 'attack'
             ? "{$actor['name']}の攻撃！"
             : "{$actor['name']}の{$skill['label']}！";
@@ -135,6 +136,10 @@ class BattleEngine
         $targetType = (string) $skill['target_type'];
         $coefficient = (float) $skill['coefficient'];
         $actionType = (string) $skill['action_type'];
+
+        if ($actionType === 'flee') {
+            return $this->resolveEnemyFlee($state, $actorId);
+        }
 
         // 魔法は「〜は〜を唱えた！」だけを告知する（技名の告知と重なるため出さない）
         $events = $actionType === 'spell' ? [] : [$this->announceEvent($actorId, $announceText)];
@@ -178,11 +183,73 @@ class BattleEngine
             foreach ($targets as $tid) {
                 $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
             }
+            $events = array_merge($events, $this->applySpellSelfEffects($state, $actorId, $spell));
 
             return $events;
         }
 
         throw new InvalidArgumentException("不明な敵行動です: {$actionType}");
+    }
+
+    /**
+     * 傷ついた味方がいないのに回復魔法を引いたときは、空振りさせず通常攻撃にする。
+     *
+     * @param  array<string, array<string, mixed>>  $units
+     * @param  array<string, mixed>  $skill
+     * @return array<string, mixed>
+     */
+    private function swapUselessEnemyHeal(array $units, array $skill): array
+    {
+        if (($skill['action_type'] ?? '') !== 'spell') {
+            return $skill;
+        }
+
+        $spell = $this->factory->findSpell((string) $skill['skill_code']);
+        if (($spell['effect'] ?? '') !== 'heal_mag' || $this->woundedEnemyIds($units) !== []) {
+            return $skill;
+        }
+
+        return [
+            'skill_code' => 'attack',
+            'label' => '攻撃',
+            'action_type' => 'punch',
+            'target_type' => 'ally_single',
+            'coefficient' => 1.0,
+        ];
+    }
+
+    /**
+     * HP が減っている生存中の敵ユニット。
+     *
+     * @param  array<string, array<string, mixed>>  $units
+     * @return list<string>
+     */
+    private function woundedEnemyIds(array $units): array
+    {
+        return array_keys(array_filter(
+            $units,
+            fn ($u) => ($u['side'] ?? '') === 'enemy' && ($u['alive'] ?? false) && $u['hp'] < $u['max_hp'],
+        ));
+    }
+
+    /**
+     * 敵が戦場から逃げる。倒したわけではないので、経験値・ゴールドは入らない。
+     * 戦闘不能と同じ扱い（alive = false）にするので、敵が全員いなくなれば通常どおり勝利になる。
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function resolveEnemyFlee(array &$state, string $actorId): array
+    {
+        $unit = &$state['units'][$actorId];
+        $unit['alive'] = false;
+        $unit['fled'] = true;
+        $state['log'][] = "{$unit['name']}は逃げ出した！";
+
+        return [
+            $this->announceEvent($actorId, "{$unit['name']}は逃げ出した！"),
+            ['type' => 'enemy_fled', 'actor' => $actorId],
+        ];
     }
 
     /**
@@ -256,6 +323,7 @@ class BattleEngine
         foreach ($targets as $tid) {
             $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
         }
+        $events = array_merge($events, $this->applySpellSelfEffects($state, $actorId, $spell));
 
         return $events;
     }
@@ -349,6 +417,7 @@ class BattleEngine
 
         switch ($spell['effect']) {
             case 'damage':
+            case 'damage_hp_cost':
                 $coefficient = (float) ($spell['coefficient'] ?? 1.0);
                 $damageResult = $this->calcDamageWithCritical($actor, $target, 'mag', $coefficient, 'magical');
                 $events = array_merge(
@@ -359,7 +428,7 @@ class BattleEngine
                 break;
 
             case 'heal_mag':
-                $amount = (int) floor((float) $actor['mag'] * (float) config('battle.heal_mag_multiplier'));
+                $amount = SpellHealing::healMagAmount((float) $actor['mag'], $spell);
                 $healed = min($amount, $target['max_hp'] - $target['hp']);
                 $target['hp'] += $healed;
                 $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];
@@ -369,6 +438,7 @@ class BattleEngine
             case 'buff_evasion_set':
             case 'buff_def':
             case 'debuff_def':
+            case 'debuff_def_both':
                 $buffKey = $spell['buff'];
                 $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
                 $events[] = [
@@ -381,6 +451,29 @@ class BattleEngine
                 $state['log'][] = "{$target['name']}に{$label}";
                 break;
 
+            case 'instant_death':
+                if (! $target['alive']) {
+                    break;
+                }
+                // power = 即死の成功率（%）。外れたら何も起きない
+                if (! $this->rollHit((int) ($spell['power'] ?? 10))) {
+                    $events[] = ['type' => 'spell_failed', 'actor' => $actorId, 'target' => $targetId];
+                    $state['log'][] = "{$label}は{$target['name']}に効かなかった";
+                    break;
+                }
+                // 残りHP分のダメージとして扱うので、魔法障壁で防げ、敵が倒れたときの経験値・ゴールドも通常どおり入る
+                $deathEvents = $this->applyDamage($state, $actorId, $targetId, (int) $target['hp'], null, false);
+                foreach ($deathEvents as $i => $deathEvent) {
+                    if (($deathEvent['type'] ?? '') === 'damage') {
+                        $deathEvents[$i]['instant_death'] = true;
+                    }
+                }
+                $events = array_merge($events, $deathEvents);
+                if (! $target['alive']) {
+                    $state['log'][] = "{$target['name']}は{$label}で倒れた";
+                }
+                break;
+
             case 'shield_next':
                 $target['damage_shield'] = true;
                 $events[] = ['type' => 'shield_applied', 'actor' => $actorId, 'target' => $targetId];
@@ -391,7 +484,7 @@ class BattleEngine
                 if (! $target['alive']) {
                     $chance = (int) ($spell['power'] ?? 50);
                     if ($this->rollHit($chance)) {
-                        $revivedHp = (int) floor($target['max_hp'] / 2);
+                        $revivedHp = (int) floor($target['max_hp'] * (int) config('battle.revive_hp_percent', 50) / 100);
                         $target['hp'] = max(1, $revivedHp);
                         $target['alive'] = true;
                         $events[] = ['type' => 'revive', 'actor' => $actorId, 'target' => $targetId, 'hp' => $target['hp']];
@@ -429,6 +522,55 @@ class BattleEngine
                 $target['statuses'] = [];
                 $events[] = ['type' => 'status_cured', 'target' => $targetId];
                 $state['log'][] = "{$target['name']}の状態異常が治った";
+                break;
+        }
+
+        return $events;
+    }
+
+    /**
+     * 魔法を唱えた本人に、対象の数に関係なく 1 回だけ起きる効果。
+     * - damage_hp_cost: 最大 HP の power % を消費する（自滅はせず、HP は最低 1 残る）
+     * - debuff_def_both: 対象と同じ防御ダウンを自分にも受ける
+     *
+     * @param  array<string, mixed>  $state
+     * @param  array<string, mixed>  $spell
+     * @return list<array<string, mixed>>
+     */
+    private function applySpellSelfEffects(array &$state, string $actorId, array $spell): array
+    {
+        $events = [];
+        $caster = &$state['units'][$actorId];
+
+        switch ($spell['effect']) {
+            case 'damage_hp_cost':
+                $cost = (int) floor($caster['max_hp'] * (int) ($spell['power'] ?? 50) / 100);
+                $lost = min($cost, max(0, (int) $caster['hp'] - 1));
+                if ($lost > 0) {
+                    $caster['hp'] -= $lost;
+                    $events[] = [
+                        'type' => 'damage',
+                        'actor' => $actorId,
+                        'target' => $actorId,
+                        'value' => $lost,
+                        'element' => null,
+                        'critical' => false,
+                    ];
+                    $state['log'][] = "{$caster['name']}は反動で{$lost}ダメージを受けた";
+                }
+                break;
+
+            case 'debuff_def_both':
+                $buffKey = $spell['buff'];
+                $caster['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
+                $events[] = [
+                    'type' => 'buff_applied',
+                    'actor' => $actorId,
+                    'target' => $actorId,
+                    'buff' => $buffKey,
+                    'icon' => config("battle.buffs.{$buffKey}.icon"),
+                ];
+                $state['log'][] = "{$caster['name']}にも{$spell['label']}";
                 break;
         }
 
@@ -649,17 +791,19 @@ class BattleEngine
      */
     private function effectiveEvasionRate(array $defender): int
     {
+        $fixed = null;
         foreach ($defender['buffs'] as $key => $turns) {
             if ($turns <= 0) {
                 continue;
             }
             $buff = config("battle.buffs.{$key}");
             if (($buff['type'] ?? '') === 'evasion_set') {
-                return (int) ($buff['value'] ?? 50);
+                // 回避率固定の効果が複数かかっているときは、いちばん高いものを使う
+                $fixed = max($fixed ?? 0, (int) ($buff['value'] ?? 50));
             }
         }
 
-        return (int) ($defender['evasion_rate'] ?? 0);
+        return $fixed ?? (int) ($defender['evasion_rate'] ?? 0);
     }
 
     /**
@@ -794,6 +938,14 @@ class BattleEngine
         }
 
         if ($targetType === 'ally_single') {
+            if ($effect === 'heal_mag') {
+                // 回復は、いちばん HP の割合が減っている味方に使う
+                $wounded = $this->woundedEnemyIds($units);
+                usort($wounded, fn ($a, $b) => $units[$a]['hp'] / $units[$a]['max_hp'] <=> $units[$b]['hp'] / $units[$b]['max_hp']);
+
+                return array_slice($wounded, 0, 1);
+            }
+
             if ($effect === 'revive_chance') {
                 $candidates = array_keys(array_filter(
                     $units,
@@ -988,6 +1140,7 @@ class BattleEngine
             'mp' => $unit['mp'],
             'max_mp' => $unit['max_mp'],
             'alive' => $unit['alive'],
+            'fled' => (bool) ($unit['fled'] ?? false),
             'buffs' => $buffs,
             'damage_shield' => (bool) ($unit['damage_shield'] ?? false),
             'user_character_id' => $unit['user_character_id'] ?? null,

@@ -65,7 +65,7 @@ class DungeonExplorationEngine
         $floor = (int) $session->floor_at_start;
 
         while ($nodeKey !== null && $nodeKey !== '') {
-            $node = $this->catalog->findNode($session->event_code, $nodeKey);
+            $node = $this->catalog->findNode($session->event_code, $nodeKey, $floor);
             $context = $session->context ?? [];
 
             if (in_array($node->node_type, ['party_choice', 'party_choice_skip'], true)) {
@@ -255,7 +255,7 @@ class DungeonExplorationEngine
                 }
             }
 
-            $this->applyUpcomingEffectAmounts($session->event_code, $node, $context);
+            $this->applyUpcomingEffectAmounts($session->event_code, $node, $context, $floor);
             $session->context = $context;
 
             $line = $this->nodeToLine($user, $node, $context);
@@ -285,7 +285,7 @@ class DungeonExplorationEngine
             return ['segment' => ['kind' => 'complete'], 'complete' => true];
         }
 
-        $node = $this->catalog->findNode($session->event_code, $nodeKey);
+        $node = $this->catalog->findNode($session->event_code, $nodeKey, (int) $session->floor_at_start);
 
         if ($node->node_type === 'end') {
             $context = $session->context ?? [];
@@ -572,7 +572,7 @@ class DungeonExplorationEngine
     /**
      * @param  array<string, mixed>  $context
      */
-    private function applyUpcomingEffectAmounts(string $eventCode, DungeonEventNode $node, array &$context): void
+    private function applyUpcomingEffectAmounts(string $eventCode, DungeonEventNode $node, array &$context, int $floor): void
     {
         unset($context['pending_gold_amount'], $context['pending_damage_amount']);
 
@@ -581,7 +581,7 @@ class DungeonExplorationEngine
         // 効果ノードまでセリフ・地の文だけが続く場合も、その量を {damage_amount} 等に展開できるよう先読みする
         for ($depth = 0; $depth < self::EFFECT_AMOUNT_LOOKAHEAD && $nextKey !== ''; $depth++) {
             try {
-                $next = $this->catalog->findNode($eventCode, $nextKey);
+                $next = $this->catalog->findNode($eventCode, $nextKey, $floor);
             } catch (\InvalidArgumentException) {
                 return;
             }
@@ -805,7 +805,7 @@ class DungeonExplorationEngine
         }
 
         $attr = (string) ($node->stat_attr ?: 'spirit');
-        $multiplier = (int) ($node->stat_multiplier ?? 3);
+        $multiplier = $this->effectiveStatMultiplier($node, 3, $floor);
         $failDamage = (int) ($node->fixed_damage ?? 0);
         $label = $this->statCheckLabel($attr);
         $lines = [];
@@ -818,7 +818,7 @@ class DungeonExplorationEngine
                 continue;
             }
 
-            $rate = $this->successRateForSlot($user, $slotId, $attr, $multiplier, $floor);
+            $rate = $this->successRateForSlot($user, $slotId, $attr, $multiplier);
 
             // 判定中の味方を {name} として差し込む。event 全体の context は汚さない
             $allyContext = array_merge($context, [
@@ -890,7 +890,7 @@ class DungeonExplorationEngine
      */
     public function applyChoice(DungeonExplorationSession $session, User $user, string $choiceId): void
     {
-        $node = $this->catalog->findNode($session->event_code, (string) $session->current_node_key);
+        $node = $this->catalog->findNode($session->event_code, (string) $session->current_node_key, (int) $session->floor_at_start);
         $context = $session->context ?? [];
 
         if ($node->node_type === 'binary_choice') {
@@ -936,11 +936,11 @@ class DungeonExplorationEngine
         bool $performRoll = false,
     ): array {
         $attr = (string) $node->stat_attr;
-        $multiplier = (int) ($node->stat_multiplier ?? 2);
+        $floor = (int) $session->floor_at_start;
+        $multiplier = $this->effectiveStatMultiplier($node, 2, $floor);
         $slot = $this->slotForStatCheck($attr, $context);
 
-        $floor = (int) $session->floor_at_start;
-        $rate = $this->successRateForSlot($user, $slot, $attr, $multiplier, $floor);
+        $rate = $this->successRateForSlot($user, $slot, $attr, $multiplier);
         $context['last_success_rate'] = $rate;
         $context['last_stat_check_label'] = $this->statCheckLabel($attr);
 
@@ -1034,14 +1034,14 @@ class DungeonExplorationEngine
     /**
      * @param  array<string, mixed>  $context
      */
-    private function findUpcomingStatCheckNode(string $eventCode, string $nodeKey, int $maxDepth = 8): ?DungeonEventNode
+    private function findUpcomingStatCheckNode(string $eventCode, string $nodeKey, int $floor, int $maxDepth = 8): ?DungeonEventNode
     {
         if ($nodeKey === '' || $maxDepth <= 0) {
             return null;
         }
 
         try {
-            $node = $this->catalog->findNode($eventCode, $nodeKey);
+            $node = $this->catalog->findNode($eventCode, $nodeKey, $floor);
         } catch (\InvalidArgumentException) {
             return null;
         }
@@ -1052,7 +1052,7 @@ class DungeonExplorationEngine
 
         $next = (string) ($node->next_default ?? '');
         if ($next !== '') {
-            return $this->findUpcomingStatCheckNode($eventCode, $next, $maxDepth - 1);
+            return $this->findUpcomingStatCheckNode($eventCode, $next, $floor, $maxDepth - 1);
         }
 
         return null;
@@ -1069,16 +1069,16 @@ class DungeonExplorationEngine
         array $context,
         int $floor,
     ): array {
-        $statNode = $this->findUpcomingStatCheckNode($eventCode, $startNodeKey);
+        $statNode = $this->findUpcomingStatCheckNode($eventCode, $startNodeKey, $floor);
         if ($statNode === null) {
             return $context;
         }
 
         $attr = (string) $statNode->stat_attr;
-        $multiplier = (int) ($statNode->stat_multiplier ?? 2);
+        $multiplier = $this->effectiveStatMultiplier($statNode, 2, $floor);
         $slot = $this->slotForStatCheck($attr, $context);
 
-        $context['last_success_rate'] = $this->successRateForSlot($user, $slot, $attr, $multiplier, $floor);
+        $context['last_success_rate'] = $this->successRateForSlot($user, $slot, $attr, $multiplier);
         $context['last_stat_check_label'] = $this->statCheckLabel($attr);
 
         return $context;
@@ -1156,7 +1156,23 @@ class DungeonExplorationEngine
         return max(1, (int) ceil($baseMultiplier * $scale / 100));
     }
 
-    private function successRateForSlot(User $user, string $slotId, string $attr, int $baseMultiplier, int $floor): int
+    /**
+     * 判定ノードがその層で使う倍率。層ごとの上書き（dungeon_event_floor_overrides.csv）があればその値そのもの、
+     * なければノードの倍率に層補正（stat_multiplier_scale）をかけたもの。
+     */
+    private function effectiveStatMultiplier(DungeonEventNode $node, int $defaultMultiplier, int $floor): int|float
+    {
+        if ($node->statMultiplierOverridden) {
+            return $node->stat_multiplier;
+        }
+
+        return $this->scaledStatMultiplier((int) ($node->stat_multiplier ?? $defaultMultiplier), $floor);
+    }
+
+    /**
+     * @param  int|float  $multiplier  その層で使う倍率（effectiveStatMultiplier の結果）
+     */
+    private function successRateForSlot(User $user, string $slotId, string $attr, int|float $multiplier): int
     {
         if ($slotId === '') {
             return 0;
@@ -1172,9 +1188,9 @@ class DungeonExplorationEngine
         $character->loadMissing('characterMaster');
         $value = $this->statValueForCharacter($character, $attr);
         $hpRatio = $this->hpRatioForCharacter($character);
-        $multiplier = $this->scaledStatMultiplier($baseMultiplier, $floor);
 
-        return $this->clampSuccessRate((int) ceil($value * $multiplier * $hpRatio));
+        // 小数の倍率（2.3 など）で浮動小数点の誤差が出ても、端数は切り上げる
+        return $this->clampSuccessRate((int) ceil(round($value * $multiplier * $hpRatio, 6)));
     }
 
     /**
@@ -1427,11 +1443,11 @@ class DungeonExplorationEngine
         $statNode = null;
         if (in_array($node->node_type, ['party_choice', 'party_choice_skip'], true) && $eventCode !== '') {
             $startKey = (string) ($node->next_on_success ?: $node->next_default ?: '');
-            $statNode = $this->findUpcomingStatCheckNode($eventCode, $startKey);
+            $statNode = $this->findUpcomingStatCheckNode($eventCode, $startKey, $floor);
         }
 
         $statAttr = $statNode !== null ? (string) $statNode->stat_attr : '';
-        $statMultiplier = $statNode !== null ? (int) ($statNode->stat_multiplier ?? 2) : 0;
+        $statMultiplier = $statNode !== null ? $this->effectiveStatMultiplier($statNode, 2, $floor) : 0;
 
         foreach ($party as $slotId => $character) {
             if ($character->hp <= 0) {
@@ -1439,7 +1455,7 @@ class DungeonExplorationEngine
             }
 
             if ($statNode !== null) {
-                $rate = $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier, $floor);
+                $rate = $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier);
                 $label = $character->characterMaster->name.'（成功率'.$rate.'%）';
             } else {
                 $label = $character->characterMaster->name;
@@ -1450,7 +1466,7 @@ class DungeonExplorationEngine
                 'name' => $character->characterMaster->name,
                 'str' => (int) $character->str,
                 'success_rate' => $statNode !== null
-                    ? $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier, $floor)
+                    ? $this->successRateForSlot($user, $slotId, $statAttr, $statMultiplier)
                     : null,
                 'label' => $label,
             ];

@@ -120,4 +120,61 @@ class DungeonAdminSettingsTest extends TestCase
                 'force_dialogue_events' => false,
             ]);
     }
+
+    public function test_admin_can_mark_floors_cleared(): void
+    {
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+
+        $this->getJson('/api/admins/dungeon-settings')
+            ->assertOk()
+            ->assertJson(['cleared_floor' => 0, 'unlocked_floor' => 1]);
+
+        // 1層: クリア済みになり、2層が解放される
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 1])
+            ->assertOk()
+            ->assertJson(['cleared_floor' => 1, 'unlocked_floor' => 2, 'message' => '1層をクリア済みにしました。']);
+
+        // 3層: 2層もクリア済みとして扱われ、最終層なので解放層は 3 のまま
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 3])
+            ->assertOk()
+            ->assertJson(['cleared_floor' => 3, 'unlocked_floor' => 3]);
+
+        $progress = UserDungeonProgress::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame(3, (int) $progress->cleared_floor);
+        $this->assertSame(3, (int) $progress->unlocked_floor);
+    }
+
+    public function test_admin_clear_never_lowers_cleared_floor(): void
+    {
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 3])->assertOk();
+
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 1])
+            ->assertOk()
+            ->assertJson(['cleared_floor' => 3, 'unlocked_floor' => 3, 'message' => '1層はすでにクリア済みです。']);
+    }
+
+    public function test_admin_clear_second_floor_unlocks_third_floor(): void
+    {
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 2])
+            ->assertOk()
+            ->assertJson(['cleared_floor' => 2, 'unlocked_floor' => 3]);
+    }
+
+    public function test_admin_clear_rejects_unknown_floor(): void
+    {
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 0])->assertStatus(422);
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 4])->assertStatus(422);
+        $this->postJson('/api/admins/dungeon-clear', [])->assertStatus(422);
+    }
+
+    public function test_home_reset_clears_cleared_floor(): void
+    {
+        $this->postJson('/api/admins/dungeon-clear', ['floor' => 3])->assertOk();
+
+        $this->postJson('/api/reset')->assertOk();
+
+        $this->getJson('/api/admins/dungeon-settings')
+            ->assertOk()
+            ->assertJson(['cleared_floor' => 0, 'unlocked_floor' => 1]);
+    }
 }

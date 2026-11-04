@@ -12,6 +12,7 @@ class UserDungeonProgress extends Model
         'user_id',
         'floor',
         'unlocked_floor',
+        'cleared_floor',
         'step',
         'skip_battle_encounters',
         'force_dialogue_events',

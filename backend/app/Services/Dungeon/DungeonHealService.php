@@ -5,11 +5,13 @@ namespace App\Services\Dungeon;
 use App\Models\DungeonExplorationSession;
 use App\Models\User;
 use App\Models\UserCharacter;
+use App\Services\Battle\SpellHealing;
 use App\Services\Growth\LevelGrowthService;
 use App\Services\MasterData\MasterDataProvider;
 use App\Services\Player\EquipmentService;
 use App\Services\Player\GameNavigationService;
 use App\Services\Player\ItemInventoryService;
+use App\Services\Player\SpellLearningService;
 use App\Services\Player\UserCharacterService;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +25,7 @@ class DungeonHealService
         private readonly MasterDataProvider $masters = new MasterDataProvider,
         private readonly GameNavigationService $navigation = new GameNavigationService,
         private readonly EquipmentService $equipment = new EquipmentService,
+        private readonly SpellLearningService $spellLearning = new SpellLearningService,
     ) {}
 
     /**
@@ -39,7 +42,7 @@ class DungeonHealService
         }
 
         $item = $this->items->findItem($itemCode);
-        $maxStats = $this->growth->statsForLevel($target->characterMaster, $target->level);
+        $maxStats = $this->growth->statsForCharacter($target);
 
         DB::transaction(function () use ($user, $target, $item, $maxStats): void {
             match ($item->effect) {
@@ -73,8 +76,7 @@ class DungeonHealService
             throw new \InvalidArgumentException('戦闘不能のキャラクターは魔法を使えません。');
         }
 
-        $masterCode = $caster->characterMaster->code;
-        $spellIds = $this->masters->spellIdsForCharacter($masterCode);
+        $spellIds = $this->spellLearning->spellIdsFor($caster);
         if (! in_array($spellId, $spellIds, true)) {
             throw new \InvalidArgumentException('その魔法は使えません。');
         }
@@ -85,7 +87,7 @@ class DungeonHealService
             throw new \InvalidArgumentException('回復に使える魔法ではありません。');
         }
 
-        $maxTarget = $this->growth->statsForLevel($target->characterMaster, $target->level);
+        $maxTarget = $this->growth->statsForCharacter($target);
         $mpCost = (int) ($spell['mp_cost'] ?? 0);
         if ($caster->mp < $mpCost) {
             throw new \InvalidArgumentException('MPが足りません。');
@@ -97,10 +99,11 @@ class DungeonHealService
                     $target,
                     $maxTarget['hp'],
                     // 戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する
-                    (int) floor((float) $this->equipment->effectiveCombatStats($caster)['mag'] * (float) config('battle.heal_mag_multiplier')),
+                    SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell),
                 ),
                 'heal' => $this->applyHpHeal($target, $maxTarget['hp'], (int) ($spell['power'] ?? 0)),
-                'revive_chance' => $this->applyRevive($target, $maxTarget['hp'], (int) ($spell['power'] ?? 50)),
+                // 蘇生後の HP は戦闘中と同じ割合（power は戦闘中の成功率）
+                'revive_chance' => $this->applyRevive($target, $maxTarget['hp'], (int) config('battle.revive_hp_percent', 50)),
                 default => throw new \InvalidArgumentException('この魔法は使えません。'),
             };
 
@@ -120,8 +123,7 @@ class DungeonHealService
         $spells = [];
 
         foreach ($party as $slotId => $character) {
-            $masterCode = $character->characterMaster->code;
-            foreach ($this->masters->spellIdsForCharacter($masterCode) as $spellId) {
+            foreach ($this->spellLearning->spellIdsFor($character) as $spellId) {
                 $spell = $this->masters->findSpell($spellId);
                 $effect = $spell['effect'] ?? '';
                 if (! in_array($effect, ['heal_mag', 'heal', 'revive_chance'], true)) {

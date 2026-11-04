@@ -5,6 +5,10 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\UserCharacter;
 use App\Models\UserDungeonProgress;
+use App\Services\Battle\BattleEngine;
+use App\Services\Battle\BattleOrchestrator;
+use App\Services\Battle\EnemySkillPicker;
+use App\Services\Dungeon\DungeonAdvanceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -82,17 +86,24 @@ class DungeonFloorApiTest extends TestCase
         $response->assertJsonPath('step', 3);
     }
 
-    public function test_floor_two_boss_encounter_at_step_41(): void
+    public function test_floor_two_boss_encounter_at_step_31_is_dragon_with_two_cultists(): void
     {
         config([
-            'game.dungeon.floors.2.boss_step' => 41,
+            'game.dungeon.floors.2.boss_step' => 31,
             'game.dungeon.test_force' => 'battle',
         ]);
+        // Lv1 のデモパーティは、ドラゴンブレスを引くと開幕で全滅して 1 層に戻ってしまう。
+        // 敵の初手は必ず先頭の技（通常攻撃）にして、編成の確認だけを行う。
+        $this->app->bind(DungeonAdvanceService::class, fn () => new DungeonAdvanceService(
+            orchestrator: new BattleOrchestrator(
+                engine: new BattleEngine(enemySkillPicker: new EnemySkillPicker(roll: static fn (): int => 0)),
+            ),
+        ));
 
         $user = $this->demoUser();
         UserDungeonProgress::query()->updateOrCreate(
             ['user_id' => $user->id],
-            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 40, 'in_dungeon' => false],
+            ['floor' => 2, 'unlocked_floor' => 2, 'step' => 30, 'in_dungeon' => false],
         );
 
         $this->postJson('/api/dungeon/enter', ['floor' => 2])->assertOk();
@@ -101,7 +112,13 @@ class DungeonFloorApiTest extends TestCase
         $response->assertJsonPath('event', 'battle');
         $response->assertJsonPath('boss_encounter', true);
         $response->assertJsonPath('floor', 2);
-        $response->assertJsonPath('step', 41);
+        $response->assertJsonPath('step', 31);
+
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertSame(['mahou', 'dragon', 'mahou'], $enemies->pluck('master_code')->all());
+        $this->assertSame(['邪教徒 A', 'エルドラゴン', '邪教徒 B'], $enemies->pluck('name')->all());
+        $response->assertJsonPath('state.meta.boss', true);
+        $response->assertJsonPath('state.meta.can_flee', false);
     }
 
     public function test_floor_two_mid_boss_triggers_exploration_at_step_20(): void
@@ -124,6 +141,23 @@ class DungeonFloorApiTest extends TestCase
             'user_id' => $user->id,
             'event_code' => 'floor2_mid_boss',
         ]);
+    }
+
+    public function test_navigation_reports_the_floor_being_explored(): void
+    {
+        $this->postJson('/api/dungeon/enter', ['floor' => 1])->assertOk();
+        $this->getJson('/api/player/navigation')
+            ->assertOk()
+            ->assertJsonPath('in_dungeon', true)
+            ->assertJsonPath('dungeon_floor', 1);
+
+        UserDungeonProgress::query()
+            ->where('user_id', $this->demoUser()->id)
+            ->update(['floor' => 2, 'unlocked_floor' => 2]);
+
+        $this->getJson('/api/player/navigation')
+            ->assertOk()
+            ->assertJsonPath('dungeon_floor', 2);
     }
 
     public function test_boss_victory_unlocks_floor_two_and_floor_two_is_enterable(): void
@@ -198,6 +232,8 @@ class DungeonFloorApiTest extends TestCase
         $progress = UserDungeonProgress::query()->where('user_id', $user->id)->first();
         $this->assertSame(0, (int) $progress->step);
         $this->assertFalse((bool) $progress->in_dungeon);
+        $this->assertSame(1, (int) $progress->cleared_floor);
+        $this->assertSame(2, (int) $progress->unlocked_floor);
 
         $this->getJson('/api/player/navigation')
             ->assertOk()
@@ -274,7 +310,7 @@ class DungeonFloorApiTest extends TestCase
     {
         config([
             'game.dungeon.floors.1.boss_step' => 31,
-            'game.dungeon.floors.2.boss_step' => 41,
+            'game.dungeon.floors.2.boss_step' => 31,
             'game.dungeon.playable_floor' => 2,
             'game.dungeon.test_force' => null,
         ]);

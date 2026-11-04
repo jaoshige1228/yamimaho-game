@@ -5,9 +5,14 @@ namespace App\Services\Dungeon;
 use App\Models\DungeonDialogueEventMaster;
 use App\Models\DungeonEventMaster;
 use App\Models\DungeonEventNode;
+use App\Models\ItemMaster;
 
 class DungeonEventCatalog
 {
+    public function __construct(
+        private readonly DungeonEventFloorOverrides $overrides = new DungeonEventFloorOverrides,
+    ) {}
+
     public function pickRandomEventCode(int $floor): string
     {
         return $this->pickFromPool($this->mechanicalEventPool($floor), $floor, 'mechanical');
@@ -92,7 +97,10 @@ class DungeonEventCatalog
         return $event;
     }
 
-    public function findNode(string $eventCode, string $nodeKey): DungeonEventNode
+    /**
+     * イベントのノード。層ごとの数値の上書き（dungeon_event_floor_overrides.csv）を反映して返す。
+     */
+    public function findNode(string $eventCode, string $nodeKey, int $floor): DungeonEventNode
     {
         $node = DungeonEventNode::query()
             ->where('event_code', $eventCode)
@@ -103,7 +111,39 @@ class DungeonEventCatalog
             throw new \InvalidArgumentException("Unknown node {$eventCode}.{$nodeKey}");
         }
 
+        $this->overrides->apply($node, $floor);
+        $this->applyRewardItems($node, $floor);
+
         return $node;
+    }
+
+    /**
+     * 報酬アイテムを、その層の差し替え（game.dungeon.floors.N.reward_item_map）に合わせる。
+     * - grant_item ノードの stat_attr（アイテムコード）
+     * - 文面の {item:元のコード} を、その層で出すアイテムの名前に
+     */
+    private function applyRewardItems(DungeonEventNode $node, int $floor): void
+    {
+        if ($node->node_type === 'grant_item') {
+            $node->stat_attr = DungeonFloorConfig::rewardItemCode($floor, (string) $node->stat_attr);
+        }
+
+        foreach (['text', 'dialogue_pc1', 'dialogue_pc2', 'dialogue_pc3', 'dialogue_pc4'] as $column) {
+            $text = $node->{$column};
+            if (! is_string($text) || ! str_contains($text, '{item:')) {
+                continue;
+            }
+
+            $node->{$column} = preg_replace_callback(
+                '/\{item:([a-z0-9_]+)\}/',
+                function (array $match) use ($floor): string {
+                    $code = DungeonFloorConfig::rewardItemCode($floor, $match[1]);
+
+                    return (string) (ItemMaster::query()->where('code', $code)->value('name') ?? $code);
+                },
+                $text,
+            );
+        }
     }
 
     /**

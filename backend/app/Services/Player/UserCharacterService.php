@@ -125,8 +125,7 @@ class UserCharacterService
         $party = $this->ensureParty($user);
 
         foreach ($party as $character) {
-            $master = $character->characterMaster;
-            $stats = $this->growth->statsForLevel($master, $character->level);
+            $stats = $this->growth->statsForCharacter($character);
 
             $character->hp = $stats['hp'];
             $character->mp = $stats['mp'];
@@ -147,7 +146,7 @@ class UserCharacterService
     public function toPartyUnitPayload(UserCharacter $character, string $slotId): array
     {
         $master = $character->characterMaster;
-        $maxStats = $this->growth->statsForLevel($master, $character->level);
+        $maxStats = $this->growth->statsForCharacter($character);
         $combat = $this->equipment->effectiveCombatStats($character);
 
         return [

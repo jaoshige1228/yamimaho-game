@@ -6,6 +6,8 @@ export const usePlayerStore = defineStore('player', () => {
   const gold = ref(0);
   const items = ref([]);
   const inDungeon = ref(false);
+  /** 探索中の層（探索画面の背景・BGM の切り替えに使う） */
+  const dungeonFloor = ref(1);
   const activeBattleId = ref(null);
   const battleFromDungeon = ref(false);
   const navigationLoaded = ref(false);
@@ -18,8 +20,13 @@ export const usePlayerStore = defineStore('player', () => {
     items.value = Array.isArray(value) ? value : [];
   }
 
+  function setDungeonFloor(value) {
+    dungeonFloor.value = Math.max(1, Number(value) || 1);
+  }
+
   function setNavigation(data) {
     inDungeon.value = Boolean(data?.in_dungeon);
+    setDungeonFloor(data?.dungeon_floor);
     activeBattleId.value = data?.active_battle_id ?? null;
     battleFromDungeon.value = Boolean(data?.battle_from_dungeon);
     navigationLoaded.value = true;
@@ -47,11 +54,13 @@ export const usePlayerStore = defineStore('player', () => {
     gold,
     items,
     inDungeon,
+    dungeonFloor,
     activeBattleId,
     battleFromDungeon,
     navigationLoaded,
     setGold,
     setItems,
+    setDungeonFloor,
     setNavigation,
     fetchParty,
     fetchGold,

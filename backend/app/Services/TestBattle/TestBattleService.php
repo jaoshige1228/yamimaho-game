@@ -7,6 +7,7 @@ use App\Models\EnemyMaster;
 use App\Models\User;
 use App\Models\WeaponMaster;
 use App\Services\Dungeon\DungeonFloorConfig;
+use App\Services\Dungeon\DungeonStepEncounterBuilder;
 use App\Services\Player\UserCharacterService;
 
 class TestBattleService
@@ -55,7 +56,7 @@ class TestBattleService
                 [
                     'id' => 'floor2_boss',
                     'label' => '2層ボス戦',
-                    'description' => 'イフリーヌ',
+                    'description' => 'エルドラゴン＆邪教徒×2',
                 ],
                 [
                     'id' => 'floor2_mid_boss',
@@ -163,17 +164,11 @@ class TestBattleService
      */
     private function buildFloorBoss(int $floor, bool $bossEncounter): array
     {
-        $code = DungeonFloorConfig::bossEnemyCode($floor) ?? 'inu_moe';
-        $master = $this->findEnemy($floor, $code);
+        // 実際のダンジョンのボス戦と同じ構成（DungeonStepEncounterBuilder）を使う
+        $enemies = (new DungeonStepEncounterBuilder)->build($floor, (int) DungeonFloorConfig::bossStep($floor));
 
         return [
-            'enemies' => [[
-                'slot' => 'enemy_1',
-                'master_code' => $master->code,
-                'floor' => $floor,
-                'name' => $master->name,
-                'sprite' => $master->sprite,
-            ]],
+            'enemies' => $enemies,
             'meta' => [
                 'source' => 'test',
                 'floor' => $floor,

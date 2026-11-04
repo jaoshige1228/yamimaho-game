@@ -78,6 +78,86 @@ class DungeonStepEncounterBuilderTest extends TestCase
         $this->assertSame('イフリーヌ', $enemies[0]['name']);
     }
 
+    /**
+     * @return array<string, array{0: int, 1: int, 2: list<string>, 3: int, 4: int}>
+     */
+    public static function floor2Bands(): array
+    {
+        return [
+            '1〜10 ジャック1〜2体' => [1, 10, ['jack', 'mimic'], 1, 2],
+            '11〜20 ジャック/刈り取る奴2〜3体' => [11, 20, ['jack', 'shinigami', 'mimic'], 2, 3],
+            '21〜25 ジャック/刈り取る奴/ヘルナイト2〜3体' => [21, 25, ['jack', 'shinigami', 'knight', 'mimic'], 2, 3],
+            '26〜30 刈り取る奴/ヘルナイト2〜3体' => [26, 30, ['shinigami', 'knight', 'mimic'], 2, 3],
+        ];
+    }
+
+    /**
+     * ミミックはレア（約 3%）なので、「全種類が出ること」は通常の敵だけで確かめる。
+     *
+     * @param  list<string>  $allowedCodes
+     */
+    #[DataProvider('floor2Bands')]
+    public function test_floor2_band_spawns_expected_enemies(
+        int $from,
+        int $to,
+        array $allowedCodes,
+        int $countMin,
+        int $countMax,
+    ): void {
+        $seenCodes = [];
+        $seenCounts = [];
+
+        for ($step = $from; $step <= $to; $step++) {
+            for ($i = 0; $i < 15; $i++) {
+                $enemies = $this->builder->build(2, $step);
+                $seenCounts[] = count($enemies);
+
+                $this->assertGreaterThanOrEqual($countMin, count($enemies), "step {$step}");
+                $this->assertLessThanOrEqual($countMax, count($enemies), "step {$step}");
+                foreach ($enemies as $enemy) {
+                    $this->assertContains($enemy['master_code'], $allowedCodes, "step {$step}");
+                    $this->assertSame(2, $enemy['floor']);
+                    $seenCodes[] = $enemy['master_code'];
+                }
+            }
+        }
+
+        $regularCodes = array_values(array_diff($allowedCodes, ['mimic']));
+        $this->assertEqualsCanonicalizing($regularCodes, array_values(array_unique(array_diff($seenCodes, ['mimic']))));
+        $this->assertContains($countMin, $seenCounts);
+        $this->assertContains($countMax, $seenCounts);
+    }
+
+    public function test_mimic_is_rare_on_floor_two(): void
+    {
+        $mimics = 0;
+        $total = 0;
+
+        foreach ([5, 15, 23, 28] as $step) {
+            for ($i = 0; $i < 400; $i++) {
+                foreach ($this->builder->build(2, $step) as $enemy) {
+                    $total++;
+                    $mimics += $enemy['master_code'] === 'mimic' ? 1 : 0;
+                }
+            }
+        }
+
+        // 設定上は約 3%。出るには出るが、ほとんどは通常の敵であること
+        $rate = $mimics / $total;
+        $this->assertGreaterThan(0.01, $rate);
+        $this->assertLessThan(0.07, $rate);
+    }
+
+    public function test_floor2_boss_step_spawns_dragon_with_two_cultists(): void
+    {
+        $enemies = $this->builder->build(2, 31);
+
+        $this->assertSame(['mahou', 'dragon', 'mahou'], array_column($enemies, 'master_code'));
+        $this->assertSame(['enemy_1', 'enemy_2', 'enemy_3'], array_column($enemies, 'slot'));
+        $this->assertSame(['邪教徒 A', 'エルドラゴン', '邪教徒 B'], array_column($enemies, 'name'));
+        $this->assertSame([2, 2, 2], array_column($enemies, 'floor'));
+    }
+
     public function test_encounter_includes_floor_for_battle_lookup(): void
     {
         $enemies = $this->builder->build(2, 5);

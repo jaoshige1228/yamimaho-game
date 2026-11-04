@@ -56,6 +56,9 @@ return [
     /** 回復魔法（effect=heal_mag）の回復量 = 詠唱者の魔力 × この値。戦闘中・探索中の両方で使う */
     'heal_mag_multiplier' => 2,
 
+    /** 蘇生魔法（effect=revive_chance）で復活したときの HP（最大 HP に対する割合 %）。戦闘中・探索中で共通 */
+    'revive_hp_percent' => 50,
+
     'buffs' => [
         'def_up' => ['stat' => 'def', 'multiplier' => 1.3, 'turns' => 3, 'icon' => 'def_up'],
         'def_up_large' => ['stat' => 'def', 'multiplier' => 1.5, 'turns' => 3, 'icon' => 'def_up_large'],
@@ -66,5 +69,10 @@ return [
         'atk_down' => ['stat' => 'str', 'multiplier' => 0.8, 'turns' => 3, 'icon' => 'atk_down'],
         'atk_down_large' => ['stat' => 'str', 'multiplier' => 0.6, 'turns' => 3, 'icon' => 'atk_down_large'],
         'evasion_set' => ['type' => 'evasion_set', 'value' => 60, 'turns' => 3, 'icon' => 'evasion'],
+        // 全体魔法・新魔法用（アイコンは既存のものを流用）
+        'def_up_small' => ['stat' => 'def', 'multiplier' => 1.2, 'turns' => 3, 'icon' => 'def_up'],
+        'def_down_small' => ['stat' => 'def', 'multiplier' => 0.8, 'turns' => 3, 'icon' => 'def_down'],
+        'def_down_huge' => ['stat' => 'def', 'multiplier' => 0.5, 'turns' => 3, 'icon' => 'def_down_large'],
+        'evasion_set_small' => ['type' => 'evasion_set', 'value' => 30, 'turns' => 3, 'icon' => 'evasion'],
     ],
 ];

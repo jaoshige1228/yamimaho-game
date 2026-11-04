@@ -22,6 +22,8 @@ class GameNavigationService
 
         return [
             'in_dungeon' => $inDungeon,
+            // 探索画面の背景・BGM を層ごとに切り替えるために使う
+            'dungeon_floor' => $this->dungeon->getFloor($user),
             'active_battle_id' => $activeBattleId,
             'battle_from_dungeon' => $activeBattleId !== null
                 ? $this->isDungeonBattle($activeBattleId)

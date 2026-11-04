@@ -31,12 +31,21 @@ class DungeonFloorConfig
         return $bossStep !== null && $step === $bossStep;
     }
 
-    public static function bossEnemyCode(int $floor): ?string
+    /**
+     * ボス戦に出る敵のコード（左から enemy_1, enemy_2…。同じコードを重ねて複数体にできる）。
+     *
+     * @return list<string>
+     */
+    public static function bossEnemyCodes(int $floor): array
     {
         $floors = config('game.dungeon.floors', []);
-        $code = $floors[$floor]['boss_enemy_code'] ?? null;
+        $codes = $floors[$floor]['boss_enemy_codes'] ?? [];
 
-        return is_string($code) && $code !== '' ? $code : null;
+        if (! is_array($codes)) {
+            return [];
+        }
+
+        return array_values(array_filter($codes, fn ($code) => is_string($code) && $code !== ''));
     }
 
     public static function midBossStep(int $floor): ?int
@@ -78,7 +87,7 @@ class DungeonFloorConfig
     }
 
     /**
-     * @return list<array{from: int, to: int, codes: list<string>, count_min?: int, count_max?: int}>
+     * @return list<array{from: int, to: int, codes: list<string>, weights?: array<string, int>, count_min?: int, count_max?: int}>
      */
     public static function encounterBands(int $floor): array
     {
@@ -86,6 +95,16 @@ class DungeonFloorConfig
         $bands = $floors[$floor]['encounter_bands'] ?? [];
 
         return is_array($bands) ? $bands : [];
+    }
+
+    /**
+     * 探索イベントが報酬として出すアイテムのコード。層ごとの差し替え（reward_item_map）があればそれ、なければそのまま。
+     */
+    public static function rewardItemCode(int $floor, string $itemCode): string
+    {
+        $map = config("game.dungeon.floors.{$floor}.reward_item_map", []);
+
+        return is_array($map) && isset($map[$itemCode]) ? (string) $map[$itemCode] : $itemCode;
     }
 
     public static function statMultiplierScale(int $floor): int

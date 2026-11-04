@@ -146,7 +146,11 @@ class MasterDataSeeder extends Seeder
                 if ($spell === null) {
                     continue;
                 }
-                $sync[$spell->id] = ['sort_order' => (int) $row['sort_order']];
+                $learnAfterDefeat = trim((string) ($row['learn_after_defeat'] ?? ''));
+                $sync[$spell->id] = [
+                    'sort_order' => (int) $row['sort_order'],
+                    'learn_after_defeat' => $learnAfterDefeat !== '' ? $learnAfterDefeat : null,
+                ];
             }
 
             $character->spells()->sync($sync);

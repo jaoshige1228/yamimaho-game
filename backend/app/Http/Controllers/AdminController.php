@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AdminDungeonClearRequest;
 use App\Http\Requests\AdminDungeonSettingsRequest;
 use App\Http\Requests\AdminGrantExpRequest;
 use App\Services\Admin\AdminPartyService;
@@ -88,6 +89,28 @@ class AdminController extends Controller
                 'message' => 'ダンジョン設定を反映しました。',
                 'skip_battles' => (bool) $validated['skip_battles'],
                 'force_dialogue_events' => (bool) $validated['force_dialogue_events'],
+            ],
+            $this->dungeonProgress->statusPayload($user),
+        ));
+    }
+
+    /** ダンジョンの指定した層をクリア済みにする（元に戻せない） */
+    public function dungeonClear(AdminDungeonClearRequest $request): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        $floor = (int) $request->validated('floor');
+        $alreadyCleared = $this->dungeonProgress->getClearedFloor($user) >= $floor;
+        $this->dungeonProgress->markFloorCleared($user, $floor);
+
+        return response()->json(array_merge(
+            [
+                'message' => $alreadyCleared
+                    ? "{$floor}層はすでにクリア済みです。"
+                    : "{$floor}層をクリア済みにしました。",
             ],
             $this->dungeonProgress->statusPayload($user),
         ));

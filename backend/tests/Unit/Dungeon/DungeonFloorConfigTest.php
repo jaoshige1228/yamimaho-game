@@ -15,6 +15,32 @@ class DungeonFloorConfigTest extends TestCase
         $this->assertFalse(DungeonFloorConfig::isMidBossStep(1, 20));
     }
 
+    public function test_boss_depth_is_the_same_on_floor_one_and_two(): void
+    {
+        $this->assertSame(31, DungeonFloorConfig::bossStep(1));
+        $this->assertSame(31, DungeonFloorConfig::bossStep(2));
+        $this->assertTrue(DungeonFloorConfig::isBossStep(2, 31));
+        $this->assertFalse(DungeonFloorConfig::isBossStep(2, 41));
+    }
+
+    public function test_boss_enemies_per_floor(): void
+    {
+        $this->assertSame(['inu_moe'], DungeonFloorConfig::bossEnemyCodes(1));
+        $this->assertSame(['mahou', 'dragon', 'mahou'], DungeonFloorConfig::bossEnemyCodes(2));
+        $this->assertSame([], DungeonFloorConfig::bossEnemyCodes(3));
+    }
+
+    public function test_reward_items_are_upgraded_on_floor_two_only(): void
+    {
+        $this->assertSame('potion_hp_s', DungeonFloorConfig::rewardItemCode(1, 'potion_hp_s'));
+        $this->assertSame('potion_mp_s', DungeonFloorConfig::rewardItemCode(1, 'potion_mp_s'));
+        $this->assertSame('potion_hp_m', DungeonFloorConfig::rewardItemCode(2, 'potion_hp_s'));
+        $this->assertSame('potion_mp_m', DungeonFloorConfig::rewardItemCode(2, 'potion_mp_s'));
+        // 差し替えの指定がないコード・層はそのまま
+        $this->assertSame('world_tree_leaf', DungeonFloorConfig::rewardItemCode(2, 'world_tree_leaf'));
+        $this->assertSame('potion_hp_s', DungeonFloorConfig::rewardItemCode(3, 'potion_hp_s'));
+    }
+
     public function test_floor_two_mid_boss_event_and_enemies(): void
     {
         $this->assertSame('floor2_mid_boss', DungeonFloorConfig::midBossEventCode(2));

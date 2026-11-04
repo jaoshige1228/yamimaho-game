@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\DungeonExplorationSession;
 use App\Services\Dungeon\DungeonProgressService;
 use App\Services\Player\PartyGoldService;
+use App\Services\Player\SpellLearningService;
 use App\Services\Player\UserCharacterService;
 
 /**
@@ -21,6 +22,7 @@ class BattleOrchestrator
         private readonly DungeonProgressService $dungeonProgress = new DungeonProgressService,
         private readonly UserCharacterService $characters = new UserCharacterService,
         private readonly PartyGoldService $gold = new PartyGoldService,
+        private readonly SpellLearningService $spellLearning = new SpellLearningService,
     ) {}
 
     /**
@@ -158,6 +160,8 @@ class BattleOrchestrator
 
         if ($status === 'victory') {
             $events = array_merge($events, $this->rewards->applyVictoryRewards($state, $user));
+            // 倒した敵に応じた新しい魔法の習得（イフリーヌ初回撃破など。通常戦・テスト戦闘も同じ経路）
+            $events = array_merge($events, $this->spellLearning->learnAfterVictory($state, $user));
 
             if ($isDungeon && ($meta['mid_boss'] ?? false)) {
                 $this->resumeExplorationAfterMidBoss($user, $meta);

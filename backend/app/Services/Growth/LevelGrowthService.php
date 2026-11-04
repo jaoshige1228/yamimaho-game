@@ -61,6 +61,19 @@ class LevelGrowthService
     }
 
     /**
+     * プレイヤーのキャラの最大ステータス。statsForLevel に、イベント報酬などで加算された最大MP（max_mp_bonus）を足したもの。
+     *
+     * @return array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int, vit: int}
+     */
+    public function statsForCharacter(UserCharacter $character): array
+    {
+        $stats = $this->statsForLevel($character->characterMaster, (int) $character->level);
+        $stats['mp'] += max(0, (int) $character->max_mp_bonus);
+
+        return $stats;
+    }
+
+    /**
      * @param  array{hp: int, mp: int, str: int, mag: int, def: int, spd: int, know: int, spirit: int, vit: int}  $stats
      * @param  int  $reachedLevel  この成長で到達するレベル
      */
@@ -111,9 +124,9 @@ class LevelGrowthService
                 break;
             }
 
-            $before = $this->statsForLevel($master, $character->level);
+            $before = $this->statsForCharacter($character);
             $character->level = $nextLevel;
-            $after = $this->statsForLevel($master, $character->level);
+            $after = $this->statsForCharacter($character);
 
             $character->hp = min($after['hp'], $character->hp + max(0, $after['hp'] - $before['hp']));
             $character->mp = min($after['mp'], $character->mp + max(0, $after['mp'] - $before['mp']));

@@ -20,7 +20,7 @@ class MasterDataProvider
     /** @var array<string, array<string, mixed>>|null */
     private ?array $spellCache = null;
 
-    /** @var array<string, list<string>>|null */
+    /** @var array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>|null */
     private ?array $characterSpellCache = null;
 
     /** @var array<string, list<array<string, mixed>>>|null */
@@ -110,13 +110,40 @@ class MasterDataProvider
     }
 
     /**
+     * キャラクターが使える魔法（並び順どおり）。最初から使える魔法に加えて、
+     * 敵を倒して覚える魔法のうち $learnedSpellCodes に入っているものを含める。
+     *
+     * @param  list<string>  $learnedSpellCodes  すでに覚えた魔法のコード
      * @return list<string>
      */
-    public function spellIdsForCharacter(string $characterCode): array
+    public function spellIdsForCharacter(string $characterCode, array $learnedSpellCodes = []): array
     {
-        $map = $this->characterSpellMap();
+        $ids = [];
+        foreach ($this->characterSpellMap()[$characterCode] ?? [] as $entry) {
+            if ($entry['learn_after_defeat'] === null || in_array($entry['spell_code'], $learnedSpellCodes, true)) {
+                $ids[] = $entry['spell_code'];
+            }
+        }
 
-        return $map[$characterCode] ?? [];
+        return $ids;
+    }
+
+    /**
+     * 指定した敵のどれかを倒したときに、キャラクターが覚える魔法。
+     *
+     * @param  list<string>  $defeatedEnemyCodes
+     * @return list<string>
+     */
+    public function spellIdsLearnedByDefeating(string $characterCode, array $defeatedEnemyCodes): array
+    {
+        $ids = [];
+        foreach ($this->characterSpellMap()[$characterCode] ?? [] as $entry) {
+            if ($entry['learn_after_defeat'] !== null && in_array($entry['learn_after_defeat'], $defeatedEnemyCodes, true)) {
+                $ids[] = $entry['spell_code'];
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -224,7 +251,7 @@ class MasterDataProvider
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>
      */
     private function characterSpellMap(): array
     {
@@ -242,7 +269,7 @@ class MasterDataProvider
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>
      */
     private function loadCharacterSpellsFromDb(): array
     {
@@ -253,7 +280,10 @@ class MasterDataProvider
             ->get()
             ->each(function (CharacterMaster $character) use (&$map): void {
                 $map[$character->code] = $character->spells
-                    ->pluck('code')
+                    ->map(fn (SpellMaster $spell) => [
+                        'spell_code' => $spell->code,
+                        'learn_after_defeat' => self::nullIfBlank($spell->pivot->learn_after_defeat ?? null),
+                    ])
                     ->values()
                     ->all();
             });
@@ -262,7 +292,7 @@ class MasterDataProvider
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>
      */
     private function loadCharacterSpellsFromCsv(): array
     {
@@ -273,10 +303,20 @@ class MasterDataProvider
         foreach ($rows as $row) {
             $characterCode = $row['character_code'];
             $map[$characterCode] ??= [];
-            $map[$characterCode][] = $row['spell_code'];
+            $map[$characterCode][] = [
+                'spell_code' => $row['spell_code'],
+                'learn_after_defeat' => self::nullIfBlank($row['learn_after_defeat'] ?? null),
+            ];
         }
 
         return $map;
+    }
+
+    private static function nullIfBlank(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     /**

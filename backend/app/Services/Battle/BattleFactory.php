@@ -10,6 +10,7 @@ use App\Models\WeaponMaster;
 use App\Services\Growth\LevelGrowthService;
 use App\Services\MasterData\MasterDataProvider;
 use App\Services\Player\EquipmentService;
+use App\Services\Player\SpellLearningService;
 use App\Services\Player\UserCharacterService;
 use Illuminate\Support\Str;
 
@@ -20,6 +21,7 @@ class BattleFactory
         private readonly LevelGrowthService $growth = new LevelGrowthService,
         private readonly UserCharacterService $userCharacters = new UserCharacterService,
         private readonly EquipmentService $equipment = new EquipmentService,
+        private readonly SpellLearningService $spellLearning = new SpellLearningService,
     ) {}
 
     public function createDemo(string $enemyConfigKey = 'demo_enemies'): array
@@ -87,7 +89,7 @@ class BattleFactory
         $party = $this->userCharacters->ensureParty($user);
         $units = [];
 
-        foreach (config('game.party_slots', []) as $slotId => $masterCode) {
+        foreach (array_keys(config('game.party_slots', [])) as $slotId) {
             /** @var UserCharacter|null $character */
             $character = $party->get($slotId);
             if ($character === null) {
@@ -99,7 +101,7 @@ class BattleFactory
             }
 
             $master = $character->characterMaster;
-            $spells = $this->masters->spellIdsForCharacter($masterCode);
+            $spells = $this->spellLearning->spellIdsFor($character);
             $units[$slotId] = $this->makeUnitFromUserCharacter($slotId, $character, $master, $spells);
         }
 
@@ -137,7 +139,7 @@ class BattleFactory
         $party = $this->userCharacters->ensureParty($user);
         $units = [];
 
-        foreach (config('game.party_slots', []) as $slotId => $masterCode) {
+        foreach (array_keys(config('game.party_slots', [])) as $slotId) {
             /** @var UserCharacter|null $character */
             $character = $party->get($slotId);
             if ($character === null) {
@@ -145,7 +147,7 @@ class BattleFactory
             }
 
             $master = $character->characterMaster;
-            $spells = $this->masters->spellIdsForCharacter($masterCode);
+            $spells = $this->spellLearning->spellIdsFor($character);
             $units[$slotId] = $this->makeUnitFromUserCharacter($slotId, $character, $master, $spells);
         }
 
@@ -258,7 +260,7 @@ class BattleFactory
             $floor = isset($meta['floor']) ? (int) $meta['floor'] : null;
             $master = $this->masters->findEnemy($meta['master_code'], $floor);
             $sprite = (string) ($meta['sprite'] ?? $master['sprite'] ?? $master['code']);
-            if (! preg_match('/^[a-z][a-z0-9_]*$/i', $sprite)) {
+            if (! preg_match('/^[a-z0-9][a-z0-9_]*$/i', $sprite)) {
                 $sprite = (string) $master['code'];
             }
 
@@ -322,7 +324,7 @@ class BattleFactory
         CharacterMaster $master,
         array $spells = [],
     ): array {
-        $maxStats = $this->growth->statsForLevel($master, $character->level);
+        $maxStats = $this->growth->statsForCharacter($character);
         $combat = $this->equipment->effectiveCombatStats($character);
 
         return [
