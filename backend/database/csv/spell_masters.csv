@@ -1,6 +1,6 @@
 code,label,description,mp_cost,target_type,effect,element,coefficient,power,buff_key
-pc1_heal_water,癒しの水,治癒効果のある水をバシャー。味方一体のHPを小回復。,8,ally_single,heal_mag,,1.2,,
-pc1_holy_water,神聖の水,治癒効果のある水をドシャー。味方一体のHPを中回復。,12,ally_single,heal_mag,,2.4,,
+pc1_heal_water,癒しの水,治癒効果のある水をバシャー。味方一体のHPを小回復。,8,ally_single,heal_mag,,1.7,,
+pc1_holy_water,神聖の水,治癒効果のある水をドシャー。味方一体のHPを中回復。,14,ally_single,heal_mag,,2.8,,
 pc1_water_blade,水の刃,鋭く固めた水を射出。敵一体にダメージ。,6,enemy_single,damage,water,2.3,,
 pc1_water_veil,水の幻影,仲間の隣に幻影を生み出し、敵を惑わせる。3ターンの間味方一体の回避率が上昇。,10,ally_single,buff_evasion_set,,,,evasion_set
 pc1_water_veil_all,水の幻影群,仲間全員の幻影を生み出し、敵を惑わせる。3ターンの間、味方全体の回避率が少し上昇。,18,ally_all,buff_evasion_set,,,,evasion_set_small
@@ -13,7 +13,7 @@ pc3_fire_shot,炎弾,圧縮した火炎をシューッ。敵一体にダメー�
 pc3_fire_burst,爆破,炸裂する火炎。敵一体に大ダメージ。,12,enemy_single,damage,fire,3.0,,
 pc3_fire_wave,火炎波及,炎の波を繰り出す。敵全体にダメージ。,16,enemy_all,damage,fire,1.7,,
 pc3_black_hole,ブラックホール,闇魔法。敵全体を飲み込み大ダメージ。ただし自分のHPも最大値の半分消費する。,30,enemy_all,damage_hp_cost,dark,3.0,50,
-pc3_ragaon_beat,ラグオンビート,闇魔法。敵一体の表皮または表面に薄く亀裂を走らせる。3ターンの間、防御力を大きく下げる。ただし自分の防御力も同等に下がる。,20,enemy_single,debuff_def_both,,,,def_down_huge
+pc3_ragaon_beat,ラグオンビート,闇魔法。敵の表皮または表面に薄く亀裂を走らせる。3ターンの間、敵一体の防御力を大きく下げる。ただし自分の防御力も同等に下がる。,20,enemy_single,debuff_def_both,,,,def_down_huge
 pc4_stone_shot,石弾,生成した石を射出。敵一体にダメージ。,6,enemy_single,damage,earth,2.3,,
 pc4_rock_fall,岩落とし,生成した岩石を敵の頭上に落とす。敵一体に大ダメージ。,12,enemy_single,damage,earth,3.0,,
 pc4_earth_armor,土の鎧,土でできた鎧を仲間に纏わせる。3ターンの間味方一体の防御力を上げる。,10,ally_single,buff_def,,,,def_up

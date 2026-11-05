@@ -78,12 +78,40 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame($master->spd + 2, $lv3['spd']);
 
         // Lv2〜20 の19回の内訳: 通常 8回（Lv2,3,5,6,8,9,10,11）+ Lv4（HP+20 MP+6 魔力防御+4 他+3）
-        // + Lv7（他+3、ほかは通常）+ Lv12〜20 の9回（HP+15 MP+5 魔力防御+4 他+2）
-        $this->assertSame($master->hp + 8 * 10 + 20 + 10 + 9 * 15, $lv20['hp']);
-        $this->assertSame($master->mp + 8 * 3 + 6 + 3 + 9 * 5, $lv20['mp']);
-        $this->assertSame($master->mag + 8 * 2 + 4 + 2 + 9 * 4, $lv20['mag']);
-        $this->assertSame($master->def + 8 * 2 + 4 + 2 + 9 * 4, $lv20['def']);
-        $this->assertSame($master->vit + 8 * 1 + 3 + 3 + 9 * 2, $lv20['vit']);
+        // + Lv7（他+3、ほかは通常）+ Lv12〜20 のうち Lv18 を除く8回（HP+15 MP+5 魔力防御+4 他+2）
+        // + Lv18（HP+30 MP+10 魔力防御+8 他+4）
+        $this->assertSame($master->hp + 8 * 10 + 20 + 10 + 8 * 15 + 30, $lv20['hp']);
+        $this->assertSame($master->mp + 8 * 3 + 6 + 3 + 8 * 5 + 10, $lv20['mp']);
+        $this->assertSame($master->mag + 8 * 2 + 4 + 2 + 8 * 4 + 8, $lv20['mag']);
+        $this->assertSame($master->def + 8 * 2 + 4 + 2 + 8 * 4 + 8, $lv20['def']);
+        $this->assertSame($master->vit + 8 * 1 + 3 + 3 + 8 * 2 + 4, $lv20['vit']);
+    }
+
+    public function test_only_reaching_level_18_uses_the_special_growth(): void
+    {
+        $this->seed(\Database\Seeders\MasterDataSeeder::class);
+
+        $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
+        $growth = new LevelGrowthService;
+
+        $gained = function (int $from, int $to) use ($growth, $master): array {
+            $before = $growth->statsForLevel($master, $from);
+            $after = $growth->statsForLevel($master, $to);
+
+            return array_map(fn (string $stat) => $after[$stat] - $before[$stat], array_combine(array_keys($before), array_keys($before)));
+        };
+
+        // Lv12 以降の通常（Lv17→Lv18 の前後）
+        $late = ['hp' => 15, 'mp' => 5, 'mag' => 4, 'def' => 4, 'str' => 2, 'spd' => 2, 'know' => 2, 'spirit' => 2, 'vit' => 2];
+        $this->assertEquals($late, $gained(16, 17));
+        $this->assertEquals($late, $gained(18, 19));
+        $this->assertEquals($late, $gained(19, 20));
+
+        // Lv18 に上がるときだけ: HP+30 MP+10 魔力+8 防御+8 その他+4
+        $this->assertEquals(
+            ['hp' => 30, 'mp' => 10, 'mag' => 8, 'def' => 8, 'str' => 4, 'spd' => 4, 'know' => 4, 'spirit' => 4, 'vit' => 4],
+            $gained(17, 18),
+        );
     }
 
     public function test_grant_exp_levels_up_character(): void

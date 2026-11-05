@@ -396,13 +396,20 @@ function setDisplayHp(targetId, hp) {
   displayHp.value[targetId] = Math.max(0, Math.min(unit.max_hp, hp));
 }
 
+/** 「〇〇は△△を唱えた！」の告知イベントか */
+function isSpellAnnounce(ev) {
+  return ev?.type === 'announce' && Boolean(ev.text?.includes('唱え'));
+}
+
 async function playEvents(events) {
   for (let i = 0; i < events.length; i += 1) {
     const ev = events[i];
     if (ev.type === 'turn_start') {
       visualCurrentActor.value = ev.actor;
       playSe('attack_before');
-      if (String(ev.actor).startsWith('enemy')) {
+      // 敵の物理攻撃は、アイコンが前に出てから告知を出す。魔法の詠唱は動かさず、PC と同じタイミングで
+      // 告知をすぐ出す（動いてから遅れて「〇〇を唱えた！」が出るとテンポが悪い）
+      if (String(ev.actor).startsWith('enemy') && !isSpellAnnounce(events[i + 1])) {
         activeEnemyLunge.value = ev.actor;
         await delay(280);
         activeEnemyLunge.value = null;
@@ -411,7 +418,7 @@ async function playEvents(events) {
     }
     if (ev.type === 'announce') {
       showActionBanner(ev.text);
-      const isSpell = ev.text?.includes('唱え');
+      const isSpell = isSpellAnnounce(ev);
       if (isSpell) {
         showFlash(flashKindForSpellAnnounce(ev));
         playSe('magic');
