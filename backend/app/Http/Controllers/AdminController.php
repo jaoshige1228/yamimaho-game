@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\AdminDungeonClearRequest;
 use App\Http\Requests\AdminDungeonSettingsRequest;
+use App\Http\Requests\AdminEquipRequest;
 use App\Http\Requests\AdminGrantExpRequest;
 use App\Services\Admin\AdminPartyService;
 use App\Services\Dungeon\DungeonProgressService;
@@ -51,6 +52,43 @@ class AdminController extends Controller
                 ];
             })->values(),
         ]);
+    }
+
+    /** 味方の装備と、選べる武器・防具の一覧 */
+    public function equipment(): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        return response()->json($this->adminParty->equipmentPayload($user));
+    }
+
+    /** 味方の装備を替える（持っているかどうかは問わない） */
+    public function equip(AdminEquipRequest $request): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        $validated = $request->validated();
+
+        try {
+            $payload = $this->adminParty->equip(
+                $user,
+                (string) $validated['slot_id'],
+                $validated['weapon_code'] ?? null,
+                $validated['armor_code'] ?? null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $name = collect($payload['characters'])->firstWhere('slot_id', $validated['slot_id'])['name'] ?? '';
+
+        return response()->json(array_merge(['message' => "{$name}の装備を変更しました。"], $payload));
     }
 
     public function dungeonSettingsShow(): JsonResponse

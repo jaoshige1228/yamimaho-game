@@ -396,6 +396,9 @@ function setDisplayHp(targetId, hp) {
   displayHp.value[targetId] = Math.max(0, Math.min(unit.max_hp, hp));
 }
 
+/** 敵アイコンが前に出る動きの長さ（ms） */
+const ENEMY_LUNGE_MS = 280;
+
 /** 「〇〇は△△を唱えた！」の告知イベントか */
 function isSpellAnnounce(ev) {
   return ev?.type === 'announce' && Boolean(ev.text?.includes('唱え'));
@@ -407,12 +410,21 @@ async function playEvents(events) {
     if (ev.type === 'turn_start') {
       visualCurrentActor.value = ev.actor;
       playSe('attack_before');
-      // 敵の物理攻撃は、アイコンが前に出てから告知を出す。魔法の詠唱は動かさず、PC と同じタイミングで
-      // 告知をすぐ出す（動いてから遅れて「〇〇を唱えた！」が出るとテンポが悪い）
-      if (String(ev.actor).startsWith('enemy') && !isSpellAnnounce(events[i + 1])) {
-        activeEnemyLunge.value = ev.actor;
-        await delay(280);
-        activeEnemyLunge.value = null;
+      // 敵はアイコンが前に出る（どの敵の行動か分かるように）。物理攻撃は動き終えてから告知を出すが、
+      // 魔法の詠唱は動きを待たず、PC と同じタイミングで告知をすぐ出す（動きと同時に進める。
+      // 動いてから遅れて「〇〇を唱えた！」が出るとテンポが悪い）
+      if (String(ev.actor).startsWith('enemy')) {
+        const actor = ev.actor;
+        const clearLunge = () => {
+          if (activeEnemyLunge.value === actor) activeEnemyLunge.value = null;
+        };
+        activeEnemyLunge.value = actor;
+        if (isSpellAnnounce(events[i + 1])) {
+          setTimeout(clearLunge, ENEMY_LUNGE_MS);
+        } else {
+          await delay(ENEMY_LUNGE_MS);
+          clearLunge();
+        }
       }
       await delay(120);
     }

@@ -31,6 +31,13 @@ const clearSubmitting = ref(false);
 const clearError = ref('');
 const clearMessage = ref('');
 
+const equipment = ref({ weapons: [], armors: [], characters: [] });
+/** キャラごとに、いま選んでいる武器・防具（「装備を変更」を押すまで反映しない） */
+const equipDraft = ref({});
+const equipSubmittingSlot = ref('');
+const equipError = ref('');
+const equipMessage = ref('');
+
 function toDungeonStatus(data) {
   return {
     floor: data.floor ?? 1,
@@ -47,6 +54,60 @@ async function loadParty() {
   party.value = data.characters ?? [];
 }
 
+function applyEquipment(data) {
+  equipment.value = {
+    weapons: data.weapons ?? [],
+    armors: data.armors ?? [],
+    characters: data.characters ?? [],
+  };
+  equipDraft.value = Object.fromEntries(
+    equipment.value.characters.map((c) => [
+      c.slot_id,
+      { weapon_code: c.weapon_code ?? '', armor_code: c.armor_code ?? '' },
+    ]),
+  );
+}
+
+async function loadEquipment() {
+  applyEquipment(await api('/admins/equipment', { method: 'GET' }));
+}
+
+/** 選んでいる装備が、いま付けているものと違うか */
+function equipChanged(member) {
+  const draft = equipDraft.value[member.slot_id];
+  if (!draft) return false;
+  return draft.weapon_code !== (member.weapon_code ?? '') || draft.armor_code !== (member.armor_code ?? '');
+}
+
+async function applyEquip(member) {
+  const draft = equipDraft.value[member.slot_id];
+  if (!draft?.weapon_code || !draft?.armor_code) {
+    equipError.value = '武器と防具を選んでください';
+    equipMessage.value = '';
+    return;
+  }
+
+  equipSubmittingSlot.value = member.slot_id;
+  equipError.value = '';
+  equipMessage.value = '';
+  try {
+    const data = await api('/admins/equipment', {
+      method: 'POST',
+      body: JSON.stringify({
+        slot_id: member.slot_id,
+        weapon_code: draft.weapon_code,
+        armor_code: draft.armor_code,
+      }),
+    });
+    applyEquipment(data);
+    equipMessage.value = data.message ?? '装備を変更しました';
+  } catch (e) {
+    equipError.value = e.message;
+  } finally {
+    equipSubmittingSlot.value = '';
+  }
+}
+
 async function loadDungeonSettings() {
   const data = await api('/admins/dungeon-settings', { method: 'GET' });
   skipBattles.value = Boolean(data.skip_battles);
@@ -60,7 +121,7 @@ async function init() {
   try {
     await api('/admins/status', { method: 'GET' });
     available.value = true;
-    await Promise.all([loadParty(), loadDungeonSettings()]);
+    await Promise.all([loadParty(), loadDungeonSettings(), loadEquipment()]);
   } catch (e) {
     available.value = false;
     if (e.status !== 404) {
@@ -256,6 +317,49 @@ onMounted(() => init());
       </section>
 
       <section class="admin-panel">
+        <h2>装備の操作</h2>
+        <p class="desc">
+          味方の武器・防具を、持っているかどうかに関係なく好きなものに替えます。替えた装備は所持扱いになり、
+          装備画面でも選べます。装備なしにはできません（いちばん弱い装備は基本の杖・基本のローブです）。
+        </p>
+        <ul v-if="equipment.characters.length" class="equip-list">
+          <li v-for="member in equipment.characters" :key="member.slot_id" class="equip-row">
+            <div class="equip-head">
+              <strong>{{ member.name }}</strong>
+              <span class="muted">Lv {{ member.level }}</span>
+            </div>
+            <label class="field">
+              <span>武器</span>
+              <select v-model="equipDraft[member.slot_id].weapon_code">
+                <option v-for="w in equipment.weapons" :key="w.code" :value="w.code">
+                  {{ w.name }}（魔力 +{{ w.mag_bonus }}）
+                </option>
+              </select>
+            </label>
+            <label class="field">
+              <span>防具</span>
+              <select v-model="equipDraft[member.slot_id].armor_code">
+                <option v-for="a in equipment.armors" :key="a.code" :value="a.code">
+                  {{ a.name }}（防御 +{{ a.def_bonus }}）
+                </option>
+              </select>
+            </label>
+            <button
+              type="button"
+              class="btn-primary equip-btn"
+              :disabled="!equipChanged(member) || equipSubmittingSlot !== ''"
+              @click="applyEquip(member)"
+            >
+              {{ equipSubmittingSlot === member.slot_id ? '処理中…' : '装備を変更' }}
+            </button>
+          </li>
+        </ul>
+        <p v-else class="muted">パーティーデータがありません</p>
+        <p v-if="equipMessage" class="success">{{ equipMessage }}</p>
+        <p v-if="equipError" class="error">{{ equipError }}</p>
+      </section>
+
+      <section class="admin-panel">
         <h2>現在のパーティー</h2>
         <ul v-if="party.length" class="party-list">
           <li v-for="member in party" :key="member.slot_id">
@@ -390,6 +494,45 @@ onMounted(() => init());
 }
 .party-list strong {
   min-width: 4.5rem;
+}
+.equip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.equip-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.equip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.field select {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(157, 124, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 0.9rem;
+}
+.equip-row .field {
+  min-width: 0;
+}
+.equip-btn {
+  align-self: flex-end;
+  min-height: 40px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
 }
 .clear-list {
   list-style: none;

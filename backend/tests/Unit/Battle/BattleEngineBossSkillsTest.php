@@ -174,10 +174,84 @@ class BattleEngineBossSkillsTest extends TestCase
         $this->assertSame('ally', $result['state']['units'][$damages[0]['target']]['side']);
     }
 
+    public function test_gusu_and_kasu_skills_are_defined(): void
+    {
+        $masters = new MasterDataProvider;
+
+        $kasu = collect($masters->enemySkillsFor('npc_kasu'))->pluck('weight', 'skill_code');
+        $this->assertSame(['pc3_fire_shot', 'pc3_fire_burst', 'pc3_fire_wave'], $kasu->keys()->all());
+        $this->assertSame('pc3_fire_burst', $kasu->sortDesc()->keys()->first(), '強い魔法（爆破）がいちばん出やすい');
+
+        $gusu = collect($masters->enemySkillsFor('npc_gusu'))->pluck('weight', 'skill_code');
+        $this->assertSame(['pc2_vine_whip', 'pc2_vine_bind', 'pc2_burst_tree', 'pc2_world_tree'], $gusu->keys()->all());
+        $this->assertSame('pc2_vine_whip', $gusu->sortDesc()->keys()->first(), 'ダメージの出る魔法がいちばん出やすい');
+    }
+
+    public function test_gusu_attacks_instead_when_nobody_has_fallen(): void
+    {
+        $state = $this->gusuState();
+        $state['units']['enemy_3']['alive'] = true;
+        $state['units']['enemy_3']['hp'] = 500;
+
+        $result = $this->engine('pc2_world_tree')->runEnemyTurnsUntilPlayer($state);
+
+        $this->assertSame('グースの攻撃！', collect($result['events'])->firstWhere('type', 'announce')['text']);
+        $this->assertSame([], $this->eventsOfType($result['events'], 'revive_failed'));
+        $this->assertSame([], $this->eventsOfType($result['events'], 'revive'));
+        $this->assertCount(1, $this->eventsOfType($result['events'], 'damage'));
+    }
+
+    public function test_gusu_attacks_instead_when_the_only_fallen_enemy_has_fled(): void
+    {
+        $state = $this->gusuState();
+        $state['units']['enemy_3']['fled'] = true;
+
+        $result = $this->engine('pc2_world_tree')->runEnemyTurnsUntilPlayer($state);
+
+        $this->assertSame('グースの攻撃！', collect($result['events'])->firstWhere('type', 'announce')['text']);
+        $this->assertFalse($result['state']['units']['enemy_3']['alive'], '逃げた敵は蘇生しない');
+    }
+
+    public function test_gusu_revives_a_fallen_ally(): void
+    {
+        $result = $this->engine('pc2_world_tree', hitRoll: 1)->runEnemyTurnsUntilPlayer($this->gusuState());
+
+        $this->assertSame('グースは宇宙樹の気配を唱えた！', collect($result['events'])->firstWhere('type', 'announce')['text']);
+        $revive = $this->eventsOfType($result['events'], 'revive');
+        $this->assertCount(1, $revive);
+        $this->assertSame('enemy_3', $revive[0]['target']);
+        $this->assertTrue($result['state']['units']['enemy_3']['alive']);
+        $this->assertSame(250, $result['state']['units']['enemy_3']['hp'], '最大HPの50%');
+    }
+
+    public function test_gusu_tries_to_revive_but_may_fail(): void
+    {
+        $result = $this->engine('pc2_world_tree', hitRoll: 100)->runEnemyTurnsUntilPlayer($this->gusuState());
+
+        $this->assertCount(1, $this->eventsOfType($result['events'], 'revive_failed'));
+        $this->assertFalse($result['state']['units']['enemy_3']['alive']);
+    }
+
+    /**
+     * グース（enemy_1）と、倒れた味方（enemy_3）がいる状態。
+     *
+     * @return array<string, mixed>
+     */
+    private function gusuState(): array
+    {
+        $state = $this->bossState(actor: 'enemy_1');
+        $state['units']['enemy_1']['name'] = 'グース';
+        $state['units']['enemy_1']['master_code'] = 'npc_gusu';
+        $state['units']['enemy_3']['name'] = 'カース';
+        $state['units']['enemy_3']['master_code'] = 'npc_kasu';
+
+        return $state;
+    }
+
     /**
      * 敵の種類ごとに決まったスキルを必ず引くエンジン（実際のスキル内容は CSV から読む）。
      */
-    private function engine(string $skillCode): BattleEngine
+    private function engine(string $skillCode, int $hitRoll = 100): BattleEngine
     {
         $masters = new MasterDataProvider;
         $picker = new class($masters, $skillCode) extends EnemySkillPicker
@@ -204,7 +278,7 @@ class BattleEngineBossSkillsTest extends TestCase
         return new BattleEngine(
             enemySkillPicker: $picker,
             damageRoll: static fn (): float => 1.0,
-            hitRoll: static fn (): int => 100,
+            hitRoll: static fn (): int => $hitRoll,
             critRoll: static fn (): int => 100,
         );
     }

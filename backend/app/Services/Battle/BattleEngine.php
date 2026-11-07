@@ -128,7 +128,7 @@ class BattleEngine
     private function resolveEnemySkill(array &$state, string $actorId, array $skill): array
     {
         $actor = $state['units'][$actorId];
-        $skill = $this->swapUselessEnemyHeal($state['units'], $skill);
+        $skill = $this->swapUselessEnemySupport($state['units'], $skill);
         $announceText = $skill['skill_code'] === 'attack'
             ? "{$actor['name']}の攻撃！"
             : "{$actor['name']}の{$skill['label']}！";
@@ -192,20 +192,26 @@ class BattleEngine
     }
 
     /**
-     * 傷ついた味方がいないのに回復魔法を引いたときは、空振りさせず通常攻撃にする。
+     * 回復する味方がいない（傷ついた味方がいない）、蘇生する味方がいない（倒れた味方がいない）のに
+     * その魔法を引いたときは、空振りさせず通常攻撃にする。
      *
      * @param  array<string, array<string, mixed>>  $units
      * @param  array<string, mixed>  $skill
      * @return array<string, mixed>
      */
-    private function swapUselessEnemyHeal(array $units, array $skill): array
+    private function swapUselessEnemySupport(array $units, array $skill): array
     {
         if (($skill['action_type'] ?? '') !== 'spell') {
             return $skill;
         }
 
         $spell = $this->factory->findSpell((string) $skill['skill_code']);
-        if (($spell['effect'] ?? '') !== 'heal_mag' || $this->woundedEnemyIds($units) !== []) {
+        $useless = match ((string) ($spell['effect'] ?? '')) {
+            'heal_mag' => $this->woundedEnemyIds($units) === [],
+            'revive_chance' => $this->fallenEnemyIds($units) === [],
+            default => false,
+        };
+        if (! $useless) {
             return $skill;
         }
 
@@ -229,6 +235,20 @@ class BattleEngine
         return array_keys(array_filter(
             $units,
             fn ($u) => ($u['side'] ?? '') === 'enemy' && ($u['alive'] ?? false) && $u['hp'] < $u['max_hp'],
+        ));
+    }
+
+    /**
+     * 倒れている敵ユニット（逃げ出した敵は含まない。蘇生の対象）。
+     *
+     * @param  array<string, array<string, mixed>>  $units
+     * @return list<string>
+     */
+    private function fallenEnemyIds(array $units): array
+    {
+        return array_keys(array_filter(
+            $units,
+            fn ($u) => ($u['side'] ?? '') === 'enemy' && ! ($u['alive'] ?? true) && ! ($u['fled'] ?? false),
         ));
     }
 
@@ -947,10 +967,7 @@ class BattleEngine
             }
 
             if ($effect === 'revive_chance') {
-                $candidates = array_keys(array_filter(
-                    $units,
-                    fn ($u) => ($u['side'] ?? '') === 'enemy' && ! ($u['alive'] ?? true),
-                ));
+                $candidates = $this->fallenEnemyIds($units);
             } else {
                 $candidates = array_keys(array_filter(
                     $units,
@@ -1152,6 +1169,9 @@ class BattleEngine
             'pdef' => $unit['pdef'] ?? null,
             'mdef' => $unit['mdef'] ?? null,
             'spd' => $unit['spd'] ?? null,
+            'know' => $unit['know'] ?? null,
+            'spirit' => $unit['spirit'] ?? null,
+            'vit' => $unit['vit'] ?? null,
         ];
     }
 

@@ -1,7 +1,7 @@
 <script setup>
+import { computed } from 'vue';
 import BuffIcons from './BuffIcons.vue';
 import UnitBars from './UnitBars.vue';
-import { useLongPress } from '../../composables/useLongPress';
 import { enemySpriteAssetKey } from '../../utils/enemySprite';
 import { characterSpriteUrls, publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
@@ -39,9 +39,7 @@ function isDisplayFled(unit) {
   return props.fledIds.includes(unit.id);
 }
 
-const emit = defineEmits(['select', 'show-stats']);
-
-const longPress = useLongPress((unit) => emit('show-stats', unit));
+const emit = defineEmits(['select']);
 
 function spriteUrl(unit) {
   const key = enemySpriteAssetKey(unit);
@@ -51,15 +49,29 @@ function spriteUrl(unit) {
   return publicAssetUrl(`/assets/enemies/${key}.png`);
 }
 
+/**
+ * NPC（グース／カース）の画像は縦長（600×1200）だが、絵があるのは上の約 40% だけで下は透明。
+ * そのまま枠に収めると絵が小さく上に寄るので、絵のある上の部分だけを切り出して見せる。
+ */
+function isPortrait(unit) {
+  return enemySpriteAssetKey(unit).startsWith('npc_');
+}
+
 function canSelect(unit) {
   if (!props.targetMode?.startsWith('enemy')) return false;
   return unit.alive && props.targetMode === 'enemy_single';
 }
 
+/**
+ * 1 体あたりの幅の上限。敵が少ないほど大きく見せる（高さは敵エリアいっぱいまで使い、画像の縦横比は保つ）
+ */
+const rowStyle = computed(() => {
+  const count = props.units.length;
+  const maxWidth = count <= 1 ? 260 : count === 2 ? 200 : 140;
+  return { '--enemy-slot-max': `${maxWidth}px` };
+});
+
 function onSlotClick(unit) {
-  if (longPress.shouldSuppressClick()) {
-    return;
-  }
   if (canSelect(unit)) {
     emit('select', unit.id);
   }
@@ -67,7 +79,7 @@ function onSlotClick(unit) {
 </script>
 
 <template>
-  <div class="enemy-row">
+  <div class="enemy-row" :style="rowStyle">
     <button
       v-for="unit in units"
       :key="unit.id"
@@ -85,14 +97,15 @@ function onSlotClick(unit) {
         supportEffectClass(unit),
       ]"
       @click="onSlotClick(unit)"
-      @pointerdown="longPress.onPressStart($event, unit)"
-      @pointerup="longPress.onPressEnd"
-      @pointerleave="longPress.onPressEnd"
-      @pointercancel="longPress.onPressCancel"
       @contextmenu.prevent
     >
       <div class="enemy-sprite-wrap">
-        <img :src="spriteUrl(unit)" :alt="unit.name" class="sprite" />
+        <img
+          :src="spriteUrl(unit)"
+          :alt="unit.name"
+          class="sprite"
+          :class="{ portrait: isPortrait(unit) }"
+        />
         <BuffIcons
           :buffs="unit.buffs"
           :buff-icons="buffIcons"
@@ -116,7 +129,7 @@ function onSlotClick(unit) {
 }
 .enemy-slot {
   flex: 1;
-  max-width: 120px;
+  max-width: var(--enemy-slot-max, 120px);
   min-width: 0;
   border: none;
   background: transparent;
@@ -155,18 +168,28 @@ function onSlotClick(unit) {
   position: relative;
   width: 100%;
 }
+/*
+ * 画像は枠の幅いっぱいの正方形（縦横比は contain で保つ）。高さは、敵エリア（.field-top。コンテナ）の
+ * 高さから名前・HP バー分を引いた分までに収める。cqh が使えない環境では 180px が上限。
+ */
 .sprite {
+  display: block;
   width: 100%;
-  max-height: 88px;
+  aspect-ratio: 1 / 1;
+  max-height: 180px;
+  max-height: calc(100cqh - 56px);
   object-fit: contain;
+  object-position: center bottom;
   transform: scale(1.05);
   transform-origin: bottom center;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
   pointer-events: none;
 }
-.enemy-slot.boss-floor1 .sprite {
-  max-height: 110px;
-  transform: scale(1.3);
+.sprite.portrait {
+  /* 絵のある上 490px 分（600×490）だけを幅いっぱいに見せる */
+  aspect-ratio: 600 / 490;
+  object-fit: cover;
+  object-position: center top;
 }
 .name {
   display: block;

@@ -44,6 +44,26 @@ class BattleApiTest extends TestCase
         );
     }
 
+    public function test_battle_units_expose_every_stat_shown_in_the_stats_modal(): void
+    {
+        $response = $this->postJson('/api/battles/demo')->assertOk();
+        $allies = collect($response->json('state.units'))->where('side', 'ally');
+        $this->assertCount(4, $allies);
+
+        foreach ($allies as $unit) {
+            foreach (['str', 'mag', 'def', 'spd', 'know', 'spirit', 'vit'] as $stat) {
+                $this->assertIsInt($unit[$stat], "{$unit['id']} の {$stat}");
+                $this->assertGreaterThan(0, $unit[$stat], "{$unit['id']} の {$stat}");
+            }
+        }
+
+        // リロード後の取得（GET）でも同じ項目が出る
+        $reloaded = collect($this->getJson('/api/battles/'.$response->json('battle_id'))->assertOk()->json('state.units'))
+            ->where('side', 'ally');
+        $this->assertSame($allies->pluck('know', 'id')->all(), $reloaded->pluck('know', 'id')->all());
+        $this->assertSame($allies->pluck('vit', 'id')->all(), $reloaded->pluck('vit', 'id')->all());
+    }
+
     public function test_demo_battle_allies_use_equipment_bonuses(): void
     {
         $response = $this->postJson('/api/battles/demo')->assertOk();

@@ -40,7 +40,6 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
         :floor1-boss-sprite="floor1BossSprite"
         :fled-ids="fledIds"
         @select="emit('select-target', $event)"
-        @show-stats="emit('show-stats', $event)"
       />
     </section>
     <section class="field-bottom">
@@ -79,6 +78,8 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
 }
 .field-top {
   position: relative;
+  /* 敵画像の高さの上限を、この敵エリアの高さから決める（EnemyRow の cqh） */
+  container-type: size;
   height: 38%;
   min-height: 0;
   background: var(--battle-bg-top);
