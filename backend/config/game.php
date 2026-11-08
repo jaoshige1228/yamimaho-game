@@ -139,6 +139,16 @@ return [
           ],
         ],
       ],
+      /**
+       * 3 層は探索イベントの設定だけ先に入れてある（ボス・通常戦の敵はまだ未設定のため、プレイ可能な層は playable_floor = 2 のまま）。
+       * 宝箱・スフィンクスの報酬は、HP / MP 回復薬の大。
+       */
+      3 => [
+        'reward_item_map' => [
+          'potion_hp_s' => 'potion_hp_l',
+          'potion_mp_s' => 'potion_mp_l',
+        ],
+      ],
     ],
     /** テスト用: null | battle | exploration | dialogue | flavor */
     'test_force' => env('DUNGEON_TEST_FORCE'),

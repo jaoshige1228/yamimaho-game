@@ -13,6 +13,12 @@ const expMessage = ref('');
 const party = ref([]);
 const lastResults = ref([]);
 
+const goldInput = ref(1000);
+const goldNow = ref(0);
+const goldSubmitting = ref(false);
+const goldError = ref('');
+const goldMessage = ref('');
+
 const skipBattles = ref(false);
 const forceDialogueEvents = ref(false);
 const resetProgress = ref(false);
@@ -52,6 +58,7 @@ function toDungeonStatus(data) {
 async function loadParty() {
   const data = await api('/admins/party', { method: 'GET' });
   party.value = data.characters ?? [];
+  goldNow.value = Number(data.gold ?? 0);
 }
 
 function applyEquipment(data) {
@@ -158,6 +165,31 @@ async function grantExp() {
   }
 }
 
+async function grantGold() {
+  const gold = Number(goldInput.value);
+  if (!Number.isInteger(gold) || gold < 1) {
+    goldError.value = '1 以上の整数を入力してください';
+    goldMessage.value = '';
+    return;
+  }
+
+  goldSubmitting.value = true;
+  goldError.value = '';
+  goldMessage.value = '';
+  try {
+    const data = await api('/admins/grant-gold', {
+      method: 'POST',
+      body: JSON.stringify({ gold }),
+    });
+    goldMessage.value = data.message ?? 'ゴールドを追加しました';
+    if (data.gold != null) goldNow.value = Number(data.gold);
+  } catch (e) {
+    goldError.value = e.message;
+  } finally {
+    goldSubmitting.value = false;
+  }
+}
+
 async function applyDungeonSettings() {
   dungeonSubmitting.value = true;
   dungeonError.value = '';
@@ -241,6 +273,32 @@ onMounted(() => init());
         </div>
         <p v-if="expMessage" class="success">{{ expMessage }}</p>
         <p v-if="expError" class="error">{{ expError }}</p>
+      </section>
+
+      <section class="admin-panel">
+        <h2>ゴールド追加</h2>
+        <p class="desc">
+          パーティーの所持金に、指定した数のゴールドを足します（いまの所持金: <strong>{{ goldNow.toLocaleString() }} G</strong>）。
+        </p>
+        <div class="exp-form">
+          <label class="field">
+            <span>追加するゴールド</span>
+            <input
+              v-model.number="goldInput"
+              type="number"
+              min="1"
+              max="9999999"
+              step="1"
+              inputmode="numeric"
+              @keydown.enter.prevent="grantGold"
+            />
+          </label>
+          <button type="button" class="btn-primary" :disabled="goldSubmitting" @click="grantGold">
+            {{ goldSubmitting ? '処理中…' : 'ゴールドを追加' }}
+          </button>
+        </div>
+        <p v-if="goldMessage" class="success">{{ goldMessage }}</p>
+        <p v-if="goldError" class="error">{{ goldError }}</p>
       </section>
 
       <section class="admin-panel">

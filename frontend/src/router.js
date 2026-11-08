@@ -10,6 +10,7 @@ import ShopView from './views/ShopView.vue';
 import EquipView from './views/EquipView.vue';
 import ItemsView from './views/ItemsView.vue';
 import DungeonEnterView from './views/DungeonEnterView.vue';
+import FamiliarView from './views/FamiliarView.vue';
 import { usePlayerStore } from './stores/player';
 
 const router = createRouter({
@@ -44,6 +45,12 @@ const router = createRouter({
       name: 'items',
       component: ItemsView,
       meta: { title: '持ち物' },
+    },
+    {
+      path: '/familiar',
+      name: 'familiar',
+      component: FamiliarView,
+      meta: { title: '使い魔' },
     },
     {
       path: '/dungeon/enter',
@@ -94,13 +101,13 @@ router.beforeEach(async (to) => {
     return true;
   }
 
-  const hubBlocked = ['hub', 'shop', 'equip', 'items', 'dungeon-enter'];
+  const hubBlocked = ['hub', 'shop', 'equip', 'items', 'familiar', 'dungeon-enter'];
   if (player.inDungeon && hubBlocked.includes(String(to.name))) {
     return { name: 'dungeon', replace: true };
   }
 
   if (player.activeBattleId) {
-    if (['hub', 'dungeon', 'dungeon-enter', 'shop', 'equip', 'items'].includes(String(to.name))) {
+    if (['hub', 'dungeon', 'dungeon-enter', 'shop', 'equip', 'items', 'familiar'].includes(String(to.name))) {
       return {
         name: 'battle',
         params: { id: player.activeBattleId },

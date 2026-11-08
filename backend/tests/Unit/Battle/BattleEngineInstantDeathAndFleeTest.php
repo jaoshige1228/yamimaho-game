@@ -70,7 +70,8 @@ class BattleEngineInstantDeathAndFleeTest extends TestCase
         $state['units']['pc2']['alive'] = false;
         $state['units']['pc1']['damage_shield'] = true;
 
-        $result = $this->zarakiEngine(hitRoll: 1)->runEnemyTurnsUntilPlayer($state);
+        // ロール10 = 味方の素の回避率(5%)では避けられず、即死(10%)は成功する値
+        $result = $this->zarakiEngine(hitRoll: 10)->runEnemyTurnsUntilPlayer($state);
 
         $types = array_column($result['events'], 'type');
         $this->assertContains('shield_break', $types);

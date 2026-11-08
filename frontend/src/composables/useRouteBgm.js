@@ -7,7 +7,7 @@ import { useAppAudio } from './useAppAudio';
 
 function resolveBgmTrack(route, battleState, player) {
   const name = route.name;
-  if (name === 'hub' || name === 'shop' || name === 'equip' || name === 'items' || name === 'dungeon-enter') {
+  if (name === 'hub' || name === 'shop' || name === 'equip' || name === 'items' || name === 'familiar' || name === 'dungeon-enter') {
     return 'home';
   }
   if (name === 'dungeon') {

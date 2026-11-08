@@ -30,15 +30,19 @@ class DungeonFloorConfigTest extends TestCase
         $this->assertSame([], DungeonFloorConfig::bossEnemyCodes(3));
     }
 
-    public function test_reward_items_are_upgraded_on_floor_two_only(): void
+    public function test_reward_items_are_upgraded_per_floor(): void
     {
         $this->assertSame('potion_hp_s', DungeonFloorConfig::rewardItemCode(1, 'potion_hp_s'));
         $this->assertSame('potion_mp_s', DungeonFloorConfig::rewardItemCode(1, 'potion_mp_s'));
         $this->assertSame('potion_hp_m', DungeonFloorConfig::rewardItemCode(2, 'potion_hp_s'));
         $this->assertSame('potion_mp_m', DungeonFloorConfig::rewardItemCode(2, 'potion_mp_s'));
+        // 3 層は HP / MP 回復薬の「強」（大）
+        $this->assertSame('potion_hp_l', DungeonFloorConfig::rewardItemCode(3, 'potion_hp_s'));
+        $this->assertSame('potion_mp_l', DungeonFloorConfig::rewardItemCode(3, 'potion_mp_s'));
         // 差し替えの指定がないコード・層はそのまま
         $this->assertSame('world_tree_leaf', DungeonFloorConfig::rewardItemCode(2, 'world_tree_leaf'));
-        $this->assertSame('potion_hp_s', DungeonFloorConfig::rewardItemCode(3, 'potion_hp_s'));
+        $this->assertSame('world_tree_leaf', DungeonFloorConfig::rewardItemCode(3, 'world_tree_leaf'));
+        $this->assertSame('potion_hp_s', DungeonFloorConfig::rewardItemCode(4, 'potion_hp_s'));
     }
 
     public function test_floor_two_mid_boss_event_and_enemies(): void

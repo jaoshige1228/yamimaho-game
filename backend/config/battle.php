@@ -60,7 +60,7 @@ return [
     'revive_hp_percent' => 50,
 
     'buffs' => [
-        'def_up' => ['stat' => 'def', 'multiplier' => 1.3, 'turns' => 3, 'icon' => 'def_up'],
+        'def_up' => ['stat' => 'def', 'multiplier' => 1.4, 'turns' => 3, 'icon' => 'def_up'],
         'def_up_large' => ['stat' => 'def', 'multiplier' => 1.5, 'turns' => 3, 'icon' => 'def_up_large'],
         'def_down' => ['stat' => 'def', 'multiplier' => 0.7, 'turns' => 3, 'icon' => 'def_down'],
         'def_down_large' => ['stat' => 'def', 'multiplier' => 0.6, 'turns' => 3, 'icon' => 'def_down_large'],
@@ -72,6 +72,11 @@ return [
         // 全体魔法・新魔法用（アイコンは既存のものを流用）
         'def_up_small' => ['stat' => 'def', 'multiplier' => 1.2, 'turns' => 3, 'icon' => 'def_up'],
         'def_down_small' => ['stat' => 'def', 'multiplier' => 0.8, 'turns' => 3, 'icon' => 'def_down'],
+        // 使い魔の支援（攻撃バフ）。筋力と魔力の両方に乗る。Lv8 以降は large（config/familiar.php）
+        'atk_up_familiar' => ['stat' => ['str', 'mag'], 'multiplier' => 1.2, 'turns' => 3, 'icon' => 'atk_up'],
+        'atk_up_familiar_large' => ['stat' => ['str', 'mag'], 'multiplier' => 1.3, 'turns' => 3, 'icon' => 'atk_up'],
+        // 大爆樹用（×0.65）
+        'def_down_big' => ['stat' => 'def', 'multiplier' => 0.65, 'turns' => 3, 'icon' => 'def_down_large'],
         'def_down_huge' => ['stat' => 'def', 'multiplier' => 0.5, 'turns' => 3, 'icon' => 'def_down_large'],
         'evasion_set_small' => ['type' => 'evasion_set', 'value' => 30, 'turns' => 3, 'icon' => 'evasion'],
     ],

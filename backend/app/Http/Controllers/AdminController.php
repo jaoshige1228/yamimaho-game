@@ -6,8 +6,10 @@ use App\Http\Requests\AdminDungeonClearRequest;
 use App\Http\Requests\AdminDungeonSettingsRequest;
 use App\Http\Requests\AdminEquipRequest;
 use App\Http\Requests\AdminGrantExpRequest;
+use App\Http\Requests\AdminGrantGoldRequest;
 use App\Services\Admin\AdminPartyService;
 use App\Services\Dungeon\DungeonProgressService;
+use App\Services\Player\PartyGoldService;
 use App\Services\Player\UserCharacterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +20,7 @@ class AdminController extends Controller
         private readonly AdminPartyService $adminParty,
         private readonly UserCharacterService $characters,
         private readonly DungeonProgressService $dungeonProgress,
+        private readonly PartyGoldService $gold,
     ) {}
 
     public function status(): JsonResponse
@@ -37,6 +40,7 @@ class AdminController extends Controller
         $party = $this->characters->partyInSlotOrder($user);
 
         return response()->json([
+            'gold' => $this->gold->getGold($user),
             'characters' => $party->map(function ($character, $slotId) {
                 return [
                     'slot_id' => $slotId,
@@ -167,6 +171,23 @@ class AdminController extends Controller
         return response()->json([
             'message' => "パーティー全員に {$exp} の経験値を配りました。",
             'characters' => $results,
+        ]);
+    }
+
+    /** パーティーの所持金に、指定したゴールドを足す */
+    public function grantGold(AdminGrantGoldRequest $request): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        $amount = (int) $request->validated('gold');
+        $total = $this->adminParty->grantGold($user, $amount);
+
+        return response()->json([
+            'message' => "パーティーに {$amount}G を追加しました。（所持金 {$total}G）",
+            'gold' => $total,
         ]);
     }
 }

@@ -93,11 +93,15 @@ class BattleOpeningDefeatTest extends TestCase
 
     /**
      * 敵の技抽選を固定し、各敵が「最後の技」（イフリーヌ=火炎放射、カース=火炎波及）を必ず選ぶようにする。
+     * 味方の回避（素の回避率5%）で全滅しないよう、命中ロールも固定する（100 = 回避されない）。
      */
     private function orchestratorWhereEnemiesUseLastSkill(): BattleOrchestrator
     {
         return new BattleOrchestrator(
-            engine: new BattleEngine(enemySkillPicker: new EnemySkillPicker(roll: fn () => 99)),
+            engine: new BattleEngine(
+                enemySkillPicker: new EnemySkillPicker(roll: fn () => 99),
+                hitRoll: fn () => 100,
+            ),
         );
     }
 

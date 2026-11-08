@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use App\Services\Player\PartyGoldService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
 use Tests\TestCase;
@@ -41,6 +43,51 @@ class AdminApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('characters.0.level', 4)
             ->assertJsonPath('characters.0.levels_gained', 3);
+    }
+
+    public function test_grant_gold_adds_the_given_amount_to_the_party(): void
+    {
+        $this->assertSame(0, $this->getJson('/api/admins/party')->assertOk()->json('gold'), '最初は 0G');
+
+        $first = $this->postJson('/api/admins/grant-gold', ['gold' => 1000])->assertOk()
+            ->assertJsonPath('gold', 1000)
+            ->assertJsonPath('message', 'パーティーに 1000G を追加しました。（所持金 1000G）');
+        $this->assertSame(1000, $first->json('gold'));
+
+        // 足していく（上書きではない）
+        $this->postJson('/api/admins/grant-gold', ['gold' => 250])->assertOk()->assertJsonPath('gold', 1250);
+
+        $this->assertSame(1250, $this->demoGold());
+        $this->assertSame(1250, $this->getJson('/api/admins/party')->assertOk()->json('gold'));
+        // プレイヤー画面が読む API にも反映される
+        $this->assertSame(1250, $this->getJson('/api/player/party')->assertOk()->json('gold'));
+    }
+
+    public function test_grant_gold_adds_on_top_of_existing_gold(): void
+    {
+        $this->getJson('/api/admins/party')->assertOk();
+        (new PartyGoldService)->setGold(User::query()->where('email', config('game.demo_user_email'))->firstOrFail(), 54);
+
+        $this->postJson('/api/admins/grant-gold', ['gold' => 46])->assertOk()->assertJsonPath('gold', 100);
+    }
+
+    public function test_grant_gold_rejects_invalid_amounts_and_changes_nothing(): void
+    {
+        $this->postJson('/api/admins/grant-gold', ['gold' => 500])->assertOk();
+
+        foreach ([[], ['gold' => 0], ['gold' => -100], ['gold' => 1.5], ['gold' => 'abc'], ['gold' => null], ['gold' => 10000000]] as $body) {
+            $this->postJson('/api/admins/grant-gold', $body)->assertUnprocessable();
+        }
+
+        $this->assertSame(500, $this->demoGold());
+    }
+
+    public function test_grant_gold_never_exceeds_the_column_limit(): void
+    {
+        $this->getJson('/api/admins/party')->assertOk();
+        (new PartyGoldService)->setGold(User::query()->where('email', config('game.demo_user_email'))->firstOrFail(), 4294967290);
+
+        $this->postJson('/api/admins/grant-gold', ['gold' => 9999999])->assertOk()->assertJsonPath('gold', 4294967295);
     }
 
     public function test_admin_equipment_lists_all_gear_and_the_party(): void
@@ -141,6 +188,7 @@ class AdminApiTest extends TestCase
         $this->assertTrue((bool) config('game.test_mode_enabled'), 'リリース前は既定でテストモードが有効');
         $this->getJson('/api/admins/status')->assertOk();
         $this->postJson('/api/admins/grant-exp', ['exp' => 50])->assertOk();
+        $this->postJson('/api/admins/grant-gold', ['gold' => 100])->assertOk();
         $this->getJson('/api/admins/equipment')->assertOk();
     }
 
@@ -150,8 +198,16 @@ class AdminApiTest extends TestCase
 
         $this->getJson('/api/admins/status')->assertNotFound();
         $this->postJson('/api/admins/grant-exp', ['exp' => 50])->assertNotFound();
+        $this->postJson('/api/admins/grant-gold', ['gold' => 100])->assertNotFound();
         $this->getJson('/api/admins/dungeon-settings')->assertNotFound();
         $this->getJson('/api/admins/equipment')->assertNotFound();
         $this->postJson('/api/admins/equipment', ['slot_id' => 'pc1', 'weapon_code' => 'staff_master'])->assertNotFound();
+    }
+
+    private function demoGold(): int
+    {
+        return (new PartyGoldService)->getGold(
+            User::query()->where('email', config('game.demo_user_email'))->firstOrFail()->fresh(),
+        );
     }
 }

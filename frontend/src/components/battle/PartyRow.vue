@@ -46,10 +46,10 @@ function canSelect(unit) {
   if (props.targetMode !== 'ally_single') return false;
 
   const effect = props.spellEffect;
-  if (effect === 'revive_chance') {
+  if (effect === 'revive_chance' || effect === 'revive_full') {
     return !unit.alive || unit.hp <= 0;
   }
-  if (effect === 'heal_mag' || effect === 'heal') {
+  if (effect === 'heal_mag' || effect === 'heal' || effect === 'heal_full') {
     return unit.alive && unit.hp < unit.max_hp;
   }
 
@@ -118,6 +118,7 @@ function onSlotClick(unit) {
           :buffs="unit.buffs"
           :buff-icons="buffIcons"
           :damage-shield="unit.damage_shield"
+          :life-ward="unit.life_ward"
         />
       </div>
       <div class="unit-meta">

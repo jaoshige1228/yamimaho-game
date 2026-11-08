@@ -15,13 +15,18 @@ class LevelGrowthService
     private const GROWTH_BY_REACHED_LEVEL = [
         4 => ['hp' => 20, 'mp' => 6, 'mag' => 4, 'def' => 4, 'flat' => 3],
         7 => [...self::DEFAULT_GROWTH, 'flat' => 3],
-        18 => ['hp' => 30, 'mp' => 10, 'mag' => 8, 'def' => 8, 'flat' => 4],
+        18 => ['hp' => 50, 'mp' => 10, 'mag' => 8, 'def' => 8, 'flat' => 4],
     ];
 
     /** このレベル以上に上がるときは、常にこの上昇値を使う（GROWTH_BY_REACHED_LEVEL に指定のあるレベルを除く） */
     private const LATE_GROWTH_FROM_LEVEL = 12;
 
-    private const LATE_GROWTH = ['hp' => 15, 'mp' => 5, 'mag' => 4, 'def' => 4, 'flat' => 2];
+    private const LATE_GROWTH = ['hp' => 25, 'mp' => 5, 'mag' => 4, 'def' => 4, 'flat' => 2];
+
+    /** このレベル以上に上がるときは、LATE_GROWTH の代わりにこの上昇値を使う（GROWTH_BY_REACHED_LEVEL に指定のあるレベルを除く） */
+    private const VETERAN_GROWTH_FROM_LEVEL = 21;
+
+    private const VETERAN_GROWTH = ['hp' => 40, 'mp' => 6, 'mag' => 6, 'def' => 6, 'flat' => 3];
 
     /** @var list<string> */
     private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];
@@ -101,6 +106,10 @@ class LevelGrowthService
         // レベル個別の指定を最優先（Lv12 以降でも Lv18 だけ別の値、など）
         if (isset(self::GROWTH_BY_REACHED_LEVEL[$reachedLevel])) {
             return self::GROWTH_BY_REACHED_LEVEL[$reachedLevel];
+        }
+
+        if ($reachedLevel >= self::VETERAN_GROWTH_FROM_LEVEL) {
+            return self::VETERAN_GROWTH;
         }
 
         return $reachedLevel >= self::LATE_GROWTH_FROM_LEVEL ? self::LATE_GROWTH : self::DEFAULT_GROWTH;

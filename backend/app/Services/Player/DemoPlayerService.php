@@ -13,6 +13,7 @@ class DemoPlayerService
     private readonly DungeonProgressService $dungeonProgress = new DungeonProgressService,
     private readonly PartyGoldService $gold = new PartyGoldService,
     private readonly ItemInventoryService $items = new ItemInventoryService,
+    private readonly FamiliarService $familiars = new FamiliarService,
   ) {}
 
   public function resolveOrCreateUser(): User
@@ -36,5 +37,6 @@ class DemoPlayerService
     $this->dungeonProgress->resetAll($user);
     $this->gold->resetGold($user);
     $this->items->resetItems($user);
+    $this->familiars->reset($user);
   }
 }

@@ -151,6 +151,21 @@ class BattleEngineBossSkillsTest extends TestCase
         $this->assertSame(400, $result['state']['units']['enemy_2']['hp']);
     }
 
+    public function test_cultist_heal_never_targets_a_fallen_ally(): void
+    {
+        // 倒れた邪教徒 B（HP 0/500 = 割合はいちばん低い）がいても、回復は生きている味方に向かい、倒れた味方は戻らない
+        $state = $this->bossState(actor: 'enemy_1');
+        $state['units']['enemy_2']['hp'] = 400; // 40%
+
+        $result = $this->engine('cult_heal')->runEnemyTurnsUntilPlayer($state);
+
+        $heals = $this->eventsOfType($result['events'], 'heal');
+        $this->assertCount(1, $heals);
+        $this->assertSame('enemy_2', $heals[0]['target']);
+        $this->assertSame(0, $result['state']['units']['enemy_3']['hp']);
+        $this->assertFalse($result['state']['units']['enemy_3']['alive']);
+    }
+
     public function test_cultist_heal_never_exceeds_max_hp(): void
     {
         $state = $this->bossState(actor: 'enemy_1');

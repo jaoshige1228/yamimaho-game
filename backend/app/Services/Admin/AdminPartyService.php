@@ -8,6 +8,7 @@ use App\Models\UserCharacter;
 use App\Models\WeaponMaster;
 use App\Services\Growth\LevelGrowthService;
 use App\Services\Player\EquipmentOwnershipService;
+use App\Services\Player\PartyGoldService;
 use App\Services\Player\UserCharacterService;
 use Illuminate\Support\Facades\DB;
 
@@ -17,6 +18,7 @@ class AdminPartyService
         private readonly UserCharacterService $characters = new UserCharacterService,
         private readonly LevelGrowthService $growth = new LevelGrowthService,
         private readonly EquipmentOwnershipService $ownership = new EquipmentOwnershipService,
+        private readonly PartyGoldService $gold = new PartyGoldService,
     ) {}
 
     /**
@@ -94,6 +96,21 @@ class AdminPartyService
         });
 
         return $this->equipmentPayload($user);
+    }
+
+    /** users.gold（符号なし整数）の上限。これを超えないよう、合計を丸める */
+    private const GOLD_MAX = 4294967295;
+
+    /**
+     * パーティーの所持金に、指定したゴールドを足す。
+     *
+     * @return int 足したあとの所持金
+     */
+    public function grantGold(User $user, int $amount): int
+    {
+        $user->refresh();
+
+        return $this->gold->setGold($user, min(self::GOLD_MAX, $this->gold->getGold($user) + max(0, $amount)));
     }
 
     /**

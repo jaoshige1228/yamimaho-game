@@ -30,10 +30,22 @@ function itemUsable(item, target) {
   return false;
 }
 
+/** 味方全体にかける回復魔法（精霊の虹など）。対象は選ばない */
+function isAllTargetSpell(spell) {
+  return spell.target_type === 'ally_all';
+}
+
 function spellUsable(spell, target) {
-  if (!target || !spell.affordable) return false;
-  if (spell.effect === 'revive_chance') return !target.alive || target.hp <= 0;
-  if (spell.effect === 'heal_mag' || spell.effect === 'heal') {
+  if (!spell.affordable) return false;
+  if (isAllTargetSpell(spell)) {
+    // 傷ついている味方が一人でもいれば使える
+    return props.party.some((u) => u.alive && u.hp < u.max_hp);
+  }
+  if (!target) return false;
+  if (spell.effect === 'revive_chance' || spell.effect === 'revive_full') {
+    return !target.alive || target.hp <= 0;
+  }
+  if (spell.effect === 'heal_mag' || spell.effect === 'heal' || spell.effect === 'heal_full') {
     return target.alive && target.hp < target.max_hp;
   }
   return false;
@@ -83,7 +95,8 @@ async function useItem(item) {
 }
 
 async function useSpell(spell) {
-  if (!selectedTarget.value) return;
+  const allTarget = isAllTargetSpell(spell);
+  if (!allTarget && !selectedTarget.value) return;
   busy.value = true;
   error.value = '';
   try {
@@ -95,7 +108,8 @@ async function useSpell(spell) {
         mode: 'spell',
         caster_slot_id: spell.caster_slot_id,
         spell_id: spell.id,
-        target_slot_id: selectedTarget.value.slot_id ?? selectedTarget.value.id,
+        // 味方全体の魔法は対象を送らない
+        ...(allTarget ? {} : { target_slot_id: selectedTarget.value.slot_id ?? selectedTarget.value.id }),
       }),
     });
     emit('updated', data);
@@ -163,7 +177,7 @@ async function useSpell(spell) {
             @click="useSpell(spell)"
           >
             <span class="label">{{ spell.caster_name }}：{{ spell.label }}</span>
-            <span class="desc">MP {{ spell.mp_cost }}</span>
+            <span class="desc">MP {{ spell.mp_cost }}{{ isAllTargetSpell(spell) ? '（味方全員）' : '' }}</span>
           </button>
         </section>
 

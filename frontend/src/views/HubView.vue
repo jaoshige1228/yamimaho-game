@@ -51,6 +51,9 @@ onMounted(() => loadHubData());
           <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'items' })">
             持ち物を見る
           </button>
+          <button type="button" class="hub-secondary-btn" @click="router.push({ name: 'familiar' })">
+            使い魔の様子を見る
+          </button>
         </div>
         <p v-if="error" class="scene-error">{{ error }}</p>
       </ScenePanel>

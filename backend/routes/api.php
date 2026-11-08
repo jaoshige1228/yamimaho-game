@@ -5,6 +5,7 @@ use App\Http\Controllers\BattleController;
 use App\Http\Controllers\DungeonController;
 use App\Http\Controllers\DungeonExplorationController;
 use App\Http\Controllers\DungeonHealController;
+use App\Http\Controllers\FamiliarController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\ResetController;
 use App\Http\Controllers\ShopController;
@@ -19,6 +20,8 @@ Route::middleware('demo.player')->group(function (): void {
     Route::post('/player/equipment/equip', [PlayerController::class, 'equip']);
     Route::get('/shop/equipment', [ShopController::class, 'equipment']);
     Route::post('/shop/equipment/buy', [ShopController::class, 'buyEquipment']);
+    Route::get('/familiar', [FamiliarController::class, 'show']);
+    Route::post('/familiar/feed', [FamiliarController::class, 'feed']);
     Route::get('/dungeon', [DungeonController::class, 'show']);
     Route::post('/dungeon/enter', [DungeonController::class, 'enter']);
     Route::post('/dungeon/advance', [DungeonController::class, 'advance']);
@@ -39,6 +42,7 @@ Route::middleware(['demo.player', 'test.mode'])->prefix('admins')->group(functio
     Route::get('/status', [AdminController::class, 'status']);
     Route::get('/party', [AdminController::class, 'party']);
     Route::post('/grant-exp', [AdminController::class, 'grantExp']);
+    Route::post('/grant-gold', [AdminController::class, 'grantGold']);
     Route::get('/equipment', [AdminController::class, 'equipment']);
     Route::post('/equipment', [AdminController::class, 'equip']);
     Route::get('/dungeon-settings', [AdminController::class, 'dungeonSettingsShow']);

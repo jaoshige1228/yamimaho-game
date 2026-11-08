@@ -13,6 +13,10 @@ class BattleEngineSpellRestrictionTest extends TestCase
     {
         return [
             'status' => 'active',
+            'current_actor' => 'pc1',
+            'awaiting_input' => true,
+            'turn_order' => ['pc1', 'pc2'],
+            'turn_index' => 0,
             'units' => [
                 'pc1' => [
                     'id' => 'pc1',
@@ -50,6 +54,7 @@ class BattleEngineSpellRestrictionTest extends TestCase
         $engine = new BattleEngine(new BattleFactory);
 
         $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('回復できない対象です。');
         $engine->applyPlayerAction(
             $this->baseState(),
             'pc1',
@@ -59,11 +64,29 @@ class BattleEngineSpellRestrictionTest extends TestCase
         );
     }
 
+    public function test_heal_on_fallen_target_is_rejected(): void
+    {
+        $engine = new BattleEngine(new BattleFactory);
+        // 戦闘不能（HP0・alive=false）の味方には、HP回復魔法は使えない（蘇生魔法を使う）
+        $state = $this->baseState(['hp' => 0, 'alive' => false]);
+
+        try {
+            $engine->applyPlayerAction($state, 'pc1', 'spell', 'pc1_heal_water', 'pc2');
+            $this->fail('倒れた味方への回復が拒否されませんでした。');
+        } catch (InvalidArgumentException $e) {
+            $this->assertSame('回復できない対象です。', $e->getMessage());
+        }
+
+        $this->assertSame(0, $state['units']['pc2']['hp']);
+        $this->assertFalse($state['units']['pc2']['alive']);
+    }
+
     public function test_revive_on_alive_target_is_rejected(): void
     {
         $engine = new BattleEngine(new BattleFactory);
 
         $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('蘇生できない対象です。');
         $engine->applyPlayerAction(
             $this->baseState(),
             'pc1',

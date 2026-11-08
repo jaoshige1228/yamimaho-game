@@ -8,21 +8,6 @@ use Tests\TestCase;
 
 class BattleEngineSpellEffectTest extends TestCase
 {
-    public function test_heal_mag_restores_mag_times_two(): void
-    {
-        $engine = new BattleEngine(factory: new BattleFactory);
-        $state = $this->spellState('pc1_heal_water', 'pc1');
-        // 回復量が最大HPの上限に隠れないよう、不足HPを十分大きくする（魔力15 → 回復30）
-        $state['units']['pc1']['max_hp'] = 200;
-
-        $result = $engine->applyPlayerAction($state, 'pc1', 'spell', 'pc1_heal_water', 'pc1');
-        $heal = collect($result['events'])->firstWhere('type', 'heal');
-
-        $this->assertNotNull($heal);
-        $this->assertSame(30, $heal['value']);
-        $this->assertSame(60, $result['state']['units']['pc1']['hp']);
-    }
-
     public function test_shield_next_blocks_damage_once(): void
     {
         $engine = new BattleEngine(

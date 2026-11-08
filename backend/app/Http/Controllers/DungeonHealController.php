@@ -35,12 +35,12 @@ class DungeonHealController extends Controller
         $mode = (string) $request->input('mode', '');
         $targetSlotId = (string) $request->input('target_slot_id', '');
 
-        if ($targetSlotId === '') {
-            return response()->json(['message' => 'target_slot_id が必要です'], 422);
-        }
-
         try {
             if ($mode === 'item') {
+                if ($targetSlotId === '') {
+                    return response()->json(['message' => 'target_slot_id が必要です'], 422);
+                }
+
                 $itemCode = (string) $request->input('item_code', '');
                 if ($itemCode === '') {
                     return response()->json(['message' => 'item_code が必要です'], 422);
@@ -56,6 +56,7 @@ class DungeonHealController extends Controller
                     return response()->json(['message' => 'caster_slot_id と spell_id が必要です'], 422);
                 }
 
+                // 味方全体の回復魔法は target_slot_id なしで使える（単体の魔法で無いときはサービス側が「対象が見つかりません」を返す）
                 return response()->json($this->heal->healWithSpell($user, $casterSlotId, $spellId, $targetSlotId));
             }
 

@@ -16,3 +16,4 @@ infra/terraform/environments/*.tfvars
 !infra/terraform/environments/*.tfvars.example
 infra/terraform/generated/
 インフラメモ.txt
+使い魔システム.md

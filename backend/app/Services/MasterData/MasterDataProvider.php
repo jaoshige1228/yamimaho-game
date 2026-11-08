@@ -20,7 +20,7 @@ class MasterDataProvider
     /** @var array<string, array<string, mixed>>|null */
     private ?array $spellCache = null;
 
-    /** @var array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>|null */
+    /** @var array<string, list<array{spell_code: string, learn_after_defeat: string|null, replaced_by: string|null}>>|null */
     private ?array $characterSpellCache = null;
 
     /** @var array<string, list<array<string, mixed>>>|null */
@@ -112,6 +112,7 @@ class MasterDataProvider
     /**
      * キャラクターが使える魔法（並び順どおり）。最初から使える魔法に加えて、
      * 敵を倒して覚える魔法のうち $learnedSpellCodes に入っているものを含める。
+     * 強化版（replaced_by に指定された魔法）を覚えた魔法は、忘れるので含めない。
      *
      * @param  list<string>  $learnedSpellCodes  すでに覚えた魔法のコード
      * @return list<string>
@@ -120,7 +121,9 @@ class MasterDataProvider
     {
         $ids = [];
         foreach ($this->characterSpellMap()[$characterCode] ?? [] as $entry) {
-            if ($entry['learn_after_defeat'] === null || in_array($entry['spell_code'], $learnedSpellCodes, true)) {
+            $known = $entry['learn_after_defeat'] === null || in_array($entry['spell_code'], $learnedSpellCodes, true);
+            $replaced = $entry['replaced_by'] !== null && in_array($entry['replaced_by'], $learnedSpellCodes, true);
+            if ($known && ! $replaced) {
                 $ids[] = $entry['spell_code'];
             }
         }
@@ -251,7 +254,7 @@ class MasterDataProvider
     }
 
     /**
-     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>
+     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null, replaced_by: string|null}>>
      */
     private function characterSpellMap(): array
     {
@@ -269,7 +272,7 @@ class MasterDataProvider
     }
 
     /**
-     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>
+     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null, replaced_by: string|null}>>
      */
     private function loadCharacterSpellsFromDb(): array
     {
@@ -283,6 +286,7 @@ class MasterDataProvider
                     ->map(fn (SpellMaster $spell) => [
                         'spell_code' => $spell->code,
                         'learn_after_defeat' => self::nullIfBlank($spell->pivot->learn_after_defeat ?? null),
+                        'replaced_by' => self::nullIfBlank($spell->pivot->replaced_by ?? null),
                     ])
                     ->values()
                     ->all();
@@ -292,7 +296,7 @@ class MasterDataProvider
     }
 
     /**
-     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null}>>
+     * @return array<string, list<array{spell_code: string, learn_after_defeat: string|null, replaced_by: string|null}>>
      */
     private function loadCharacterSpellsFromCsv(): array
     {
@@ -306,6 +310,7 @@ class MasterDataProvider
             $map[$characterCode][] = [
                 'spell_code' => $row['spell_code'],
                 'learn_after_defeat' => self::nullIfBlank($row['learn_after_defeat'] ?? null),
+                'replaced_by' => self::nullIfBlank($row['replaced_by'] ?? null),
             ];
         }
 
@@ -569,6 +574,12 @@ class MasterDataProvider
         $buffKey = (string) ($row['buff_key'] ?? '');
         if ($buffKey !== '') {
             $spell['buff'] = $buffKey;
+        }
+
+        // 空 = 通常の魔法。skill = 魔法ではない特技（「〇〇の△△！」と告知する）
+        $castStyle = (string) ($row['cast_style'] ?? '');
+        if ($castStyle !== '') {
+            $spell['cast_style'] = $castStyle;
         }
 
         return $spell;

@@ -48,6 +48,7 @@ class SpellLearningService
      * 勝利した戦闘で倒した敵に応じて、パーティ全員が新しい魔法を覚える（戦闘不能のキャラも含む）。
      * すでに覚えている魔法は対象外なので、同じ敵を何度倒しても覚えるのは最初の1回だけ。
      * 同じ「初回」のタイミングで、`game.first_defeat_max_mp_bonus` に設定されたキャラの最大MPも加算する（文言は出さない）。
+     * 覚えた魔法の強化版にあたる古い魔法（character_spells.csv の replaced_by）は、同時に忘れる。
      *
      * @param  array<string, mixed>  $state
      * @return list<array<string, mixed>>  覚えた人がいれば spells_learned イベント 1 件、いなければ空
@@ -77,6 +78,13 @@ class SpellLearningService
                 continue;
             }
 
+            // 強化版を覚えたことで使えなくなる魔法
+            $masterCode = $character->characterMaster->code;
+            $forgottenIds = array_values(array_diff(
+                $this->masters->spellIdsForCharacter($masterCode, $alreadyLearned),
+                $this->masters->spellIdsForCharacter($masterCode, [...$alreadyLearned, ...$newSpellIds]),
+            ));
+
             $spells = [];
             DB::transaction(function () use ($character, $newSpellIds, $defeatedCodes, $alreadyLearned, &$spells): void {
                 foreach ($newSpellIds as $spellId) {
@@ -94,6 +102,10 @@ class SpellLearningService
                 'slot_id' => $slotId,
                 'name' => $character->characterMaster->name,
                 'spells' => $spells,
+                'forgotten' => array_map(
+                    fn (string $spellId) => ['id' => $spellId, 'label' => $this->masters->findSpell($spellId)['label']],
+                    $forgottenIds,
+                ),
             ];
         }
 

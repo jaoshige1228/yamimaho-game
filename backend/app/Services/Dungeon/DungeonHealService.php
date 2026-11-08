@@ -17,6 +17,12 @@ use Illuminate\Support\Facades\DB;
 
 class DungeonHealService
 {
+    /** 探索中に使える魔法の effect */
+    private const FIELD_SPELL_EFFECTS = ['heal_mag', 'heal', 'heal_full', 'revive_chance', 'revive_full'];
+
+    /** 味方全体にかけるときに「回復」として扱う effect */
+    private const HEAL_EFFECTS = ['heal_mag', 'heal', 'heal_full'];
+
     public function __construct(
         private readonly DungeonProgressService $progress = new DungeonProgressService,
         private readonly UserCharacterService $characters = new UserCharacterService,
@@ -61,14 +67,22 @@ class DungeonHealService
     /**
      * @return array<string, mixed>
      */
-    public function healWithSpell(User $user, string $casterSlotId, string $spellId, string $targetSlotId): array
+    public function healWithSpell(User $user, string $casterSlotId, string $spellId, ?string $targetSlotId = null): array
     {
         $this->assertCanHeal($user);
 
         $party = $this->characters->partyInSlotOrder($user);
         $caster = $party->get($casterSlotId);
-        $target = $party->get($targetSlotId);
-        if ($caster === null || $target === null) {
+        try {
+            $spell = $this->masters->findSpell($spellId);
+        } catch (\InvalidArgumentException) {
+            throw new \InvalidArgumentException('その魔法は使えません。');
+        }
+        $effect = $spell['effect'] ?? '';
+        // 味方全体の回復（精霊の虹など）は対象を選ばない
+        $allTarget = ($spell['target_type'] ?? '') === 'ally_all' && in_array($effect, self::HEAL_EFFECTS, true);
+        $target = $allTarget || $targetSlotId === null || $targetSlotId === '' ? null : $party->get($targetSlotId);
+        if ($caster === null || (! $allTarget && $target === null)) {
             throw new \InvalidArgumentException('対象が見つかりません。');
         }
 
@@ -81,37 +95,50 @@ class DungeonHealService
             throw new \InvalidArgumentException('その魔法は使えません。');
         }
 
-        $spell = $this->masters->findSpell($spellId);
-        $effect = $spell['effect'] ?? '';
-        if (! in_array($effect, ['heal_mag', 'heal', 'revive_chance'], true)) {
+        if (! in_array($effect, self::FIELD_SPELL_EFFECTS, true)) {
             throw new \InvalidArgumentException('回復に使える魔法ではありません。');
         }
 
-        $maxTarget = $this->growth->statsForCharacter($target);
         $mpCost = (int) ($spell['mp_cost'] ?? 0);
         if ($caster->mp < $mpCost) {
             throw new \InvalidArgumentException('MPが足りません。');
         }
 
-        DB::transaction(function () use ($caster, $target, $spell, $effect, $maxTarget, $mpCost): void {
-            match ($effect) {
-                'heal_mag' => $this->applyHpHeal(
-                    $target,
-                    $maxTarget['hp'],
-                    // 戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する
-                    SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell),
-                ),
-                'heal' => $this->applyHpHeal($target, $maxTarget['hp'], (int) ($spell['power'] ?? 0)),
-                // 蘇生後の HP は戦闘中と同じ割合（power は戦闘中の成功率）
-                'revive_chance' => $this->applyRevive($target, $maxTarget['hp'], (int) config('battle.revive_hp_percent', 50)),
-                default => throw new \InvalidArgumentException('この魔法は使えません。'),
-            };
+        // 回復する相手。全体回復は、傷ついている（生きていてHPが満タンでない）味方全員
+        $targets = $allTarget
+            ? $party->filter(fn (UserCharacter $c) => $c->hp > 0 && $c->hp < $this->growth->statsForCharacter($c)['hp'])->values()->all()
+            : [$target];
+        if ($targets === []) {
+            throw new \InvalidArgumentException('回復できる対象がいません。');
+        }
+
+        DB::transaction(function () use ($caster, $targets, $spell, $effect, $mpCost): void {
+            foreach ($targets as $member) {
+                $maxHp = $this->growth->statsForCharacter($member)['hp'];
+                match ($effect) {
+                    'heal_mag' => $this->applyHpHeal(
+                        $member,
+                        $maxHp,
+                        // 戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する
+                        SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell),
+                    ),
+                    'heal' => $this->applyHpHeal($member, $maxHp, (int) ($spell['power'] ?? 0)),
+                    'heal_full' => $this->applyHpHeal($member, $maxHp, $maxHp),
+                    // 蘇生後の HP は戦闘中と同じ割合（power は戦闘中の成功率）
+                    'revive_chance' => $this->applyRevive($member, $maxHp, (int) config('battle.revive_hp_percent', 50)),
+                    'revive_full' => $this->applyRevive($member, $maxHp, 100),
+                    default => throw new \InvalidArgumentException('この魔法は使えません。'),
+                };
+            }
 
             $caster->mp -= $mpCost;
             $caster->save();
         });
 
-        return $this->buildResponse($user, "{$spell['label']}を唱えた。");
+        // 魔法ではない特技（迅速調合など）は「唱えた」と言わない
+        $verb = ($spell['cast_style'] ?? '') === 'skill' ? '使った' : '唱えた';
+
+        return $this->buildResponse($user, "{$spell['label']}を{$verb}。");
     }
 
     /**
@@ -126,7 +153,7 @@ class DungeonHealService
             foreach ($this->spellLearning->spellIdsFor($character) as $spellId) {
                 $spell = $this->masters->findSpell($spellId);
                 $effect = $spell['effect'] ?? '';
-                if (! in_array($effect, ['heal_mag', 'heal', 'revive_chance'], true)) {
+                if (! in_array($effect, self::FIELD_SPELL_EFFECTS, true)) {
                     continue;
                 }
 
@@ -138,6 +165,7 @@ class DungeonHealService
                     'description' => $spell['description'] ?? '',
                     'mp_cost' => (int) ($spell['mp_cost'] ?? 0),
                     'effect' => $effect,
+                    'target_type' => $spell['target_type'] ?? 'ally_single',
                     'affordable' => $character->hp > 0
                         && $character->mp >= (int) ($spell['mp_cost'] ?? 0),
                 ];

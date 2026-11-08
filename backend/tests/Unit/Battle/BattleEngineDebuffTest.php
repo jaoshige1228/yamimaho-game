@@ -57,8 +57,10 @@ class BattleEngineDebuffTest extends TestCase
         $raised = $method->invoke($engine, $attacker, $buffed, 'str', 1.0);
 
         $this->assertLessThan($normal, $raised);
+        // 土の鎧（def_up ×1.4）: 防御 20 → 28 なので 20 − 28 / 2 = 6
+        $this->assertSame(1.4, config('battle.buffs.def_up.multiplier'));
         $this->assertSame(10, $normal);
-        $this->assertSame(7, $raised);
+        $this->assertSame(6, $raised);
     }
 
     public function test_vine_bind_applies_def_down_and_increases_follow_up_damage(): void

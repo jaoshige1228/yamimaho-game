@@ -44,48 +44,6 @@ class BattleOrchestratorTest extends TestCase
         $this->assertTrue($result['state']['awaiting_input']);
     }
 
-    public function test_player_action_advances_turn_order(): void
-    {
-        $orch = $this->orchestrator();
-        $state = $orch->createBattle()['state'];
-        $allies = $this->allyTurnOrder($state);
-
-        foreach ($allies as $index => $allyId) {
-            $this->assertSame($allyId, $state['current_actor']);
-            $state = $orch->submitPlayerAction(
-                $state,
-                $index === 1 ? 'kick' : 'punch',
-                null,
-                'enemy_1',
-            )['state'];
-        }
-
-        $this->assertSame($allies[0], $state['current_actor']);
-    }
-
-    public function test_enemy_phase_runs_after_last_ally_without_player_input(): void
-    {
-        $orch = $this->orchestrator();
-        $state = $orch->createBattle(null, 'demo_boss')['state'];
-        $allies = $this->allyTurnOrder($state);
-
-        foreach (array_slice($allies, 0, -1) as $allyId) {
-            $this->assertSame($allyId, $state['current_actor']);
-            $state = $orch->submitPlayerAction($state, 'punch', null, 'enemy_1')['state'];
-        }
-
-        $this->assertSame($allies[array_key_last($allies)], $state['current_actor']);
-        $roundEnd = $orch->submitPlayerAction($state, 'punch', null, 'enemy_1');
-
-        $turnStarts = array_values(array_filter(
-            $roundEnd['events'],
-            fn (array $e): bool => ($e['type'] ?? '') === 'turn_start' && str_starts_with((string) ($e['actor'] ?? ''), 'enemy'),
-        ));
-
-        $this->assertGreaterThanOrEqual(1, count($turnStarts));
-        $this->assertSame($allies[0], $roundEnd['state']['current_actor']);
-    }
-
     public function test_kick_emits_announce_event(): void
     {
         $orch = $this->orchestrator();

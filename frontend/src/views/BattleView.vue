@@ -52,6 +52,8 @@ const flashClass = ref('');
 const floatingDamages = ref([]);
 const floatingSupports = ref([]);
 const actionBanners = ref([]);
+/** 使い魔の支援のバナー（顔つき）。同時に1つだけ */
+const familiarBanner = ref(null);
 const displayHp = ref({});
 /** 逃げて画面から消えた敵の ID（逃走イベントの再生に合わせて増える） */
 const fledIds = ref([]);
@@ -96,6 +98,15 @@ const canShowFlee = computed(
 
 const canFlee = computed(
   () => canShowFlee.value && awaiting.value && !busy.value && partyPhase.value === 'ready',
+);
+
+/** ボス戦（階層ボス・中ボス）。敵を大きく見せる（通常戦は小さめ） */
+const isBossBattle = computed(
+  () =>
+    state.value?.meta?.boss === true
+    || state.value?.meta?.mid_boss === true
+    || route.query.boss === '1'
+    || route.query.mid_boss === '1',
 );
 
 const floor1BossSprite = computed(
@@ -274,7 +285,7 @@ function flashKindForSpellAnnounce(ev) {
   if (effect.startsWith('buff') || effect.includes('up') || effect.includes('evasion')) {
     return 'buff';
   }
-  if (effect === 'shield_next') {
+  if (effect === 'shield_next' || effect === 'life_ward') {
     return 'shield';
   }
   if (effect.includes('revive')) {
@@ -325,6 +336,15 @@ function spellLabel(spellId) {
   if (!spellId) return null;
   const found = commands.value?.spells?.find((s) => s.id === spellId);
   return found?.label ?? null;
+}
+
+/** 使い魔の支援のバナーを出す（顔つき。時間が来たら消える） */
+function showFamiliarBanner(text, portrait, ms = FAMILIAR_BANNER_MS) {
+  const id = `${Date.now()}-${Math.random()}`;
+  familiarBanner.value = { id, text, portrait };
+  setTimeout(() => {
+    if (familiarBanner.value?.id === id) familiarBanner.value = null;
+  }, ms);
 }
 
 function showActionBanner(text) {
@@ -395,6 +415,9 @@ function setDisplayHp(targetId, hp) {
   if (!unit) return;
   displayHp.value[targetId] = Math.max(0, Math.min(unit.max_hp, hp));
 }
+
+/** 使い魔の支援バナー1枚の表示時間（ms）。CSS の familiarBannerPop(1.2s) に合わせる */
+const FAMILIAR_BANNER_MS = 1200;
 
 /** 敵アイコンが前に出る動きの長さ（ms） */
 const ENEMY_LUNGE_MS = 280;
@@ -483,6 +506,29 @@ async function playEvents(events) {
       await showSupportEffect(ev.target, 'shield');
       await delay(120);
     }
+    if (ev.type === 'familiar_support') {
+      // 「使い魔たちの支援行動！」。SE を鳴らしながら顔つきバナーを出す
+      playSe('tukaima');
+      showFamiliarBanner(ev.text, ev.portrait);
+      await delay(FAMILIAR_BANNER_MS);
+    }
+    if (ev.type === 'familiar_action') {
+      // 発動した行動のメッセージ（このあと、効果の damage / heal などが続く）
+      showFamiliarBanner(ev.text, ev.portrait);
+      await delay(FAMILIAR_BANNER_MS);
+    }
+    if (ev.type === 'life_ward_applied') {
+      showFloatingSupport(ev.target, '加護', 'shield');
+      playSe('success');
+      await showSupportEffect(ev.target, 'shield');
+      await delay(120);
+    }
+    if (ev.type === 'life_ward_triggered') {
+      showActionBanner(`${unitName(ev.target)}は命の加護で踏みとどまった！`);
+      playSe('success');
+      await showSupportEffect(ev.target, 'shield');
+      await delay(120);
+    }
     if (ev.type === 'revive') {
       setDisplayHp(ev.target, ev.hp);
       showFloatingSupport(ev.target, '蘇生', 'revive');
@@ -517,7 +563,12 @@ async function playEvents(events) {
       victoryRewards.value.push(`${ev.name}が Lv${ev.level} になった！`);
     }
     if (ev.type === 'spells_learned') {
-      learnedSpellMessages.value = (ev.characters ?? []).map((c) => `${c.name}は新しい魔法を覚えた！`);
+      // 「覚えた」の行を先に並べ、そのあとに「忘れた」の行（強化版に置き換わった魔法）を並べる
+      const characters = ev.characters ?? [];
+      learnedSpellMessages.value = [
+        ...characters.map((c) => `${c.name}は新しい魔法を覚えた！`),
+        ...characters.flatMap((c) => (c.forgotten ?? []).map((s) => `${c.name}は${s.label}を忘れた…`)),
+      ];
     }
     if (ev.type === 'dungeon_floor_cleared') {
       dungeonCleared.value = true;
@@ -786,6 +837,7 @@ watch(
       :floating-damages="floatingDamages"
       :floating-supports="floatingSupports"
       :action-banners="actionBanners"
+      :familiar-banner="familiarBanner"
     />
 
     <div class="battle-toolbar">
@@ -814,6 +866,7 @@ watch(
         :support-effect-target="supportEffectTarget"
         :active-enemy-lunge="activeEnemyLunge"
         :floor1-boss-sprite="floor1BossSprite"
+        :boss-battle="isBossBattle"
         :fled-ids="fledIds"
         :can-open-commands="canOpenCommands"
         @select-target="onSelectTarget"

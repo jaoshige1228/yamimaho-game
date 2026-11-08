@@ -19,6 +19,7 @@ class SpellMaster extends Model
         'coefficient',
         'power',
         'buff_key',
+        'cast_style',
     ];
 
     /** @return BelongsToMany<CharacterMaster, $this> */

@@ -121,6 +121,7 @@ class MasterDataSeeder extends Seeder
                     'coefficient' => ($row['coefficient'] ?? '') !== '' ? (float) $row['coefficient'] : null,
                     'power' => ($row['power'] ?? '') !== '' ? (int) $row['power'] : null,
                     'buff_key' => ($row['buff_key'] ?? '') !== '' ? $row['buff_key'] : null,
+                    'cast_style' => ($row['cast_style'] ?? '') !== '' ? $row['cast_style'] : null,
                 ],
             );
         }
@@ -147,9 +148,11 @@ class MasterDataSeeder extends Seeder
                     continue;
                 }
                 $learnAfterDefeat = trim((string) ($row['learn_after_defeat'] ?? ''));
+                $replacedBy = trim((string) ($row['replaced_by'] ?? ''));
                 $sync[$spell->id] = [
                     'sort_order' => (int) $row['sort_order'],
                     'learn_after_defeat' => $learnAfterDefeat !== '' ? $learnAfterDefeat : null,
+                    'replaced_by' => $replacedBy !== '' ? $replacedBy : null,
                 ];
             }
 

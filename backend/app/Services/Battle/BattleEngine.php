@@ -6,6 +6,12 @@ use InvalidArgumentException;
 
 class BattleEngine
 {
+    /** HPを回復する魔法の effect（heal_mag = 魔力×係数、heal = 固定値、heal_full = 全回復） */
+    private const HEAL_EFFECTS = ['heal_mag', 'heal', 'heal_full'];
+
+    /** 戦闘不能の味方を蘇生する魔法の effect（revive_chance = 確率、revive_full = 確実にHP全回復） */
+    private const REVIVE_EFFECTS = ['revive_chance', 'revive_full'];
+
     /** @var (callable(array<string, array<string, mixed>>): ?string)|null */
     private $enemyTargetPicker = null;
 
@@ -18,11 +24,15 @@ class BattleEngine
     /** @var (callable(): int)|null */
     private $critRoll = null;
 
+    /** 使い魔の支援の判断（発動するか・何をするか・誰にか）。効果の適用はこのクラスが行う */
+    private FamiliarSupport $familiarSupport;
+
     /**
      * @param  (callable(array<string, array<string, mixed>>): ?string)|null  $enemyTargetPicker
      * @param  (callable(): float)|null  $damageRoll
      * @param  (callable(): int)|null  $hitRoll  1〜100
      * @param  (callable(): int)|null  $critRoll  1〜100
+     * @param  (callable(int, int): int)|null  $familiarRoll  使い魔の支援の乱数（min〜max の整数。確率・行動・対象・顔の選択すべてに使う）
      */
     public function __construct(
         private readonly BattleFactory $factory = new BattleFactory,
@@ -31,11 +41,13 @@ class BattleEngine
         ?callable $damageRoll = null,
         ?callable $hitRoll = null,
         ?callable $critRoll = null,
+        ?callable $familiarRoll = null,
     ) {
         $this->enemyTargetPicker = $enemyTargetPicker;
         $this->damageRoll = $damageRoll;
         $this->hitRoll = $hitRoll;
         $this->critRoll = $critRoll;
+        $this->familiarSupport = new FamiliarSupport($familiarRoll);
     }
 
     /**
@@ -101,23 +113,171 @@ class BattleEngine
     {
         $end = $this->checkBattleEnd($state);
         if ($end !== null) {
-            $state['status'] = $end;
-            $state['awaiting_input'] = false;
-            $state['current_actor'] = null;
-            $events[] = ['type' => 'battle_end', 'result' => $end];
-            $state['log'][] = $end === 'victory' ? '勝利！' : '敗北…';
-
-            return ['state' => $state, 'events' => $events];
+            return $this->endBattle($state, $events, $end);
         }
 
         $nextIndex = $this->nextTurnIndex($state, $actorId);
         $nextActor = $this->factory->findNextActor($state['units'], $state['turn_order'], $nextIndex);
+
+        // 全員（味方と敵）の行動が一周したら、使い魔の支援の抽選を行う
+        if ($this->roundCompleted($state, $actorId, $nextActor)) {
+            $support = $this->runFamiliarSupport($state);
+            if ($support !== []) {
+                $events = array_merge($events, $support);
+
+                // 敵を倒しきった（勝利）・蘇生で手番が変わった、などを反映する
+                $end = $this->checkBattleEnd($state);
+                if ($end !== null) {
+                    return $this->endBattle($state, $events, $end);
+                }
+                $nextActor = $this->factory->findNextActor($state['units'], $state['turn_order'], $nextIndex);
+            }
+        }
 
         $state['turn_index'] = $nextIndex;
         $state['current_actor'] = $nextActor;
         $state['awaiting_input'] = $nextActor !== null && str_starts_with($nextActor, 'pc');
 
         return ['state' => $state, 'events' => $events];
+    }
+
+    /**
+     * 戦闘の終了処理（勝敗の確定）。
+     *
+     * @param  array<string, mixed>  $state
+     * @param  list<array<string, mixed>>  $events
+     * @return array{state: array<string, mixed>, events: list<array<string, mixed>>}
+     */
+    private function endBattle(array $state, array $events, string $end): array
+    {
+        $state['status'] = $end;
+        $state['awaiting_input'] = false;
+        $state['current_actor'] = null;
+        $events[] = ['type' => 'battle_end', 'result' => $end];
+        $state['log'][] = $end === 'victory' ? '勝利！' : '敗北…';
+
+        return ['state' => $state, 'events' => $events];
+    }
+
+    /**
+     * 今の行動で、全員の行動が一周したか（次に動くユニットの位置が、今のユニット以前に戻ったか）。
+     * 戦闘不能・逃走したユニットは飛ばされるので、生の turn_index ではなく turn_order 上の位置で比べる。
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function roundCompleted(array $state, string $actorId, ?string $nextActor): bool
+    {
+        if ($nextActor === null) {
+            return false;
+        }
+
+        $order = array_values($state['turn_order']);
+        $current = array_search($actorId, $order, true);
+        $next = array_search($nextActor, $order, true);
+
+        return $current !== false && $next !== false && $next <= $current;
+    }
+
+    /**
+     * 使い魔の支援（抽選 → 行動の決定 → 効果の適用）。戦闘に使い魔が設定されていなければ何もしない。
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function runFamiliarSupport(array &$state): array
+    {
+        $level = $this->familiarSupport->levelOf($state);
+        if ($level < 1 || ! $this->familiarSupport->shouldTrigger($level)) {
+            return [];
+        }
+
+        $decision = $this->familiarSupport->decide($state['units'], $level);
+        if ($decision === null) {
+            return [];
+        }
+
+        return $this->applyFamiliarSupport($state, $level, $decision);
+    }
+
+    /**
+     * 決まった支援の演出イベントと、効果の適用。効果のイベントは通常の damage / heal / buff_applied / revive と同じ形で、
+     * actor は 'familiar'。
+     *
+     * @param  array<string, mixed>  $state
+     * @param  array{action: string, kind: string, targets: list<string>, portrait: string}  $decision
+     * @return list<array<string, mixed>>
+     */
+    private function applyFamiliarSupport(array &$state, int $level, array $decision): array
+    {
+        $action = (array) config("familiar.actions.{$decision['action']}");
+        $targetName = isset($decision['targets'][0]) ? (string) ($state['units'][$decision['targets'][0]]['name'] ?? '') : '';
+        $message = str_replace('{target}', $targetName, (string) $action['message']);
+        $title = (string) config('familiar.support_title');
+
+        $events = [
+            ['type' => 'familiar_support', 'portrait' => $decision['portrait'], 'text' => $title],
+            ['type' => 'familiar_action', 'portrait' => $decision['portrait'], 'text' => $message],
+        ];
+        $state['log'][] = $title;
+        $state['log'][] = $message;
+
+        $averageMag = $this->familiarSupport->averageMag($state['units']);
+
+        foreach ($decision['targets'] as $targetId) {
+            $target = &$state['units'][$targetId];
+
+            switch ($decision['kind']) {
+                case 'damage':
+                    $coefficient = $this->familiarSupport->coefficientFor($decision['action'], $level);
+                    $damage = $this->calcDamage(['mag' => $averageMag, 'buffs' => []], $target, 'mag', $coefficient, 'magical');
+                    $targetLabel = (string) $target['name'];
+                    unset($target);
+                    $events = array_merge($events, $this->applyDamage($state, 'familiar', $targetId, $damage, null, false));
+                    $state['log'][] = "{$targetLabel}に{$damage}ダメージ";
+                    break;
+
+                case 'heal':
+                    // 満タン・戦闘不能の味方は回復しない（全体回復で混ざる）
+                    if (! $target['alive'] || $target['hp'] >= $target['max_hp']) {
+                        break;
+                    }
+                    $coefficient = $this->familiarSupport->coefficientFor($decision['action'], $level);
+                    $amount = SpellHealing::healMagAmount($averageMag, ['coefficient' => $coefficient]);
+                    $healed = min($amount, $target['max_hp'] - $target['hp']);
+                    $target['hp'] += $healed;
+                    $events[] = ['type' => 'heal', 'actor' => 'familiar', 'target' => $targetId, 'value' => $healed];
+                    $state['log'][] = "{$target['name']}は{$healed}回復した";
+                    break;
+
+                case 'buff':
+                    $buffKey = $this->familiarSupport->attackBuffKey($level);
+                    // 強化版と通常版は重ねない
+                    unset($target['buffs']['atk_up_familiar'], $target['buffs']['atk_up_familiar_large']);
+                    $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
+                    $events[] = [
+                        'type' => 'buff_applied',
+                        'actor' => 'familiar',
+                        'target' => $targetId,
+                        'buff' => $buffKey,
+                        'icon' => config("battle.buffs.{$buffKey}.icon"),
+                    ];
+                    break;
+
+                case 'revive':
+                    if ($target['alive']) {
+                        break;
+                    }
+                    $hp = max(1, (int) floor($target['max_hp'] * (int) config('familiar.revive_hp_percent') / 100));
+                    $target['hp'] = min($hp, (int) $target['max_hp']);
+                    $target['alive'] = true;
+                    $events[] = ['type' => 'revive', 'actor' => 'familiar', 'target' => $targetId, 'hp' => $target['hp']];
+                    $state['log'][] = "{$target['name']}は蘇生した";
+                    break;
+            }
+            unset($target);
+        }
+
+        return $events;
     }
 
     /**
@@ -175,7 +335,7 @@ class BattleEngine
             // 対象がなく不発でも、詠唱した事実は告知する（無言のターンにしない）
             $events[] = $this->announceEvent(
                 $actorId,
-                "{$actor['name']}は{$spell['label']}を唱えた！",
+                $this->spellAnnounceText($actor['name'], $spell),
                 isset($spell['element']) && $spell['element'] !== '' ? (string) $spell['element'] : null,
                 isset($spell['effect']) && $spell['effect'] !== '' ? (string) $spell['effect'] : null,
             );
@@ -207,8 +367,8 @@ class BattleEngine
 
         $spell = $this->factory->findSpell((string) $skill['skill_code']);
         $useless = match ((string) ($spell['effect'] ?? '')) {
-            'heal_mag' => $this->woundedEnemyIds($units) === [],
-            'revive_chance' => $this->fallenEnemyIds($units) === [],
+            'heal_mag', 'heal_full' => $this->woundedEnemyIds($units) === [],
+            'revive_chance', 'revive_full' => $this->fallenEnemyIds($units) === [],
             default => false,
         };
         if (! $useless) {
@@ -327,15 +487,28 @@ class BattleEngine
         }
 
         $targets = $this->resolveSpellTargets($spell, $targetId, $state['units'], $actor['side']);
-        foreach ($targets as $tid) {
-            $this->assertSpellTargetValid($spell, $state['units'][$tid]);
+        if (($spell['target_type'] ?? '') === 'ally_all' && in_array($spell['effect'] ?? '', self::HEAL_EFFECTS, true)) {
+            // 味方全体の回復は、傷ついている味方が一人でもいれば使える（満タンの味方は回復しないだけ）
+            $anyWounded = false;
+            foreach ($targets as $tid) {
+                if ((int) $state['units'][$tid]['hp'] < (int) $state['units'][$tid]['max_hp']) {
+                    $anyWounded = true;
+                }
+            }
+            if (! $anyWounded) {
+                throw new InvalidArgumentException('回復できない対象です。');
+            }
+        } else {
+            foreach ($targets as $tid) {
+                $this->assertSpellTargetValid($spell, $state['units'][$tid]);
+            }
         }
 
         $actor['mp'] -= $mpCost;
         $events[] = ['type' => 'mp_spent', 'actor' => $actorId, 'amount' => $mpCost];
         $events[] = $this->announceEvent(
             $actorId,
-            "{$actor['name']}は{$spell['label']}を唱えた！",
+            $this->spellAnnounceText($actor['name'], $spell),
             isset($spell['element']) && $spell['element'] !== '' ? (string) $spell['element'] : null,
             isset($spell['effect']) && $spell['effect'] !== '' ? (string) $spell['effect'] : null,
         );
@@ -356,7 +529,7 @@ class BattleEngine
     {
         $effect = $spell['effect'] ?? '';
 
-        if (in_array($effect, ['heal_mag', 'heal'], true)) {
+        if (in_array($effect, self::HEAL_EFFECTS, true)) {
             if (! ($target['alive'] ?? false) || (int) $target['hp'] >= (int) $target['max_hp']) {
                 throw new InvalidArgumentException('回復できない対象です。');
             }
@@ -364,7 +537,7 @@ class BattleEngine
             return;
         }
 
-        if ($effect === 'revive_chance') {
+        if (in_array($effect, self::REVIVE_EFFECTS, true)) {
             if ($target['alive'] ?? true) {
                 throw new InvalidArgumentException('蘇生できない対象です。');
             }
@@ -399,7 +572,7 @@ class BattleEngine
                 continue;
             }
 
-            if (in_array($effect, ['heal_mag', 'heal'], true)) {
+            if (in_array($effect, self::HEAL_EFFECTS, true)) {
                 if (($unit['alive'] ?? false) && (int) $unit['hp'] < (int) $unit['max_hp']) {
                     return true;
                 }
@@ -407,7 +580,7 @@ class BattleEngine
                 continue;
             }
 
-            if ($effect === 'revive_chance') {
+            if (in_array($effect, self::REVIVE_EFFECTS, true)) {
                 if (! ($unit['alive'] ?? true)) {
                     return true;
                 }
@@ -435,6 +608,16 @@ class BattleEngine
         $events = [];
         $label = $spell['label'];
 
+        // ダメージを与える魔法（即死を含む）は回避判定の対象（判定するかどうかは shouldRollEvasion を参照）
+        if (in_array($spell['effect'], ['damage', 'damage_hp_cost', 'instant_death'], true)
+            && ($target['alive'] ?? false)
+            && $this->shouldRollEvasion($actor, $target, false)
+            && $this->rollEvasion($target)) {
+            $state['log'][] = "{$target['name']}は{$label}を回避した";
+
+            return [['type' => 'miss', 'actor' => $actorId, 'target' => $targetId]];
+        }
+
         switch ($spell['effect']) {
             case 'damage':
             case 'damage_hp_cost':
@@ -448,11 +631,43 @@ class BattleEngine
                 break;
 
             case 'heal_mag':
+                // 戦闘不能・HP満タンの対象は回復しない（味方全体の回復で混ざることがある。倒れた人は蘇生でしか戻らない）
+                if (! $target['alive'] || $target['hp'] >= $target['max_hp']) {
+                    break;
+                }
                 $amount = SpellHealing::healMagAmount((float) $actor['mag'], $spell);
                 $healed = min($amount, $target['max_hp'] - $target['hp']);
                 $target['hp'] += $healed;
                 $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];
                 $state['log'][] = "{$target['name']}は{$healed}回復した";
+                break;
+
+            case 'heal_full':
+                if (! $target['alive'] || $target['hp'] >= $target['max_hp']) {
+                    break;
+                }
+                $healed = $target['max_hp'] - $target['hp'];
+                $target['hp'] = $target['max_hp'];
+                $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];
+                $state['log'][] = "{$target['name']}のHPが全回復した";
+                break;
+
+            case 'revive_full':
+                if (! $target['alive']) {
+                    $target['hp'] = $target['max_hp'];
+                    $target['alive'] = true;
+                    $events[] = ['type' => 'revive', 'actor' => $actorId, 'target' => $targetId, 'hp' => $target['hp']];
+                    $state['log'][] = "{$target['name']}はHP全回復で蘇生した";
+                }
+                break;
+
+            case 'life_ward':
+                if (! $target['alive']) {
+                    break;
+                }
+                $target['life_ward'] = true;
+                $events[] = ['type' => 'life_ward_applied', 'actor' => $actorId, 'target' => $targetId];
+                $state['log'][] = "{$target['name']}に{$label}";
                 break;
 
             case 'buff_evasion_set':
@@ -612,7 +827,7 @@ class BattleEngine
         $actor = $state['units'][$actorId];
         $target = $state['units'][$targetId];
 
-        if ($checkEvasion && $this->rollEvasion($target)) {
+        if ($this->shouldRollEvasion($actor, $target, $checkEvasion) && $this->rollEvasion($target)) {
             $state['log'][] = "{$target['name']}は攻撃を回避した";
             return [['type' => 'miss', 'actor' => $actorId, 'target' => $targetId]];
         }
@@ -652,17 +867,30 @@ class BattleEngine
             ];
         }
 
+        // 命の加護: 戦闘不能になる攻撃を受けても HP が 1 だけ残る（発動したら加護は消える）
+        $wardTriggered = false;
+        if (($target['life_ward'] ?? false) && $damage >= $target['hp']) {
+            $target['life_ward'] = false;
+            $damage = max(0, (int) $target['hp'] - 1);
+            $wardTriggered = true;
+            $state['log'][] = "{$target['name']}は命の加護で踏みとどまった";
+        }
+
         $target['hp'] = max(0, $target['hp'] - $damage);
-        $events = [
-            [
+        $events = [];
+        if (! $wardTriggered || $damage > 0) {
+            $events[] = [
                 'type' => 'damage',
                 'actor' => $actorId,
                 'target' => $targetId,
                 'value' => $damage,
                 'element' => $element,
                 'critical' => $critical,
-            ],
-        ];
+            ];
+        }
+        if ($wardTriggered) {
+            $events[] = ['type' => 'life_ward_triggered', 'actor' => $actorId, 'target' => $targetId];
+        }
 
         if ($target['hp'] === 0) {
             $target['alive'] = false;
@@ -795,15 +1023,63 @@ class BattleEngine
             if (($buff['type'] ?? '') === 'evasion_set') {
                 continue;
             }
-            $buffStat = (string) ($buff['stat'] ?? '');
-            $applies = $buffStat === $stat
-                || ($buffStat === 'def' && in_array($stat, ['def', 'pdef', 'mdef'], true));
+            // stat は 1 つの文字列、または複数（使い魔の攻撃バフは筋力と魔力の両方）
+            $buffStats = (array) ($buff['stat'] ?? '');
+            $applies = in_array($stat, $buffStats, true)
+                || (in_array('def', $buffStats, true) && in_array($stat, ['def', 'pdef', 'mdef'], true));
             if ($applies) {
                 $base *= (float) $buff['multiplier'];
             }
         }
 
         return $base;
+    }
+
+    /**
+     * 魔法の告知文。通常の魔法は「〇〇は△△を唱えた！」、魔法ではない特技（cast_style = skill）は「〇〇の△△！」。
+     *
+     * @param  array<string, mixed>  $spell
+     */
+    private function spellAnnounceText(string $actorName, array $spell): string
+    {
+        if (($spell['cast_style'] ?? '') === 'skill') {
+            return "{$actorName}の{$spell['label']}！";
+        }
+
+        return "{$actorName}は{$spell['label']}を唱えた！";
+    }
+
+    /**
+     * この攻撃で回避判定を行うか。
+     *
+     * - 敵が味方を攻撃するとき … 物理攻撃もダメージ魔法も、常に判定する（味方の素の回避率 5%、または回避バフ）
+     * - 味方が敵を攻撃するとき … 素の回避率で判定するのは通常のこぶし（$baseRateApplies）だけ。
+     *   回避バフがかかっていれば、どの物理攻撃・ダメージ魔法でも判定する
+     *
+     * @param  array<string, mixed>  $attacker
+     * @param  array<string, mixed>  $target
+     */
+    private function shouldRollEvasion(array $attacker, array $target, bool $baseRateApplies): bool
+    {
+        return $baseRateApplies
+            || ($attacker['side'] ?? '') === 'enemy'
+            || $this->hasEvasionBuff($target);
+    }
+
+    /**
+     * 回避率を固定する効果（水の幻影など）がかかっているか。
+     *
+     * @param  array<string, mixed>  $unit
+     */
+    private function hasEvasionBuff(array $unit): bool
+    {
+        foreach ($unit['buffs'] ?? [] as $key => $turns) {
+            if ($turns > 0 && (config("battle.buffs.{$key}.type") ?? '') === 'evasion_set') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1160,6 +1436,7 @@ class BattleEngine
             'fled' => (bool) ($unit['fled'] ?? false),
             'buffs' => $buffs,
             'damage_shield' => (bool) ($unit['damage_shield'] ?? false),
+            'life_ward' => (bool) ($unit['life_ward'] ?? false),
             'user_character_id' => $unit['user_character_id'] ?? null,
             'weapon' => $unit['weapon'] ?? null,
             'armor' => $unit['armor'] ?? null,

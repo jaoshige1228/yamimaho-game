@@ -5,6 +5,7 @@ namespace App\Services\Battle;
 use App\Models\User;
 use App\Models\DungeonExplorationSession;
 use App\Services\Dungeon\DungeonProgressService;
+use App\Services\Player\FamiliarService;
 use App\Services\Player\PartyGoldService;
 use App\Services\Player\SpellLearningService;
 use App\Services\Player\UserCharacterService;
@@ -23,6 +24,7 @@ class BattleOrchestrator
         private readonly UserCharacterService $characters = new UserCharacterService,
         private readonly PartyGoldService $gold = new PartyGoldService,
         private readonly SpellLearningService $spellLearning = new SpellLearningService,
+        private readonly FamiliarService $familiars = new FamiliarService,
     ) {}
 
     /**
@@ -33,6 +35,7 @@ class BattleOrchestrator
         $state = $user !== null
             ? $this->factory->createForUser($user, $enemyConfigKey)
             : $this->factory->createDemo($enemyConfigKey);
+        $state = $this->attachFamiliar($state, $user);
 
         return $this->finishIfEndedAtStart($this->engine->runEnemyTurnsUntilPlayer($state), $user);
     }
@@ -50,8 +53,30 @@ class BattleOrchestrator
         array $equipmentOverrides = [],
     ): array {
         $state = $this->factory->createForUserWithEnemies($user, $enemyList, $meta, $equipmentOverrides);
+        $state = $this->attachFamiliar($state, $user);
 
         return $this->finishIfEndedAtStart($this->engine->runEnemyTurnsUntilPlayer($state), $user);
+    }
+
+    /**
+     * ユーザーの使い魔のレベルを戦闘に持たせる（Lv0 = 支援なしなら何も入れない）。
+     * 開幕の敵フェーズより前に入れる。エンジンはユーザーを知らず、この meta だけを見る。
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function attachFamiliar(array $state, ?User $user): array
+    {
+        if ($user === null) {
+            return $state;
+        }
+
+        $level = $this->familiars->levelFor($user);
+        if ($level >= 1) {
+            $state['meta'] = array_merge($state['meta'] ?? [], ['familiar' => ['level' => $level]]);
+        }
+
+        return $state;
     }
 
     /**

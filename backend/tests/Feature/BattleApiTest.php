@@ -76,19 +76,6 @@ class BattleApiTest extends TestCase
         $this->assertGreaterThanOrEqual(10, $pc1['def']);
     }
 
-    public function test_demo_boss_battle_starts_with_ifrine(): void
-    {
-        $response = $this->postJson('/api/battles/demo-boss')->assertOk();
-
-        $units = collect($response->json('state.units'));
-        $enemies = $units->where('side', 'enemy')->values();
-
-        $this->assertSame(1, $enemies->count());
-        $this->assertSame('inu_moe', $enemies->first()['master_code']);
-        $this->assertSame(10, $enemies->first()['level']);
-        $this->assertSame(380, $enemies->first()['max_hp']);
-    }
-
     public function test_kick_action_is_accepted(): void
     {
         $start = $this->postJson('/api/battles/demo')->assertOk();

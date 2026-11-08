@@ -1,10 +1,18 @@
 <script setup>
+import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
+
 defineProps({
   flashClass: { type: String, default: '' },
   floatingDamages: { type: Array, default: () => [] },
   floatingSupports: { type: Array, default: () => [] },
   actionBanners: { type: Array, default: () => [] },
+  /** 使い魔の支援のバナー { id, text, portrait }（顔つき）。なければ null */
+  familiarBanner: { type: Object, default: null },
 });
+
+function portraitSrc(portrait) {
+  return publicAssetUrl(`/assets/characters/${portrait}.webp`);
+}
 </script>
 
 <template>
@@ -16,6 +24,16 @@ defineProps({
       class="action-banner"
     >
       {{ b.text }}
+    </div>
+    <div v-if="familiarBanner" :key="familiarBanner.id" class="familiar-banner">
+      <img
+        v-if="familiarBanner.portrait"
+        class="familiar-portrait"
+        :src="portraitSrc(familiarBanner.portrait)"
+        alt=""
+        decoding="async"
+      />
+      <div class="familiar-banner-text">{{ familiarBanner.text }}</div>
     </div>
     <div
       v-for="d in floatingDamages"
@@ -100,6 +118,59 @@ defineProps({
   white-space: nowrap;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
   animation: bannerPop 1.1s ease forwards;
+}
+/* 使い魔の支援: 戦場の上のほうに、左端に使い魔の顔が少しはみ出す幅広のバナー */
+.familiar-banner {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 15%;
+  z-index: 17;
+  display: flex;
+  align-items: center;
+  animation: familiarBannerPop 1.2s ease forwards;
+}
+.familiar-portrait {
+  flex-shrink: 0;
+  z-index: 1;
+  width: clamp(64px, 19vw, 92px);
+  height: clamp(64px, 19vw, 92px);
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 10px;
+  margin-right: -0.9rem;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.65));
+}
+.familiar-banner-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0.9rem 0.7rem 1.4rem;
+  border-radius: 6px;
+  background: rgba(18, 16, 30, 0.9);
+  color: #fff;
+  font-size: clamp(0.92rem, 4.5vw, 1.35rem);
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+@keyframes familiarBannerPop {
+  0% {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  14% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  82% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(6px);
+  }
 }
 .float-damage {
   position: absolute;

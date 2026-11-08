@@ -18,6 +18,7 @@ const SE_TRACKS = {
   miss: publicAssetUrl('/assets/audio/se/miss.mp3'),
   success: publicAssetUrl('/assets/audio/se/success.mp3'),
   heal: publicAssetUrl('/assets/audio/se/heal.mp3'),
+  tukaima: publicAssetUrl('/assets/audio/se/tukaima.mp3'),
 };
 
 const STORAGE_KEY = 'yamimaho-audio';
@@ -52,6 +53,7 @@ const SE_SOURCE_LEVELS = {
   damage: { lufs: -17.7, peak: -5.7 },
   miss: { lufs: -21.9, peak: -9.1 },
   success: { lufs: -16.4, peak: -6.4 },
+  tukaima: { lufs: -17.4, peak: -9.4 },
 };
 /** 音源ごとの音量差をこの値に揃える（SE スライダー 1.0 のときの音量） */
 const SE_TARGET_LUFS = -20;

@@ -14,6 +14,8 @@ const props = defineProps({
   supportEffectTarget: { type: Object, default: null },
   activeLunge: { type: String, default: null },
   floor1BossSprite: { type: Boolean, default: false },
+  /** ボス戦（階層ボス・中ボス）。通常戦より大きく見せて迫力を出す */
+  bossBattle: { type: Boolean, default: false },
   fledIds: { type: Array, default: () => [] },
 });
 
@@ -63,11 +65,19 @@ function canSelect(unit) {
 }
 
 /**
- * 1 体あたりの幅の上限。敵が少ないほど大きく見せる（高さは敵エリアいっぱいまで使い、画像の縦横比は保つ）
+ * 1 体あたりの幅の上限（px）。敵が少ないほど大きく見せる（高さは敵エリアいっぱいまで使い、画像の縦横比は保つ）。
+ * 通常戦は小さめ、ボス戦（階層ボス・中ボス）は迫力を出すため大きいまま。
+ * 敵の大きさを変えたいときは、ここの数字を直す。
  */
+const SLOT_MAX_WIDTH = {
+  regular: { one: 160, two: 125, many: 95 },
+  boss: { one: 260, two: 200, many: 140 },
+};
+
 const rowStyle = computed(() => {
   const count = props.units.length;
-  const maxWidth = count <= 1 ? 260 : count === 2 ? 200 : 140;
+  const table = props.bossBattle ? SLOT_MAX_WIDTH.boss : SLOT_MAX_WIDTH.regular;
+  const maxWidth = count <= 1 ? table.one : count === 2 ? table.two : table.many;
   return { '--enemy-slot-max': `${maxWidth}px` };
 });
 

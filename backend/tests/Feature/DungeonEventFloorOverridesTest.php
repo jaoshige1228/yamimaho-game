@@ -26,7 +26,8 @@ class DungeonEventFloorOverridesTest extends TestCase
         parent::setUp();
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
         $this->postJson('/api/battles/demo')->assertOk();
-        config(['game.dungeon.test_force' => 'exploration']);
+        // 3 層は探索イベントだけ先に作ってある（本番の playable_floor は 2）。テストでは 3 層に入れるようにする
+        config(['game.dungeon.test_force' => 'exploration', 'game.dungeon.playable_floor' => 3]);
     }
 
     protected function tearDown(): void
@@ -117,6 +118,113 @@ class DungeonEventFloorOverridesTest extends TestCase
         $roll = (new DungeonEventCatalog)->findNode('trap_arrow', 'roll', 2);
         $this->assertSame(4, (int) $roll->stat_multiplier);
         $this->assertFalse($roll->statMultiplierOverridden);
+    }
+
+    public function test_floor_three_has_the_same_events_as_floor_two_except_the_mid_boss(): void
+    {
+        $codes = fn (int $floor): array => DungeonEventMaster::query()->where('floor', $floor)->orderBy('code')->pluck('code')->all();
+
+        $this->assertContains('floor2_mid_boss', $codes(2));
+        $this->assertNotContains('floor2_mid_boss', $codes(3), 'グースとカース戦は 2 層だけ');
+        $this->assertSame(
+            array_values(array_diff($codes(2), ['floor2_mid_boss'])),
+            $codes(3),
+        );
+
+        $dialogue = fn (int $floor): array => \App\Models\DungeonDialogueEventMaster::query()
+            ->where('floor', $floor)->orderBy('code')->pluck('code')->all();
+        $this->assertSame($dialogue(2), $dialogue(3));
+        $this->assertNotEmpty($dialogue(3));
+
+        // 3 層の敵データ（イフリーヌ）ができるまで、謎の気配は抽選に出さない（重み 0）。ほかは 2 層と同じ重み
+        foreach (DungeonEventMaster::query()->where('floor', 3)->get() as $event) {
+            $weightOnFloorTwo = (int) DungeonEventMaster::query()->where('floor', 2)->where('code', $event->code)->value('weight');
+            $this->assertSame(
+                $event->code === 'mysterious_presence' ? 0 : $weightOnFloorTwo,
+                (int) $event->weight,
+                "3層 {$event->code} の重み",
+            );
+        }
+    }
+
+    public function test_floor_three_sets_its_own_value_for_every_check_damage_and_gold(): void
+    {
+        $overrides = collect((new DungeonEventFloorOverrides)->all())->where('floor', 3)
+            ->keyBy(fn (array $row) => $row['event_code'].'.'.$row['node_key']);
+        $floorTwo = collect((new DungeonEventFloorOverrides)->all())->where('floor', 2)
+            ->keyBy(fn (array $row) => $row['event_code'].'.'.$row['node_key']);
+
+        $eventCodes = DungeonEventMaster::query()->where('floor', 3)->pluck('code');
+        $nodes = DungeonEventNode::query()->whereIn('event_code', $eventCodes)->get();
+
+        foreach ($nodes as $node) {
+            $key = $node->event_code.'.'.$node->node_key;
+
+            // 判定は、層補正（stat_multiplier_scale）に頼らず 3 層の倍率を直接指定する
+            if (in_array($node->node_type, ['stat_check', 'stat_check_each_ally'], true)) {
+                $this->assertNotNull($overrides->get($key)['stat_multiplier'] ?? null, "3層 {$key}: 判定の倍率が未設定");
+            }
+            // ダメージ（落とし穴の即戦闘不能 99999 だけは層に関係なく同じ）
+            if (in_array($node->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party', 'stat_check_each_ally'], true)
+                && (int) $node->fixed_damage !== 99999) {
+                $this->assertNotNull($overrides->get($key)['fixed_damage'] ?? null, "3層 {$key}: ダメージが未設定");
+            }
+            if ($node->node_type === 'grant_gold') {
+                $this->assertNotNull($overrides->get($key)['stat_multiplier'] ?? null, "3層 {$key}: ゴールドが未設定");
+            }
+        }
+
+        // 3 層は 2 層より、ダメージが重く、ゴールドが多い
+        foreach ($overrides as $key => $row) {
+            if ($row['fixed_damage'] !== null && isset($floorTwo[$key]['fixed_damage'])) {
+                $this->assertGreaterThan($floorTwo[$key]['fixed_damage'], $row['fixed_damage'], "{$key} のダメージ");
+            }
+        }
+        foreach (['gold_pickup.grant_gold', 'trapped_chest.gold_path', 'safe_chest.gold_path'] as $key) {
+            $this->assertGreaterThan($floorTwo[$key]['stat_multiplier'], $overrides[$key]['stat_multiplier'], "{$key} のゴールド");
+        }
+    }
+
+    public function test_floor_three_multipliers_are_lower_than_floor_two_because_stats_are_higher(): void
+    {
+        // 3 層は想定レベルが高い（2 層 Lv12/15/18 → 3 層 Lv20/25/30）ぶん、同じ判定でも倍率は小さい
+        $catalog = new DungeonEventCatalog;
+        foreach ([['treasure_chest', 'str_roll'], ['trapped_chest', 'know_roll'], ['flash_flood', 'spirit_checks'], ['ghost_possession', 'spirit_roll']] as [$event, $node]) {
+            $two = $catalog->findNode($event, $node, 2);
+            $three = $catalog->findNode($event, $node, 3);
+            $this->assertTrue($three->statMultiplierOverridden, "{$event}.{$node}");
+            $this->assertLessThan((float) $two->stat_multiplier, (float) $three->stat_multiplier, "{$event}.{$node}");
+            $this->assertGreaterThan(1.0, (float) $three->stat_multiplier, "{$event}.{$node}");
+        }
+    }
+
+    public function test_floor_three_treasure_chest_rates_use_its_own_multiplier_rounded_up(): void
+    {
+        $this->enterFloor(3);
+        config(['game.dungeon.test_event_code' => 'treasure_chest']);
+
+        $options = $this->postJson('/api/dungeon/advance')->assertOk()->json('segment.options');
+
+        $this->assertCount(4, $options);
+        foreach ($options as $option) {
+            $this->assertSame(
+                min(95, (int) ceil(round($option['str'] * 1.35, 6))),
+                $option['success_rate'],
+                "str {$option['str']}",
+            );
+        }
+    }
+
+    public function test_floor_three_trap_arrow_uses_its_own_multiplier(): void
+    {
+        $this->enterFloor(3);
+        config(['game.dungeon.test_event_code' => 'trap_arrow']);
+
+        $text = collect($this->postJson('/api/dungeon/advance')->assertOk()->json('segment.lines'))->pluck('text')->implode("\n");
+        $this->assertSame(1, preg_match('/成功率：(\d+)%/u', $text, $m), $text);
+
+        $speeds = $this->party()->map(fn (UserCharacter $c) => (int) $c->spd);
+        $this->assertContains((int) $m[1], $speeds->map(fn (int $spd) => min(95, (int) ceil(round($spd * 1.15, 6))))->all());
     }
 
     public function test_floor_two_treasure_chest_rates_use_2_3_multiplier_rounded_up(): void
@@ -226,6 +334,13 @@ class DungeonEventFloorOverridesTest extends TestCase
             '2層 宝箱（トラップあり）' => [2, 'trapped_chest', '50ダメージ'],
             '1層 あやしい回復の泉（ハズレ）' => [1, 'suspicious_spring', '30ダメージ'],
             '2層 あやしい回復の泉（ハズレ）' => [2, 'suspicious_spring', '100ダメージ'],
+            '3層 矢のトラップ' => [3, 'trap_arrow', '120ダメージ'],
+            '3層 人喰い植物' => [3, 'man_eating_plant', '390ダメージ'],
+            '3層 鉄砲水' => [3, 'flash_flood', '290ダメージ'],
+            '3層 スフィンクス' => [3, 'sphinx_quiz', '290ダメージ'],
+            '3層 幽霊の取り憑き' => [3, 'ghost_possession', '60ダメージ'],
+            '3層 宝箱（トラップあり）' => [3, 'trapped_chest', '100ダメージ'],
+            '3層 あやしい回復の泉（ハズレ）' => [3, 'suspicious_spring', '190ダメージ'],
         ];
     }
 
@@ -254,6 +369,9 @@ class DungeonEventFloorOverridesTest extends TestCase
             '2層 宝箱（トラップあり）' => [2, 'trapped_chest', 800],
             '1層 宝箱（無条件）' => [1, 'safe_chest', 200],
             '2層 宝箱（無条件）' => [2, 'safe_chest', 400],
+            '3層 お金取得' => [3, 'gold_pickup', 200],
+            '3層 宝箱（トラップあり）' => [3, 'trapped_chest', 1600],
+            '3層 宝箱（無条件）' => [3, 'safe_chest', 800],
         ];
     }
 
@@ -291,6 +409,12 @@ class DungeonEventFloorOverridesTest extends TestCase
             '2層 宝箱（無条件・MP）' => [2, 'safe_chest_mp', 'potion_mp_m', 'MP回復薬（中）を手に入れた！'],
             '1層 スフィンクス' => [1, 'sphinx_quiz', 'potion_hp_s', 'HP回復薬を手に入れた！'],
             '2層 スフィンクス' => [2, 'sphinx_quiz', 'potion_hp_m', 'HP回復薬（中）を手に入れた！'],
+            '3層 宝箱（筋力判定）' => [3, 'treasure_chest', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
+            '3層 宝箱（トラップあり・HP）' => [3, 'trapped_chest_hp', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
+            '3層 宝箱（トラップあり・MP）' => [3, 'trapped_chest_mp', 'potion_mp_l', 'MP回復薬（強）を手に入れた！'],
+            '3層 宝箱（無条件・HP）' => [3, 'safe_chest_hp', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
+            '3層 宝箱（無条件・MP）' => [3, 'safe_chest_mp', 'potion_mp_l', 'MP回復薬（強）を手に入れた！'],
+            '3層 スフィンクス' => [3, 'sphinx_quiz', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
         ];
     }
 

@@ -18,6 +18,7 @@ defineProps({
   supportEffectTarget: { type: Object, default: null },
   activeEnemyLunge: { type: String, default: null },
   floor1BossSprite: { type: Boolean, default: false },
+  bossBattle: { type: Boolean, default: false },
   fledIds: { type: Array, default: () => [] },
   canOpenCommands: { type: Boolean, default: false },
 });
@@ -38,6 +39,7 @@ const emit = defineEmits(["select-target", "open-commands", "show-stats"]);
         :support-effect-target="supportEffectTarget"
         :active-lunge="activeEnemyLunge"
         :floor1-boss-sprite="floor1BossSprite"
+        :boss-battle="bossBattle"
         :fled-ids="fledIds"
         @select="emit('select-target', $event)"
       />

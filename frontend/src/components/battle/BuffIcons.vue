@@ -12,18 +12,23 @@ const ICON_LABELS = {
   atk_down_large: '攻撃↓↓',
   evasion: '回避',
   invincible: '無敵',
+  life_ward: '加護',
 };
 
 const props = defineProps({
   buffs: { type: Object, default: () => ({}) },
   buffIcons: { type: Object, default: () => ({}) },
   damageShield: { type: Boolean, default: false },
+  lifeWard: { type: Boolean, default: false },
 });
 
 const entries = computed(() => {
   const list = [];
   if (props.damageShield) {
     list.push({ key: 'damage_shield', label: ICON_LABELS.invincible, isEvasion: false, isInvincible: true });
+  }
+  if (props.lifeWard) {
+    list.push({ key: 'life_ward', label: ICON_LABELS.life_ward, isEvasion: false, isInvincible: true });
   }
   for (const [key, turns] of Object.entries(props.buffs ?? {})) {
     if (!turns || turns <= 0) continue;

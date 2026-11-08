@@ -21,7 +21,7 @@ class BattleEngineNewSpellTest extends TestCase
         );
     }
 
-    public function test_holy_water_heals_mag_times_three_and_a_half(): void
+    public function test_holy_water_heals_mag_times_two_and_a_half(): void
     {
         $state = $this->state('pc1', 'pc1_holy_water');
         $state['units']['pc1']['max_hp'] = 200;
@@ -29,10 +29,10 @@ class BattleEngineNewSpellTest extends TestCase
         $result = $this->engine()->applyPlayerAction($state, 'pc1', 'spell', 'pc1_holy_water', 'pc1');
         $heal = collect($result['events'])->firstWhere('type', 'heal');
 
-        // 魔力 15 × 3.5 = 52（癒しの水は ×2 のまま）
-        $this->assertSame(52, $heal['value']);
-        $this->assertSame(82, $result['state']['units']['pc1']['hp']);
-        $this->assertSame(18, $result['state']['units']['pc1']['mp']);
+        // 魔力 15 × 2.5 = 37.5 → 端数切り捨てで 37（消費MP 14）
+        $this->assertSame(37, $heal['value']);
+        $this->assertSame(67, $result['state']['units']['pc1']['hp']);
+        $this->assertSame(16, $result['state']['units']['pc1']['mp']);
     }
 
     public function test_water_veil_all_sets_evasion_buff_on_every_living_ally(): void
@@ -174,7 +174,8 @@ class BattleEngineNewSpellTest extends TestCase
         // (魔力20 - 防御5/2) × 3.0 = 52
         $this->assertSame(52, $damage['value']);
         $this->assertSame('earth', $damage['element']);
-        $this->assertSame(18, $result['state']['units']['pc4']['mp']);
+        // 消費MP 10（開始時 30）
+        $this->assertSame(20, $result['state']['units']['pc4']['mp']);
     }
 
     public function test_earth_wall_raises_defense_of_all_allies(): void

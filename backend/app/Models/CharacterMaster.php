@@ -37,7 +37,7 @@ class CharacterMaster extends Model
     public function spells(): BelongsToMany
     {
         return $this->belongsToMany(SpellMaster::class, 'character_spell_masters')
-            ->withPivot('sort_order', 'learn_after_defeat')
+            ->withPivot('sort_order', 'learn_after_defeat', 'replaced_by')
             ->withTimestamps()
             ->orderByPivot('sort_order');
     }
