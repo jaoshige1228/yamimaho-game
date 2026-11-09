@@ -19,7 +19,7 @@ class TestBattleStartRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'preset' => ['nullable', 'string', 'in:floor1_boss,floor2_boss,floor2_mid_boss'],
+            'preset' => ['nullable', 'string', 'in:floor1_boss,floor2_boss,floor2_mid_boss,floor3_boss'],
             'floor' => ['nullable', 'integer', 'min:1'],
             'code' => ['nullable', 'string', 'max:64'],
             'count' => ['nullable', 'integer', 'min:1', 'max:3'],

@@ -46,7 +46,7 @@ async function startDemoBoss() {
 }
 
 async function resetProgress() {
-  if (!window.confirm('戦闘の記録・キャラの成長・ダンジョンの探索状況をすべて消します。よろしいですか？')) {
+  if (!window.confirm('このブラウザのセーブデータ（戦闘の記録・キャラの成長・ダンジョンの探索状況・ゴールド・使い魔）をすべて消します。ほかのブラウザのセーブには影響しません。よろしいですか？')) {
     return;
   }
 
@@ -96,7 +96,10 @@ async function resetProgress() {
     >
       {{ resetting ? 'リセット中…' : 'リセット' }}
     </button>
-    <p class="reset-hint">成長・戦闘記録・ダンジョン探索をすべて消して最初からやり直します</p>
+    <p class="reset-hint">このブラウザのセーブデータ（成長・戦闘記録・ダンジョン探索など）をすべて消して最初からやり直します</p>
+    <p class="save-note">
+      セーブデータは、このブラウザに保存されます。Cookie・サイトデータを消したときや、別のブラウザ・端末、プライベートブラウズでは、このセーブには戻れません。
+    </p>
     <nav class="dev-links" aria-label="開発用リンク">
       <router-link to="/admins">/admins</router-link>
       <router-link to="/test_battles">/test_battles</router-link>
@@ -203,6 +206,13 @@ h1 {
   max-width: 280px;
   font-size: 0.72rem;
   line-height: 1.45;
+  color: #8a7aa8;
+}
+.save-note {
+  margin: 0.9rem auto 0;
+  max-width: 300px;
+  font-size: 0.68rem;
+  line-height: 1.5;
   color: #8a7aa8;
 }
 .dev-links {

@@ -309,12 +309,12 @@ class DungeonExplorationEngine
             $session->current_node_key = $result['next_node'];
             $session->save();
 
-            $rollSuccess = $result['success'] ?? null;
+            $dice = $result['dice'] ?? null;
 
             $run = $this->runUntilSegment($session, $user);
             if ($run['complete']) {
                 return [
-                    'segment' => $this->segmentWithStatCheckResult($run['segment'], $rollSuccess),
+                    'segment' => $this->segmentWithStatCheckResult($run['segment'], $dice),
                     'complete' => true,
                 ];
             }
@@ -323,7 +323,7 @@ class DungeonExplorationEngine
             $session->save();
 
             return [
-                'segment' => $this->segmentWithStatCheckResult($run['segment'], $rollSuccess),
+                'segment' => $this->segmentWithStatCheckResult($run['segment'], $dice),
                 'complete' => false,
             ];
         }
@@ -834,17 +834,21 @@ class DungeonExplorationEngine
                 'sfx' => null,
             ];
 
-            if ($this->rollSuccess($rate)) {
+            // 成功・失敗が分かる行（結果の文）の 1 行目に、ダイスロールのログを付ける
+            $dice = $this->rollD100($rate);
+            if ($dice['success']) {
                 $lines[] = [
                     'type' => 'narration',
                     'text' => $this->interpolate($successTemplate, $user, $allyContext),
                     'sfx' => null,
+                    'dice' => $this->diceLog($dice),
                 ];
             } else {
                 $failLine = [
                     'type' => 'narration',
                     'text' => $this->interpolate($failTemplate, $user, $allyContext),
                     'sfx' => null,
+                    'dice' => $this->diceLog($dice),
                 ];
                 if ($failDamage > 0) {
                     $this->damage->applyDamageToSlot($user, $slotId, $failDamage);
@@ -869,20 +873,42 @@ class DungeonExplorationEngine
             ->all();
     }
 
-    private function rollSuccess(int $rate): bool
+    /**
+     * 成功率（%）で、100 面ダイスを 1 回振る。出目が成功率以下なら成功（1d100<=成功率）。
+     * テスト用の固定（test_stat_success）があるときは、その結果と矛盾しない出目を作る。
+     *
+     * @return array{rate: int, roll: int, success: bool}
+     */
+    private function rollD100(int $rate): array
     {
         $forcedSuccess = config('game.dungeon.test_stat_success');
         if ($forcedSuccess === true) {
-            return true;
+            return ['rate' => $rate, 'roll' => 1, 'success' => true];
         }
         if ($forcedSuccess === false) {
-            return false;
+            return ['rate' => $rate, 'roll' => min(100, $rate + 1), 'success' => false];
         }
 
         $forcedRoll = config('game.dungeon.test_roll');
         $roll = is_numeric($forcedRoll) ? (int) $forcedRoll : random_int(1, 100);
 
-        return $roll <= $rate;
+        return ['rate' => $rate, 'roll' => $roll, 'success' => $roll <= $rate];
+    }
+
+    /**
+     * 結果表示の 1 行目に出す「ダイスロールのログ」。例: 「1d100<=55 ＞ 70 ＞ 失敗」
+     *
+     * @param  array{rate: int, roll: int, success: bool}  $dice
+     * @return array{text: string, result: string, rate: int, roll: int}
+     */
+    private function diceLog(array $dice): array
+    {
+        return [
+            'text' => sprintf('1d100<=%d ＞ %d ＞ %s', $dice['rate'], $dice['roll'], $dice['success'] ? '成功' : '失敗'),
+            'result' => $dice['success'] ? 'success' : 'fail',
+            'rate' => $dice['rate'],
+            'roll' => $dice['roll'],
+        ];
     }
 
     /**
@@ -952,17 +978,8 @@ class DungeonExplorationEngine
             ];
         }
 
-        $forcedSuccess = config('game.dungeon.test_stat_success');
-        if ($forcedSuccess === true) {
-            $success = true;
-        } elseif ($forcedSuccess === false) {
-            $success = false;
-        } else {
-            $forcedRoll = config('game.dungeon.test_roll');
-            $roll = is_numeric($forcedRoll) ? (int) $forcedRoll : random_int(1, 100);
-            $success = $roll <= $rate;
-        }
-        $next = $success
+        $dice = $this->rollD100($rate);
+        $next = $dice['success']
             ? ($node->next_on_success ?: $node->next_default)
             : ($node->next_on_fail ?: $node->next_default);
 
@@ -970,7 +987,8 @@ class DungeonExplorationEngine
             'preview_line' => null,
             'next_node' => $next,
             'context' => $context,
-            'success' => $success,
+            'success' => $dice['success'],
+            'dice' => $dice,
         ];
     }
 
@@ -993,18 +1011,8 @@ class DungeonExplorationEngine
             ];
         }
 
-        $forcedSuccess = config('game.dungeon.test_stat_success');
-        if ($forcedSuccess === true) {
-            $success = true;
-        } elseif ($forcedSuccess === false) {
-            $success = false;
-        } else {
-            $forcedRoll = config('game.dungeon.test_roll');
-            $roll = is_numeric($forcedRoll) ? (int) $forcedRoll : random_int(1, 100);
-            $success = $roll <= $rate;
-        }
-
-        $next = $success
+        $dice = $this->rollD100($rate);
+        $next = $dice['success']
             ? ($node->next_on_success ?: $node->next_default)
             : ($node->next_on_fail ?: $node->next_default);
 
@@ -1012,21 +1020,49 @@ class DungeonExplorationEngine
             'preview_line' => null,
             'next_node' => $next,
             'context' => $context,
-            'success' => $success,
+            'success' => $dice['success'],
+            'dice' => $dice,
         ];
     }
 
     /**
+     * 成功・失敗が判明した（= 成功・失敗の効果音が鳴る）ときの結果に、ダイスロールのログを付ける。
+     * ログは、最初に表示される文（1 行目）の `dice` に入れる。表示される文がなければ、ログだけの行を作る。
+     *
      * @param  array<string, mixed>  $segment
+     * @param  array{rate: int, roll: int, success: bool}|null  $dice
      * @return array<string, mixed>
      */
-    private function segmentWithStatCheckResult(array $segment, ?bool $success): array
+    private function segmentWithStatCheckResult(array $segment, ?array $dice): array
     {
-        if ($success === null) {
+        if ($dice === null) {
             return $segment;
         }
 
-        $segment['stat_check_result'] = $success ? 'success' : 'fail';
+        $segment['stat_check_result'] = $dice['success'] ? 'success' : 'fail';
+
+        $kind = (string) ($segment['kind'] ?? '');
+        if ($kind !== 'story' && $kind !== 'choice') {
+            // 戦闘・終了などは文を持たない（探索イベントの作りでは、判定の直後は必ず地の文かセリフ）
+            return $segment;
+        }
+
+        $lines = array_values($segment['lines'] ?? []);
+        $target = null;
+        foreach ($lines as $i => $line) {
+            // 画面の暗転だけの行（文が空）にはログを付けない。見えないまま流れてしまうため
+            if (trim((string) ($line['text'] ?? '')) !== '' && empty($line['screen_fade_ms'])) {
+                $target = $i;
+                break;
+            }
+        }
+
+        if ($target === null) {
+            array_unshift($lines, ['type' => 'narration', 'text' => '', 'sfx' => null]);
+            $target = 0;
+        }
+        $lines[$target]['dice'] = $this->diceLog($dice);
+        $segment['lines'] = $lines;
 
         return $segment;
     }

@@ -158,6 +158,49 @@ class DungeonStepEncounterBuilderTest extends TestCase
         $this->assertSame([2, 2, 2], array_column($enemies, 'floor'));
     }
 
+    public function test_floor3_boss_step_spawns_zero_with_two_navis(): void
+    {
+        $enemies = $this->builder->build(3, 31);
+
+        $this->assertSame(['navi', 'zero', 'navi'], array_column($enemies, 'master_code'));
+        $this->assertSame(['ナビ A', 'ゼロ', 'ナビ B'], array_column($enemies, 'name'));
+        $this->assertSame([3, 3, 3], array_column($enemies, 'floor'));
+        $this->assertSame(['3_navi', '3_zero', '3_navi'], array_column($enemies, 'sprite'));
+    }
+
+    public function test_floor3_enemies_appear_by_depth(): void
+    {
+        $appearing = function (int $from, int $to): array {
+            $codes = [];
+            for ($i = 0; $i < 300; $i++) {
+                $step = random_int($from, $to);
+                foreach ($this->builder->build(3, $step) as $enemy) {
+                    $codes[$enemy['master_code']] = true;
+                }
+            }
+            ksort($codes);
+
+            return array_keys($codes);
+        };
+
+        // 序盤はバニッシャーだけ、中盤はクリーナーが加わり、終盤はリーパー・クラッシャー（バニッシャーはもう出ない）
+        $this->assertSame(['bunisher'], $appearing(1, 10));
+        $this->assertSame(['bunisher', 'cleaner'], $appearing(11, 20));
+        $this->assertSame(['cleaner', 'crusher', 'leaper'], $appearing(21, 30));
+    }
+
+    public function test_every_floor3_step_has_an_encounter_band(): void
+    {
+        for ($step = 1; $step <= 30; $step++) {
+            $enemies = $this->builder->build(3, $step);
+
+            $this->assertNotEmpty($enemies, "深さ {$step}");
+            $this->assertLessThanOrEqual(3, count($enemies));
+            $this->assertNotContains('zero', array_column($enemies, 'master_code'), 'ボスは通常戦に出ない');
+            $this->assertNotContains('navi', array_column($enemies, 'master_code'), 'ボスは通常戦に出ない');
+        }
+    }
+
     public function test_encounter_includes_floor_for_battle_lookup(): void
     {
         $enemies = $this->builder->build(2, 5);

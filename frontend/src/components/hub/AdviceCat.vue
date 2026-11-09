@@ -6,7 +6,7 @@ import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 const catSrc = publicAssetUrl('/assets/characters/advice_cat.webp');
 
 const ADVICE_LINES = [
-  'HPやMPがきつくなってきたら、潔く撤退するのも\n一つの手だ。',
+  'HPやMPがきつくなってきたら、潔く撤退するのも一つの手だ。',
   '能力判定には現在HPの倍率が掛かるんだ。\nつまりHPが低いほど成功率が下がるぞ。',
 ];
 
@@ -45,23 +45,15 @@ function tellAdvice() {
 
 <style scoped>
 .advice-cat {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.65rem;
-  right: 0.8rem;
   display: flex;
   align-items: stretch;
-  gap: 0.45rem;
-  z-index: 3;
-  pointer-events: none;
-}
-.advice-cat > * {
-  pointer-events: auto;
+  gap: 0.55rem;
+  width: 100%;
 }
 .advice-cat__icon {
   flex: 0 0 auto;
-  width: 82px;
-  height: 82px;
+  width: 72px;
+  height: 72px;
   padding: 0;
   overflow: hidden;
   border: 2px solid #fff;
@@ -83,15 +75,19 @@ function tellAdvice() {
   flex: 1;
   min-width: 0;
   margin: 0;
-  padding: 0.5rem 0.9rem;
+  padding: 0.5rem 0.75rem;
   display: grid;
   align-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(200, 176, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.5);
   color: #f8f4ff;
-  font-size: 0.8rem;
+  /* 狭い画面でも、1 文が 1 行に収まりやすいように、画面幅に合わせて少し小さくする */
+  font-size: clamp(0.72rem, 3.25vw, 0.8rem);
   line-height: 1.5;
   font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   white-space: pre-line;
+  text-wrap: pretty;
 }
 .advice-cat__speech-ghost,
 .advice-cat__speech-text {

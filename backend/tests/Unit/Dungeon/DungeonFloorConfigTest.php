@@ -27,7 +27,8 @@ class DungeonFloorConfigTest extends TestCase
     {
         $this->assertSame(['inu_moe'], DungeonFloorConfig::bossEnemyCodes(1));
         $this->assertSame(['mahou', 'dragon', 'mahou'], DungeonFloorConfig::bossEnemyCodes(2));
-        $this->assertSame([], DungeonFloorConfig::bossEnemyCodes(3));
+        $this->assertSame(['navi', 'zero', 'navi'], DungeonFloorConfig::bossEnemyCodes(3));
+        $this->assertSame(31, DungeonFloorConfig::bossStep(3), '1・2 層と同じ深さ');
     }
 
     public function test_reward_items_are_upgraded_per_floor(): void

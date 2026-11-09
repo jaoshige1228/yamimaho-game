@@ -36,30 +36,45 @@ class EnemySkillPicker
             ];
         }
 
+        return $this->pickFrom($skills);
+    }
+
+    /**
+     * その敵が持つ技の一覧（enemy_skills.csv の行。技がなければ空）。
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function skillsFor(string $enemyCode): array
+    {
+        return $this->masters->enemySkillsFor($enemyCode);
+    }
+
+    /**
+     * 技の一覧から、重みに従って 1 つ選ぶ。
+     *
+     * @param  non-empty-list<array<string, mixed>>  $skills
+     * @return array{skill_code: string, label: string, action_type: string, target_type: string, coefficient: float}
+     */
+    public function pickFrom(array $skills): array
+    {
         $totalWeight = array_sum(array_column($skills, 'weight'));
         $remaining = $this->rollValue() % $totalWeight;
 
+        $chosen = $skills[count($skills) - 1];
         foreach ($skills as $skill) {
             $remaining -= (int) $skill['weight'];
             if ($remaining < 0) {
-                return [
-                    'skill_code' => (string) $skill['skill_code'],
-                    'label' => (string) $skill['label'],
-                    'action_type' => (string) $skill['action_type'],
-                    'target_type' => (string) $skill['target_type'],
-                    'coefficient' => (float) $skill['coefficient'],
-                ];
+                $chosen = $skill;
+                break;
             }
         }
 
-        $last = $skills[count($skills) - 1];
-
         return [
-            'skill_code' => (string) $last['skill_code'],
-            'label' => (string) $last['label'],
-            'action_type' => (string) $last['action_type'],
-            'target_type' => (string) $last['target_type'],
-            'coefficient' => (float) $last['coefficient'],
+            'skill_code' => (string) $chosen['skill_code'],
+            'label' => (string) $chosen['label'],
+            'action_type' => (string) $chosen['action_type'],
+            'target_type' => (string) $chosen['target_type'],
+            'coefficient' => (float) $chosen['coefficient'],
         ];
     }
 

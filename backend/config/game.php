@@ -4,6 +4,19 @@ return [
   'demo_user_email' => 'demo@yamimaho.local',
 
   /**
+   * セーブデータをブラウザごとに分けるか。
+   * true … ブラウザの Cookie（player_cookie）ごとに別のユーザー（ゲスト）を持つ。Cookie がなければ新しいゲストを作る。
+   * false … 従来どおり、全ブラウザが共有のデモユーザーを使う（元に戻したいとき・テスト用）。
+   */
+  'per_browser_saves' => env('GAME_PER_BROWSER_SAVES', true),
+
+  /** ブラウザを見分けるトークンを入れる Cookie の名前（HttpOnly・400日） */
+  'player_cookie' => 'yamimaho_player',
+
+  /** 1 時間に新しく作れるゲスト（= 新しいブラウザのセーブ）の数の上限（全体）。0 で無制限 */
+  'guest_create_per_hour' => (int) env('GAME_GUEST_CREATE_PER_HOUR', 300),
+
+  /**
    * テストモード（/admins 管理画面・/test_battles テスト戦闘とその API）を使えるか。
    * リリース前なので本番（APP_ENV=production）でも使える。リリースするときは環境変数 GAME_TEST_MODE=false にする（404 になる）。
    */
@@ -34,8 +47,8 @@ return [
    */
   'dungeon' => [
     'max_floor' => 3,
-    /** 実装済みで挑戦可能な最大層（2層目以降は未実装の間は 1） */
-    'playable_floor' => 2,
+    /** 実装済みで挑戦可能な最大層 */
+    'playable_floor' => 3,
     'battle_encounter_rate' => 30,
     'exploration_event_rate' => 60,
     'dialogue_event_rate' => 9,
@@ -140,13 +153,41 @@ return [
         ],
       ],
       /**
-       * 3 層は探索イベントの設定だけ先に入れてある（ボス・通常戦の敵はまだ未設定のため、プレイ可能な層は playable_floor = 2 のまま）。
+       * 3 層。ボス戦は 31 歩目（1・2 層と同じ）。ゼロを中央に、ナビ 2 体を両脇に置く。
+       * 序盤（1〜10）バニッシャー、中盤（11〜20）クリーナーが加わり、終盤（21〜30）はリーパー・クラッシャー。
        * 宝箱・スフィンクスの報酬は、HP / MP 回復薬の大。
        */
       3 => [
+        'boss_step' => 31,
+        'boss_enemy_codes' => ['navi', 'zero', 'navi'],
         'reward_item_map' => [
           'potion_hp_s' => 'potion_hp_l',
           'potion_mp_s' => 'potion_mp_l',
+        ],
+        'encounter_bands' => [
+          [
+            'from' => 1,
+            'to' => 10,
+            'codes' => ['bunisher'],
+            'count_min' => 1,
+            'count_max' => 2,
+          ],
+          [
+            'from' => 11,
+            'to' => 20,
+            'codes' => ['bunisher', 'cleaner'],
+            'weights' => ['bunisher' => 10, 'cleaner' => 15],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
+          [
+            'from' => 21,
+            'to' => 30,
+            'codes' => ['cleaner', 'leaper', 'crusher'],
+            'weights' => ['cleaner' => 8, 'leaper' => 15, 'crusher' => 15],
+            'count_min' => 2,
+            'count_max' => 3,
+          ],
         ],
       ],
     ],

@@ -304,7 +304,7 @@ onMounted(() => init());
       <section class="admin-panel">
         <h2>ダンジョン設定</h2>
         <p class="desc">
-          デモユーザーの探索進行を調整します。敵無しモードは永続、探索リセットは「設定を適用」時のみ深さを 0 に戻します。
+          このブラウザのセーブの探索進行を調整します。敵無しモードは永続、探索リセットは「設定を適用」時のみ深さを 0 に戻します。
         </p>
         <div class="dungeon-form">
           <label class="check">

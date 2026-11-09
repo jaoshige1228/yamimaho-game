@@ -27,6 +27,28 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame(166, $levels->expToNextLevel(3));
     }
 
+    public function test_exp_curve_gets_steeper_from_level_12(): void
+    {
+        $levels = new LevelTableProvider;
+
+        // Lv12 まではそのまま。Lv13 以降は上がりにくい（以前は Lv20 で 7,800 だったのが、いまは Lv18 で 7,800）
+        $this->assertSame(962, $levels->cumulativeExpForLevel(12));
+        $this->assertSame(7800, $levels->cumulativeExpForLevel(18));
+        $this->assertSame(9850, $levels->cumulativeExpForLevel(19));
+        $this->assertSame(12150, $levels->cumulativeExpForLevel(20));
+
+        // 必要 EXP は単調に増え、Lv13 以降は 1 レベルごとの増分も減らない（途中で楽になるレベルがない）
+        $previousGap = 0;
+        for ($level = 2; $level <= $levels->maxLevel(); $level++) {
+            $gap = $levels->cumulativeExpForLevel($level) - $levels->cumulativeExpForLevel($level - 1);
+            $this->assertGreaterThan(0, $gap, "Lv{$level} の増分");
+            if ($level >= 14) {
+                $this->assertGreaterThanOrEqual($previousGap, $gap, "Lv".($level - 1)."→Lv{$level} の増分が前より小さい");
+            }
+            $previousGap = $gap;
+        }
+    }
+
     public function test_every_stat_grows_by_a_fixed_amount_per_level(): void
     {
         $this->seed(\Database\Seeders\MasterDataSeeder::class);

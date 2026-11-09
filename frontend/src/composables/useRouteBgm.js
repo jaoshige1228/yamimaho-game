@@ -2,8 +2,18 @@ import { watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useBattleStore } from '../stores/battle';
 import { usePlayerStore } from '../stores/player';
-import { dungeonBgmTrack } from '../utils/dungeonTheme.js';
+import { battleBgmTrack, dungeonBgmTrack } from '../utils/dungeonTheme.js';
 import { useAppAudio } from './useAppAudio';
+
+/** 戦闘中の BGM。ボス・中ボスは URL のクエリでも判定する（戦闘 state を読み込む前でも切り替えられるように） */
+function battleTrackFor(route, battleState) {
+  return battleBgmTrack({
+    floor: battleState?.meta?.floor,
+    boss: route.query.boss === '1' || battleState?.meta?.boss === true,
+    midBoss: route.query.mid_boss === '1' || battleState?.meta?.mid_boss === true,
+    bgm: battleState?.meta?.bgm,
+  });
+}
 
 function resolveBgmTrack(route, battleState, player) {
   const name = route.name;
@@ -15,30 +25,12 @@ function resolveBgmTrack(route, battleState, player) {
   }
   if (name === 'status') {
     if (player.activeBattleId) {
-      if (
-        route.query.mid_boss === '1'
-        || battleState?.meta?.mid_boss === true
-        || battleState?.meta?.bgm === 'broken'
-      ) {
-        return 'broken';
-      }
-      const isBoss =
-        route.query.boss === '1' || battleState?.meta?.boss === true;
-      return isBoss ? 'boss' : 'battle';
+      return battleTrackFor(route, battleState);
     }
     return player.inDungeon ? dungeonBgmTrack(player.dungeonFloor) : 'home';
   }
   if (name === 'battle') {
-    if (
-      route.query.mid_boss === '1'
-      || battleState?.meta?.mid_boss === true
-      || battleState?.meta?.bgm === 'broken'
-    ) {
-      return 'broken';
-    }
-    const isBoss =
-      route.query.boss === '1' || battleState?.meta?.boss === true;
-    return isBoss ? 'boss' : 'battle';
+    return battleTrackFor(route, battleState);
   }
   return null;
 }
@@ -72,6 +64,7 @@ export function useRouteBgm() {
       battle.state?.meta?.boss,
       battle.state?.meta?.mid_boss,
       battle.state?.meta?.bgm,
+      battle.state?.meta?.floor,
       settings.value.bgmEnabled,
       player.inDungeon,
       player.dungeonFloor,

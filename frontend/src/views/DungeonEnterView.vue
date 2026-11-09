@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api';
+import AdviceCat from '../components/hub/AdviceCat.vue';
 import { usePlayerStore } from '../stores/player';
 import '../styles/hub-screen.css';
 
@@ -60,6 +61,13 @@ onMounted(() => loadDungeonOptions());
     </header>
 
     <main class="dungeon-enter-main">
+      <AdviceCat class="dungeon-enter-cat" />
+
+      <p class="dungeon-enter-guide">
+        <span>トラップや<wbr />モンスターに<wbr />対応しながら、<wbr />最深部を<wbr />目指しましょう。</span>
+        <span>最深部の<wbr />ボスを倒せば、<wbr />次の層が<wbr />解放されます</span>
+      </p>
+
       <p v-if="loading" class="hub-screen-muted">読み込み中…</p>
       <p v-else-if="error" class="hub-screen-error">{{ error }}</p>
       <div v-else class="floor-actions">
@@ -73,9 +81,6 @@ onMounted(() => loadDungeonOptions());
         >
           {{ enteringFloor === floor ? '入場中…' : `${floor}層に潜る` }}
         </button>
-        <p v-if="unlockedFloor < playableFloor" class="floor-hint">
-          {{ unlockedFloor + 1 }}層以降は、前の層のボスを倒すと解放されます。
-        </p>
       </div>
     </main>
   </div>
@@ -102,7 +107,31 @@ onMounted(() => loadDungeonOptions());
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem 1rem 1rem;
+  gap: 1rem;
+  padding: 0.5rem 1rem 1rem;
+}
+.dungeon-enter-cat {
+  width: min(360px, 100%);
+}
+.dungeon-enter-guide {
+  box-sizing: border-box;
+  width: min(360px, 100%);
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(200, 176, 255, 0.3);
+  border-radius: 12px;
+  background: rgba(36, 20, 68, 0.55);
+  color: #e6dcff;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  text-align: center;
+}
+.dungeon-enter-guide span {
+  display: block;
+  /* 文節の切れ目（<wbr>）でだけ折り返す。言葉の途中で切れないようにする */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 .floor-actions {
   display: flex;
@@ -125,12 +154,5 @@ onMounted(() => loadDungeonOptions());
 .floor-enter-btn:disabled {
   opacity: 0.55;
   cursor: default;
-}
-.floor-hint {
-  margin: 0.75rem 0 0;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  color: #8a7aa8;
-  text-align: center;
 }
 </style>

@@ -108,6 +108,22 @@
   text-align: left;
 }
 
+/* ダイスロールのログ（本文の 1 行目）。成功は薄い青、失敗は薄い赤 */
+.story-text-window__dice {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.story-text-window__dice--success {
+  color: #9fcdff;
+}
+
+.story-text-window__dice--fail {
+  color: #ff9d9d;
+}
+
 /*
  * セリフ: シーン下部の stage 内で
  * 立ち絵（背面）＋ 全幅テキスト枠（前面）を重ねる

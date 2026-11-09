@@ -63,6 +63,11 @@ class TestBattleService
                     'label' => '2層中間ボス戦',
                     'description' => 'グース＆カース',
                 ],
+                [
+                    'id' => 'floor3_boss',
+                    'label' => '3層ボス戦',
+                    'description' => 'ゼロ＆ナビ×2',
+                ],
             ],
             'weapons' => WeaponMaster::query()
                 ->orderBy('mag_bonus')
@@ -140,6 +145,7 @@ class TestBattleService
             'enemies' => $enemies,
             'meta' => [
                 'source' => 'test',
+                'floor' => $floor,
                 'can_flee' => false,
             ],
             'encounter' => [],
@@ -154,6 +160,7 @@ class TestBattleService
         return match ($presetId) {
             'floor1_boss' => $this->buildFloorBoss(1, bossEncounter: true),
             'floor2_boss' => $this->buildFloorBoss(2, bossEncounter: true),
+            'floor3_boss' => $this->buildFloorBoss(3, bossEncounter: true),
             'floor2_mid_boss' => $this->buildFloor2MidBoss(),
             default => throw new \InvalidArgumentException('不明なボス戦です。'),
         };

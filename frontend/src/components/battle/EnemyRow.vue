@@ -59,6 +59,23 @@ function isPortrait(unit) {
   return enemySpriteAssetKey(unit).startsWith('npc_');
 }
 
+/**
+ * 横長の画像（絵が中央に小さくまとまっていて、左右は薄い光や余白）。
+ * 枠の幅に合わせると絵が小さくなるので、枠からはみ出して大きく描く。値は 画像の縦横比（幅 / 高さ）。
+ */
+const WIDE_SPRITE_ASPECT = {
+  '3_zero': 1280 / 600,
+};
+
+function wideAspect(unit) {
+  return WIDE_SPRITE_ASPECT[enemySpriteAssetKey(unit)] ?? null;
+}
+
+function spriteStyle(unit) {
+  const aspect = wideAspect(unit);
+  return aspect ? { '--sprite-aspect': String(aspect) } : null;
+}
+
 function canSelect(unit) {
   if (!props.targetMode?.startsWith('enemy')) return false;
   return unit.alive && props.targetMode === 'enemy_single';
@@ -114,7 +131,8 @@ function onSlotClick(unit) {
           :src="spriteUrl(unit)"
           :alt="unit.name"
           class="sprite"
-          :class="{ portrait: isPortrait(unit) }"
+          :class="{ portrait: isPortrait(unit), wide: wideAspect(unit) !== null }"
+          :style="spriteStyle(unit)"
         />
         <BuffIcons
           :buffs="unit.buffs"
@@ -194,6 +212,13 @@ function onSlotClick(unit) {
   transform-origin: bottom center;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
   pointer-events: none;
+}
+/* 横長の画像は、枠の 2.6 倍の幅（ただし 420px まで）で、枠の中央に合わせてはみ出して描く */
+.sprite.wide {
+  aspect-ratio: var(--sprite-aspect);
+  width: min(260%, 420px);
+  margin-left: calc((100% - min(260%, 420px)) / 2);
+  max-width: none;
 }
 .sprite.portrait {
   /* 絵のある上 490px 分（600×490）だけを幅いっぱいに見せる */

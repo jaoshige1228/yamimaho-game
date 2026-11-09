@@ -35,3 +35,7 @@ pc3_great_explosion,大爆発,高圧縮した炎を一気に解放する。敵�
 pc4_meteor_shower,流星群,敵全体に石の弾丸が降り注ぐ。敵全体にダメージ。,14,enemy_all,damage,earth,1.7,,,
 pc4_steel_wall,鋼の城壁,味方全員を岩鋼の壁で保護する。3ターンの間味方全員の防御力を上げる。,28,ally_all,buff_def,,,,def_up,
 pc4_life_ward,命の加護,命の灯火を絶やさないための防御魔法。この魔法を受けた味方は加護状態になる。戦闘不能になる攻撃を受けてもHPが1だけ残る。効果が発動するまで加護の状態は永続する。,26,ally_single,life_ward,,,,,
+cleaner_delete,デリート,敵全体を消去しにかかる。敵一人ひとりが、5%の確率で即死する。,20,enemy_all,instant_death,,,5,,
+navi_repair,リペア,損傷を修復する。味方一体のHPを小回復。,10,ally_single,heal_mag,,1.0,,,
+navi_protect,プロテクト,防護を展開する。3ターンの間、味方一体の防御力を少し上げる。,10,ally_single,buff_def,,,,def_up_small,
+navi_jamming,ジャミング,妨害信号を流し込む。3ターンの間、敵一体の防御力を少し下げる。,10,enemy_single,debuff_def,,,,def_down_small,

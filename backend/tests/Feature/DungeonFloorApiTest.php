@@ -37,7 +37,7 @@ class DungeonFloorApiTest extends TestCase
                 'step' => 0,
                 'unlocked_floor' => 1,
                 'max_floor' => 3,
-                'playable_floor' => 2,
+                'playable_floor' => 3,
                 'boss_step' => 3,
             ]);
     }
@@ -119,6 +119,66 @@ class DungeonFloorApiTest extends TestCase
         $this->assertSame(['邪教徒 A', 'エルドラゴン', '邪教徒 B'], $enemies->pluck('name')->all());
         $response->assertJsonPath('state.meta.boss', true);
         $response->assertJsonPath('state.meta.can_flee', false);
+    }
+
+    public function test_floor_three_is_enterable_and_its_boss_at_step_31_is_zero_with_two_navis(): void
+    {
+        config([
+            'game.dungeon.floors.3.boss_step' => 31,
+            'game.dungeon.test_force' => 'battle',
+        ]);
+        // ナビは攻撃しないが、ゼロは Lv1 のデモパーティを開幕で全滅させうる。初手は必ず先頭の技にして、編成の確認だけを行う
+        $this->app->bind(DungeonAdvanceService::class, fn () => new DungeonAdvanceService(
+            orchestrator: new BattleOrchestrator(
+                engine: new BattleEngine(enemySkillPicker: new EnemySkillPicker(roll: static fn (): int => 0)),
+            ),
+        ));
+
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 3, 'unlocked_floor' => 3, 'step' => 30, 'in_dungeon' => false],
+        );
+
+        $this->postJson('/api/dungeon/enter', ['floor' => 3])->assertOk()->assertJsonPath('floor', 3);
+
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('boss_encounter', true);
+        $response->assertJsonPath('floor', 3);
+        $response->assertJsonPath('step', 31);
+        $response->assertJsonPath('state.meta.floor', 3);
+        $response->assertJsonPath('state.meta.boss', true);
+        $response->assertJsonPath('state.meta.can_flee', false);
+
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertSame(['navi', 'zero', 'navi'], $enemies->pluck('master_code')->all());
+        $this->assertSame(['3_navi', '3_zero', '3_navi'], $enemies->pluck('sprite')->all());
+    }
+
+    public function test_floor_three_regular_battle_uses_floor_three_enemies(): void
+    {
+        config(['game.dungeon.test_force' => 'battle']);
+        $this->app->bind(DungeonAdvanceService::class, fn () => new DungeonAdvanceService(
+            orchestrator: new BattleOrchestrator(
+                engine: new BattleEngine(enemySkillPicker: new EnemySkillPicker(roll: static fn (): int => 0)),
+            ),
+        ));
+
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 3, 'unlocked_floor' => 3, 'step' => 0, 'in_dungeon' => false],
+        );
+        $this->postJson('/api/dungeon/enter', ['floor' => 3])->assertOk();
+
+        $response = $this->postJson('/api/dungeon/advance')->assertOk();
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('state.meta.floor', 3);
+        $response->assertJsonPath('state.meta.boss', false);
+
+        $codes = collect($response->json('state.units'))->where('side', 'enemy')->pluck('master_code')->unique()->all();
+        $this->assertSame(['bunisher'], $codes, '深さ 1 の 3 層は、バニッシャーだけ');
     }
 
     public function test_floor_two_mid_boss_triggers_exploration_at_step_20(): void
@@ -311,7 +371,7 @@ class DungeonFloorApiTest extends TestCase
         config([
             'game.dungeon.floors.1.boss_step' => 31,
             'game.dungeon.floors.2.boss_step' => 31,
-            'game.dungeon.playable_floor' => 2,
+            'game.dungeon.playable_floor' => 3,
             'game.dungeon.test_force' => null,
         ]);
 

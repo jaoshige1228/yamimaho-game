@@ -28,7 +28,7 @@ class TestBattleApiTest extends TestCase
 
         $presetIds = collect($response->json('boss_presets'))->pluck('id')->all();
         $this->assertEquals(
-            ['floor1_boss', 'floor2_boss', 'floor2_mid_boss'],
+            ['floor1_boss', 'floor2_boss', 'floor2_mid_boss', 'floor3_boss'],
             $presetIds,
         );
     }
@@ -80,6 +80,34 @@ class TestBattleApiTest extends TestCase
         $this->assertSame(['邪教徒 A', 'エルドラゴン', '邪教徒 B'], $enemies->pluck('name')->all());
         // 画像名が「2_」のように数字で始まっても、そのまま使われる（2_dragon.png など）
         $this->assertSame(['2_mahou', '2_dragon', '2_mahou'], $enemies->pluck('sprite')->all());
+    }
+
+    public function test_start_floor3_boss_spawns_zero_with_two_navis(): void
+    {
+        $response = $this->postJson('/api/test_battles/start', [
+            'preset' => 'floor3_boss',
+        ])->assertOk();
+
+        $response->assertJsonPath('boss_encounter', true);
+        $response->assertJsonPath('state.meta.boss', true);
+        $response->assertJsonPath('state.meta.floor', 3);
+
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertSame(['navi', 'zero', 'navi'], $enemies->pluck('master_code')->all());
+        $this->assertSame(['ナビ A', 'ゼロ', 'ナビ B'], $enemies->pluck('name')->all());
+        $this->assertSame(['3_navi', '3_zero', '3_navi'], $enemies->pluck('sprite')->all());
+    }
+
+    public function test_regular_test_battle_records_its_floor_for_the_battle_bgm(): void
+    {
+        $response = $this->postJson('/api/test_battles/start', [
+            'floor' => 3,
+            'code' => 'bunisher',
+            'count' => 1,
+        ])->assertOk();
+
+        $response->assertJsonPath('state.meta.floor', 3);
+        $response->assertJsonPath('state.meta.source', 'test');
     }
 
     public function test_start_floor1_boss_sets_boss_encounter(): void

@@ -17,10 +17,11 @@ class ResetController extends Controller
     {
         $user = Auth::user();
         if ($user === null) {
-            $user = $this->players->resolveOrCreateUser();
+            return response()->json(['message' => '未ログイン'], 401);
         }
 
-        BattleState::query()->delete();
+        // 自分の戦闘だけ消す（ほかのブラウザのセーブの戦闘は消さない）
+        BattleState::query()->where('user_id', $user->id)->delete();
         $this->players->resetProgress($user);
 
         return response()->json([

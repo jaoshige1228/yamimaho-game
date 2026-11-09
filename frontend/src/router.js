@@ -26,7 +26,7 @@ const router = createRouter({
       path: '/hub',
       name: 'hub',
       component: HubView,
-      meta: { title: '待機' },
+      meta: { title: 'ホーム' },
     },
     {
       path: '/shop',

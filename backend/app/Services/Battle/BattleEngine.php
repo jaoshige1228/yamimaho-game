@@ -288,7 +288,7 @@ class BattleEngine
     private function resolveEnemySkill(array &$state, string $actorId, array $skill): array
     {
         $actor = $state['units'][$actorId];
-        $skill = $this->swapUselessEnemySupport($state['units'], $skill);
+        $skill = $this->swapUselessEnemySupport($state['units'], $skill, (string) ($actor['master_code'] ?? ''));
         $announceText = $skill['skill_code'] === 'attack'
             ? "{$actor['name']}の攻撃！"
             : "{$actor['name']}の{$skill['label']}！";
@@ -313,6 +313,10 @@ class BattleEngine
             }
 
             return $events;
+        }
+
+        if ($actionType === 'physical_double') {
+            return array_merge($events, $this->resolveEnemyDoubleStrike($state, $actorId, $coefficient));
         }
 
         $target = $this->pickRandomAliveAlly($state['units']);
@@ -352,36 +356,114 @@ class BattleEngine
     }
 
     /**
+     * 2 回行動する単体攻撃。生きている味方から、同じ相手を選ばないように 2 人を選び、1 回ずつ攻撃する。
+     * 生き残りが 1 人だけなら、その相手に 2 回攻撃する。1 回目で倒れたら、2 回目は行わない。
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function resolveEnemyDoubleStrike(array &$state, string $actorId, float $coefficient): array
+    {
+        $first = $this->pickRandomAliveAlly($state['units']);
+        if ($first === null) {
+            return [];
+        }
+
+        $events = $this->resolvePhysicalHit($state, $actorId, $first, $coefficient, null, false);
+
+        // 1 人目を除いた生存者から選ぶ。誰もいなければ（生き残りが 1 人だけ）同じ相手
+        $others = $state['units'];
+        $others[$first]['alive'] = false;
+        $second = $this->pickRandomAliveAlly($others);
+        if ($second === null && ($state['units'][$first]['alive'] ?? false)) {
+            $second = $first;
+        }
+        if ($second === null) {
+            return $events;
+        }
+
+        return array_merge($events, $this->resolvePhysicalHit($state, $actorId, $second, $coefficient, null, false));
+    }
+
+    /**
      * 回復する味方がいない（傷ついた味方がいない）、蘇生する味方がいない（倒れた味方がいない）のに
-     * その魔法を引いたときは、空振りさせず通常攻撃にする。
+     * その魔法を引いたときは、空振りさせない。
+     * - ダメージを与える行動を持つ敵 … 通常攻撃にする
+     * - 持たない敵（ナビのような支援専門）… 通常攻撃はしない。ほかの行動のうち、効くものから選び直す
      *
      * @param  array<string, array<string, mixed>>  $units
      * @param  array<string, mixed>  $skill
      * @return array<string, mixed>
      */
-    private function swapUselessEnemySupport(array $units, array $skill): array
+    private function swapUselessEnemySupport(array $units, array $skill, string $enemyCode): array
     {
-        if (($skill['action_type'] ?? '') !== 'spell') {
+        if (! $this->isUselessEnemySupport($units, $skill)) {
             return $skill;
         }
 
+        if ($this->enemyHasDamagingSkill($enemyCode)) {
+            return [
+                'skill_code' => 'attack',
+                'label' => '攻撃',
+                'action_type' => 'punch',
+                'target_type' => 'ally_single',
+                'coefficient' => 1.0,
+            ];
+        }
+
+        $usable = array_values(array_filter(
+            $this->enemySkillPicker->skillsFor($enemyCode),
+            fn (array $candidate): bool => ! $this->isUselessEnemySupport($units, $candidate),
+        ));
+
+        return $usable === [] ? $skill : $this->enemySkillPicker->pickFrom($usable);
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $units
+     * @param  array<string, mixed>  $skill
+     */
+    private function isUselessEnemySupport(array $units, array $skill): bool
+    {
+        if (($skill['action_type'] ?? '') !== 'spell') {
+            return false;
+        }
+
         $spell = $this->factory->findSpell((string) $skill['skill_code']);
-        $useless = match ((string) ($spell['effect'] ?? '')) {
+
+        return match ((string) ($spell['effect'] ?? '')) {
             'heal_mag', 'heal_full' => $this->woundedEnemyIds($units) === [],
             'revive_chance', 'revive_full' => $this->fallenEnemyIds($units) === [],
             default => false,
         };
-        if (! $useless) {
-            return $skill;
+    }
+
+    /**
+     * ダメージを与える行動（物理技・ダメージ魔法・即死魔法）をひとつでも持っているか。
+     * 技の一覧が空の敵は、通常攻撃だけをする敵なので持っている扱い。
+     */
+    private function enemyHasDamagingSkill(string $enemyCode): bool
+    {
+        $skills = $this->enemySkillPicker->skillsFor($enemyCode);
+        if ($skills === []) {
+            return true;
         }
 
-        return [
-            'skill_code' => 'attack',
-            'label' => '攻撃',
-            'action_type' => 'punch',
-            'target_type' => 'ally_single',
-            'coefficient' => 1.0,
-        ];
+        foreach ($skills as $skill) {
+            if ($skill['action_type'] !== 'spell') {
+                if ($skill['action_type'] !== 'flee') {
+                    return true;
+                }
+                continue;
+            }
+
+            $effect = (string) ($this->factory->findSpell((string) $skill['skill_code'])['effect'] ?? '');
+            if (in_array($effect, ['damage', 'damage_hp_cost', 'instant_death'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

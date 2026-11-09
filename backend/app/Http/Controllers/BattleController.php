@@ -125,8 +125,17 @@ class BattleController extends Controller
         ]);
     }
 
+    /**
+     * 戦闘を探す。ほかのユーザー（ブラウザ）の戦闘は 404 にする（user_id が空の戦闘は従来どおり誰でも見られる）。
+     */
     private function findBattle(string $id): BattleState
     {
-        return BattleState::query()->findOrFail($id);
+        $record = BattleState::query()->findOrFail($id);
+
+        if ($record->user_id !== null && (int) $record->user_id !== (int) Auth::id()) {
+            abort(404);
+        }
+
+        return $record;
     }
 }

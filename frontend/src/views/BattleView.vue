@@ -9,6 +9,7 @@ import UnitStatsModal from '../components/battle/UnitStatsModal.vue';
 import { useAppAudio } from '../composables/useAppAudio';
 import { useBattleStore } from '../stores/battle';
 import { usePlayerStore } from '../stores/player';
+import { battleBgmTrack as battleBgmTrackFor } from '../utils/dungeonTheme.js';
 
 const props = defineProps({
   id: { type: String, default: '' },
@@ -28,16 +29,14 @@ const {
   isBgmPaused,
 } = useAppAudio();
 
-const battleBgmTrack = computed(() => {
-  if (
-    route.query.mid_boss === '1'
-    || state.value?.meta?.mid_boss
-    || state.value?.meta?.bgm === 'broken'
-  ) {
-    return 'broken';
-  }
-  return route.query.boss === '1' || state.value?.meta?.boss ? 'boss' : 'battle';
-});
+const battleBgmTrack = computed(() =>
+  battleBgmTrackFor({
+    floor: state.value?.meta?.floor,
+    boss: route.query.boss === '1' || !!state.value?.meta?.boss,
+    midBoss: route.query.mid_boss === '1' || !!state.value?.meta?.mid_boss,
+    bgm: state.value?.meta?.bgm,
+  }),
+);
 
 const busy = ref(false);
 const targetMode = ref(null);

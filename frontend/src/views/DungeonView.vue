@@ -130,6 +130,10 @@ function showChoiceSegment(segment) {
 }
 
 function playStatCheckResultSe(segment) {
+  // 結果の行（ダイスロールのログ付き）がある場合は、その行を表示するとき StorySequencePlayer が鳴らす
+  if (segment?.lines?.some((line) => line?.dice)) {
+    return;
+  }
   const result = segment?.stat_check_result;
   if (result === 'success') {
     playSe('success');

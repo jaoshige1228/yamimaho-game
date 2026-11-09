@@ -5,7 +5,7 @@ import StoryCharacterSprite from './StoryCharacterSprite.vue';
 import StoryTextWindow from './StoryTextWindow.vue';
 import '../../styles/story-window.css';
 
-const { unlock } = useAppAudio();
+const { unlock, playSe } = useAppAudio();
 
 const props = defineProps({
   lines: { type: Array, required: true },
@@ -76,12 +76,30 @@ function runScreenFade(ms) {
   }, ms);
 }
 
+/**
+ * 成功・失敗が判明する行（ダイスロールのログ `dice` が付いた行）が表示されたときに、成功・失敗の効果音を鳴らす。
+ * 鉄砲水のように 1 つの場面で何人も続けて判定するときも、それぞれの結果の行で 1 回ずつ鳴る。
+ */
+function playResultSe(lineIndex) {
+  const result = props.lines[lineIndex]?.dice?.result;
+  if (result === 'success') {
+    playSe('success');
+  } else if (result === 'fail') {
+    playSe('miss');
+  }
+}
+
 watch(
   () => props.lines,
   () => {
     clearFadeTimer();
     inputLocked.value = false;
+    const wasFirstLine = index.value === 0;
     index.value = 0;
+    // index が変わらない（0 のまま）ときは、下の index の監視が動かないので、ここで鳴らす
+    if (wasFirstLine) {
+      playResultSe(0);
+    }
   },
 );
 
@@ -94,6 +112,7 @@ function emitSyncPartyIfNeeded(lineIndex) {
 
 watch(index, (lineIndex) => {
   emitSyncPartyIfNeeded(lineIndex);
+  playResultSe(lineIndex);
   const line = props.lines[lineIndex];
   const fadeMs = Number(line?.screen_fade_ms);
   if (fadeMs > 0) {
@@ -137,6 +156,7 @@ function onTap() {
             mode="dialogue"
             :text="currentLine.text"
             :character-name="characterInfo.name"
+            :dice="currentLine.dice ?? null"
           />
         </div>
         <StoryTextWindow
@@ -144,6 +164,7 @@ function onTap() {
           ref="textWindowRef"
           mode="narration"
           :text="currentLine.text"
+          :dice="currentLine.dice ?? null"
         />
       </div>
     </div>
