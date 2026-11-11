@@ -94,14 +94,14 @@ class SpellMasterDataTest extends TestCase
         $this->assertSame([14, 'heal_mag', 2.5], [$holy['mp_cost'], $holy['effect'], $holy['coefficient']]);
 
         $veilAll = $provider->findSpell('pc1_water_veil_all');
-        $this->assertSame([18, 'ally_all', 'evasion_set_small'], [$veilAll['mp_cost'], $veilAll['target_type'], $veilAll['buff']]);
+        $this->assertSame([24, 'ally_all', 'evasion_set_small'], [$veilAll['mp_cost'], $veilAll['target_type'], $veilAll['buff']]);
         $this->assertSame(30, config('battle.buffs.evasion_set_small.value'));
 
         $burstTree = $provider->findSpell('pc2_burst_tree');
         $this->assertSame([18, 'enemy_all', 'def_down_small'], [$burstTree['mp_cost'], $burstTree['target_type'], $burstTree['buff']]);
 
         $breath = $provider->findSpell('pc2_world_tree_breath');
-        $this->assertSame([24, 'revive_chance', 100], [$breath['mp_cost'], $breath['effect'], $breath['power']]);
+        $this->assertSame([32, 'revive_chance', 100], [$breath['mp_cost'], $breath['effect'], $breath['power']]);
 
         $blackHole = $provider->findSpell('pc3_black_hole');
         $this->assertSame(

@@ -100,7 +100,7 @@ class BattleRewardServiceTest extends TestCase
                     'name' => 'ガルデ',
                     'alive' => false,
                     'hp' => 0,
-                    'mp' => 0,
+                    'mp' => 7,
                     'user_character_id' => $dead->id,
                 ],
             ],
@@ -116,5 +116,56 @@ class BattleRewardServiceTest extends TestCase
 
         $dead->refresh();
         $this->assertSame($deadBefore, (int) $dead->exp);
+    }
+
+    public function test_allies_who_fell_during_the_battle_stay_down_after_victory(): void
+    {
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+
+        $alive = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))
+            ->firstOrFail();
+        $fallen = UserCharacter::query()
+            ->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc2'))
+            ->firstOrFail();
+        // 戦闘前は元気（HP・MP が残っている）。戦闘中に即死などで倒れたことにする
+        $this->assertGreaterThan(0, (int) $fallen->hp);
+        $this->assertGreaterThan(7, (int) $fallen->mp);
+
+        $state = [
+            'units' => [
+                'pc1' => [
+                    'id' => 'pc1',
+                    'side' => 'ally',
+                    'name' => 'サフィリア',
+                    'alive' => true,
+                    'hp' => 10,
+                    'mp' => 10,
+                    'user_character_id' => $alive->id,
+                ],
+                'pc2' => [
+                    'id' => 'pc2',
+                    'side' => 'ally',
+                    'name' => 'ガルデ',
+                    'alive' => false,
+                    'hp' => 0,
+                    'mp' => 7,
+                    'user_character_id' => $fallen->id,
+                ],
+            ],
+            'meta' => ['exp_earned' => 20],
+        ];
+
+        (new BattleRewardService)->applyVictoryRewards($state, $user);
+
+        $fallen->refresh();
+        $this->assertSame(0, (int) $fallen->hp, '倒れた味方は、戦闘が終わっても HP 0 のまま（復活しない）');
+        $this->assertSame(7, (int) $fallen->mp, '倒れるまでに使った MP も反映される');
+
+        $alive->refresh();
+        $this->assertSame(10, (int) $alive->hp);
+        $this->assertSame(10, (int) $alive->mp);
     }
 }

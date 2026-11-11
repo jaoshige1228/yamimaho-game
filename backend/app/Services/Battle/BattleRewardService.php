@@ -28,10 +28,6 @@ class BattleRewardService
                     continue;
                 }
 
-                if (! ($unit['alive'] ?? false)) {
-                    continue;
-                }
-
                 $userCharacterId = $unit['user_character_id'] ?? null;
                 if ($userCharacterId === null) {
                     continue;
@@ -48,9 +44,16 @@ class BattleRewardService
                     continue;
                 }
 
+                // 戦闘中に倒れた味方も、HP（0）・MP をそのまま保存する。
+                // 保存しないと戦闘前の HP のままになり、戦闘が終わると復活してしまう（即死で倒れたときも同じ）
                 $character->hp = max(0, (int) ($unit['hp'] ?? 0));
                 $character->mp = max(0, (int) ($unit['mp'] ?? 0));
                 $character->save();
+
+                // 経験値は、戦闘終了時に生きている味方だけに入る
+                if (! ($unit['alive'] ?? false)) {
+                    continue;
+                }
 
                 if ($expEach > 0) {
                     $levelEvents = $this->growth->grantExp($character, $expEach);

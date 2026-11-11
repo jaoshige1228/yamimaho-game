@@ -86,6 +86,7 @@ class BattleEngineNewSpellTest extends TestCase
     public function test_world_tree_breath_always_revives_with_half_hp(): void
     {
         $state = $this->state('pc2', 'pc2_world_tree_breath');
+        $state['units']['pc2']['mp'] = 40; // 消費MP 32
         $state['units']['pc4']['hp'] = 0;
         $state['units']['pc4']['alive'] = false;
 

@@ -30,20 +30,20 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $masters = new MasterDataProvider;
         $row = fn (string $code): array => $masters->findSpell($code);
 
-        $this->assertSame([20, 'ally_single', 'heal_full'], [$row('pc1_spirit_water')['mp_cost'], $row('pc1_spirit_water')['target_type'], $row('pc1_spirit_water')['effect']]);
-        $this->assertSame([26, 'ally_all', 'heal_mag', 2.2], [$row('pc1_spirit_rainbow')['mp_cost'], $row('pc1_spirit_rainbow')['target_type'], $row('pc1_spirit_rainbow')['effect'], $row('pc1_spirit_rainbow')['coefficient']]);
+        $this->assertSame([24, 'ally_single', 'heal_full'], [$row('pc1_spirit_water')['mp_cost'], $row('pc1_spirit_water')['target_type'], $row('pc1_spirit_water')['effect']]);
+        $this->assertSame([32, 'ally_all', 'heal_mag', 2.2], [$row('pc1_spirit_rainbow')['mp_cost'], $row('pc1_spirit_rainbow')['target_type'], $row('pc1_spirit_rainbow')['effect'], $row('pc1_spirit_rainbow')['coefficient']]);
         $this->assertSame([12, 'enemy_single', 'damage', 'water', 3.2], [$row('pc1_water_fierce_blade')['mp_cost'], $row('pc1_water_fierce_blade')['target_type'], $row('pc1_water_fierce_blade')['effect'], $row('pc1_water_fierce_blade')['element'], $row('pc1_water_fierce_blade')['coefficient']]);
 
         $this->assertSame([12, 'enemy_single', 'damage', 'wood', 3.2], [$row('pc2_vine_spear')['mp_cost'], $row('pc2_vine_spear')['target_type'], $row('pc2_vine_spear')['effect'], $row('pc2_vine_spear')['element'], $row('pc2_vine_spear')['coefficient']]);
-        $this->assertSame([26, 'enemy_all', 'debuff_def', 'def_down_big'], [$row('pc2_great_burst_tree')['mp_cost'], $row('pc2_great_burst_tree')['target_type'], $row('pc2_great_burst_tree')['effect'], $row('pc2_great_burst_tree')['buff']]);
-        $this->assertSame([40, 'ally_single', 'revive_full'], [$row('pc2_world_tree_drop')['mp_cost'], $row('pc2_world_tree_drop')['target_type'], $row('pc2_world_tree_drop')['effect']]);
+        $this->assertSame([32, 'enemy_all', 'debuff_def', 'def_down_big'], [$row('pc2_great_burst_tree')['mp_cost'], $row('pc2_great_burst_tree')['target_type'], $row('pc2_great_burst_tree')['effect'], $row('pc2_great_burst_tree')['buff']]);
+        $this->assertSame([50, 'ally_single', 'revive_full'], [$row('pc2_world_tree_drop')['mp_cost'], $row('pc2_world_tree_drop')['target_type'], $row('pc2_world_tree_drop')['effect']]);
         $this->assertSame([14, 'ally_single', 'heal_mag', 2.5, 'skill'], [$row('pc2_quick_brew')['mp_cost'], $row('pc2_quick_brew')['target_type'], $row('pc2_quick_brew')['effect'], $row('pc2_quick_brew')['coefficient'], $row('pc2_quick_brew')['cast_style']]);
 
-        $this->assertSame([24, 'enemy_all', 'damage', 'fire', 2.4], [$row('pc3_dragon_breath')['mp_cost'], $row('pc3_dragon_breath')['target_type'], $row('pc3_dragon_breath')['effect'], $row('pc3_dragon_breath')['element'], $row('pc3_dragon_breath')['coefficient']]);
-        $this->assertSame([20, 'enemy_single', 'damage', 'fire', 4.5], [$row('pc3_great_explosion')['mp_cost'], $row('pc3_great_explosion')['target_type'], $row('pc3_great_explosion')['effect'], $row('pc3_great_explosion')['element'], $row('pc3_great_explosion')['coefficient']]);
+        $this->assertSame([30, 'enemy_all', 'damage', 'fire', 2.4], [$row('pc3_dragon_breath')['mp_cost'], $row('pc3_dragon_breath')['target_type'], $row('pc3_dragon_breath')['effect'], $row('pc3_dragon_breath')['element'], $row('pc3_dragon_breath')['coefficient']]);
+        $this->assertSame([26, 'enemy_single', 'damage', 'fire', 4.5], [$row('pc3_great_explosion')['mp_cost'], $row('pc3_great_explosion')['target_type'], $row('pc3_great_explosion')['effect'], $row('pc3_great_explosion')['element'], $row('pc3_great_explosion')['coefficient']]);
 
         $this->assertSame([14, 'enemy_all', 'damage', 'earth', 1.7], [$row('pc4_meteor_shower')['mp_cost'], $row('pc4_meteor_shower')['target_type'], $row('pc4_meteor_shower')['effect'], $row('pc4_meteor_shower')['element'], $row('pc4_meteor_shower')['coefficient']]);
-        $this->assertSame([28, 'ally_all', 'buff_def', 'def_up'], [$row('pc4_steel_wall')['mp_cost'], $row('pc4_steel_wall')['target_type'], $row('pc4_steel_wall')['effect'], $row('pc4_steel_wall')['buff']]);
+        $this->assertSame([36, 'ally_all', 'buff_def', 'def_up'], [$row('pc4_steel_wall')['mp_cost'], $row('pc4_steel_wall')['target_type'], $row('pc4_steel_wall')['effect'], $row('pc4_steel_wall')['buff']]);
         $this->assertSame([26, 'ally_single', 'life_ward'], [$row('pc4_life_ward')['mp_cost'], $row('pc4_life_ward')['target_type'], $row('pc4_life_ward')['effect']]);
 
         $this->assertSame(0.65, config('battle.buffs.def_down_big.multiplier'));
@@ -60,7 +60,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $heal = collect($result['events'])->firstWhere('type', 'heal');
         $this->assertSame(40, $heal['value']);
         $this->assertSame(50, $result['state']['units']['pc2']['hp']);
-        $this->assertSame(10, $result['state']['units']['pc1']['mp']);
+        $this->assertSame(6, $result['state']['units']['pc1']['mp']);
     }
 
     public function test_spirit_water_cannot_target_a_full_hp_or_fallen_ally(): void
@@ -88,6 +88,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
     public function test_spirit_rainbow_heals_every_wounded_living_ally_by_mag_times_two_point_two(): void
     {
         $state = $this->state('pc1', 'pc1_spirit_rainbow');
+        $state['units']['pc1']['mp'] = 40; // 消費MP 32
         $state['units']['pc1']['hp'] = 30; // 不足20
         $state['units']['pc2']['hp'] = 10; // 不足40
         $state['units']['pc3']['hp'] = 50; // 満タン
@@ -103,12 +104,13 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $this->assertSame([50, 43, 50], [$units['pc1']['hp'], $units['pc2']['hp'], $units['pc3']['hp']]);
         $this->assertSame(0, $units['pc4']['hp']);
         $this->assertFalse($units['pc4']['alive'], '倒れた味方は戻らない');
-        $this->assertSame(4, $units['pc1']['mp']);
+        $this->assertSame(8, $units['pc1']['mp']);
     }
 
     public function test_spirit_rainbow_needs_at_least_one_wounded_ally(): void
     {
         $state = $this->state('pc1', 'pc1_spirit_rainbow');
+        $state['units']['pc1']['mp'] = 40;
         foreach (['pc1', 'pc2', 'pc3', 'pc4'] as $id) {
             $state['units'][$id]['hp'] = 50;
         }
@@ -121,6 +123,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
     public function test_spirit_rainbow_is_listed_as_usable_when_someone_is_wounded(): void
     {
         $state = $this->state('pc1', 'pc1_spirit_rainbow');
+        $state['units']['pc1']['mp'] = 40;
         $find = fn (array $s): array => collect($this->engine()->publicState($s)['commands']['spells'])->firstWhere('id', 'pc1_spirit_rainbow');
 
         $listed = $find($state);
@@ -186,7 +189,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
     public function test_world_tree_drop_always_revives_with_full_hp(): void
     {
         $state = $this->state('pc2', 'pc2_world_tree_drop');
-        $state['units']['pc2']['mp'] = 50;
+        $state['units']['pc2']['mp'] = 60;
         $state['units']['pc4']['hp'] = 0;
         $state['units']['pc4']['alive'] = false;
 

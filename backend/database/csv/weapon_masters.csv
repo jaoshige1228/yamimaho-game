@@ -1,5 +1,5 @@
 code,name,mag_bonus,description,price
 staff_basic,基本の杖,1,学校から支給されたシンプルな杖。,
-staff_advanced,応用の杖,8,ある程度の経験者が使える杖。,200
-staff_master,熟練の杖,20,非常に制御が難しいが強力な杖。,800
-staff_pro,大魔導の杖,50,使用者の魔力を大きく増幅する最上級の杖。,4000
+staff_advanced,応用の杖,10,ある程度の経験者が使える杖。,200
+staff_master,熟練の杖,24,非常に制御が難しいが強力な杖。,800
+staff_pro,大魔導の杖,60,使用者の魔力を大きく増幅する最上級の杖。,4000

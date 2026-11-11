@@ -31,12 +31,14 @@ class LevelGrowthServiceTest extends TestCase
     {
         $levels = new LevelTableProvider;
 
-        // Lv12 まではそのまま。Lv13 以降は上がりにくい（もとは Lv20 で 7,800 だったのが、いまは Lv19 で 7,800。一度 Lv18 まで厳しくしてから、1 レベルぶん緩めた）
+        // Lv12 まではそのまま。Lv13〜20 は、もとの表より少しだけ上がりにくい（もとの Lv20 の 7,800 が、いまは Lv20 で 8,030）。
+        // Lv21 以降は、もとの表（レベルを厳しくする前）と同じ（Lv21 = 9,850）
         $this->assertSame(962, $levels->cumulativeExpForLevel(12));
-        $this->assertSame(5800, $levels->cumulativeExpForLevel(18));
-        $this->assertSame(7800, $levels->cumulativeExpForLevel(19));
-        $this->assertSame(9850, $levels->cumulativeExpForLevel(20));
-        $this->assertSame(12150, $levels->cumulativeExpForLevel(21));
+        $this->assertSame(4830, $levels->cumulativeExpForLevel(18));
+        $this->assertSame(6240, $levels->cumulativeExpForLevel(19));
+        $this->assertSame(8030, $levels->cumulativeExpForLevel(20));
+        $this->assertSame(9850, $levels->cumulativeExpForLevel(21));
+        $this->assertSame(12150, $levels->cumulativeExpForLevel(22));
 
         // 必要 EXP は単調に増え、Lv13 以降は 1 レベルごとの増分も減らない（途中で楽になるレベルがない）
         $previousGap = 0;

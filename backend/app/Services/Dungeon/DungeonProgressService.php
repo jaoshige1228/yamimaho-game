@@ -191,13 +191,19 @@ class DungeonProgressService
         $record = $this->findOrCreate($user);
         $maxFloor = DungeonFloorConfig::maxFloor();
 
+        // その層を初めてクリアしたかどうか（クリア済みの層のボスを倒し直しても、最大MPの加算は一度だけ）
+        $firstClear = (int) $record->cleared_floor < $floor;
         $this->applyFloorCleared($record, $floor);
 
         $record->step = 0;
         $record->in_dungeon = false;
         $record->save();
 
-        // 待機画面へ戻るので、撤退・敗北時と同様にパーティを全回復する（レベルアップ反映後の最大値）
+        if ($firstClear) {
+            $this->characters->grantFirstClearMaxMpBonus($user, $floor);
+        }
+
+        // 待機画面へ戻るので、撤退・敗北時と同様にパーティを全回復する（レベルアップ反映後・最大MP加算後の最大値）
         $this->characters->restorePartyToFull($user);
 
         $nextFloor = $floor + 1;

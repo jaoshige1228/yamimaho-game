@@ -717,7 +717,7 @@ class BattleEngine
                 if (! $target['alive'] || $target['hp'] >= $target['max_hp']) {
                     break;
                 }
-                $amount = SpellHealing::healMagAmount((float) $actor['mag'], $spell);
+                $amount = SpellHealing::healMagAmount((float) $actor['mag'], $spell, $actor['master_code'] ?? null, (int) ($actor['level'] ?? 1));
                 $healed = min($amount, $target['max_hp'] - $target['hp']);
                 $target['hp'] += $healed;
                 $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];

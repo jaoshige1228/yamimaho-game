@@ -120,7 +120,7 @@ class DungeonHealService
                         $member,
                         $maxHp,
                         // 戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する
-                        SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell),
+                        SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell, $caster->characterMaster->code, (int) $caster->level),
                     ),
                     'heal' => $this->applyHpHeal($member, $maxHp, (int) ($spell['power'] ?? 0)),
                     'heal_full' => $this->applyHpHeal($member, $maxHp, $maxHp),
@@ -168,6 +168,18 @@ class DungeonHealService
                     'target_type' => $spell['target_type'] ?? 'ally_single',
                     'affordable' => $character->hp > 0
                         && $character->mp >= (int) ($spell['mp_cost'] ?? 0),
+                    // 画面に出す「回復量の見込み」。戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する。全回復・蘇生は null
+                    'amount' => match ($effect) {
+                        'heal_mag' => SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($character)['mag'], $spell, $character->characterMaster->code, (int) $character->level),
+                        'heal' => (int) ($spell['power'] ?? 0),
+                        default => null,
+                    },
+                    // 蘇生したときの HP（最大HPに対する割合 %）。蘇生の魔法だけ
+                    'revive_percent' => match ($effect) {
+                        'revive_chance' => (int) config('battle.revive_hp_percent', 50),
+                        'revive_full' => 100,
+                        default => null,
+                    },
                 ];
             }
         }

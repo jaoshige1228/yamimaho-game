@@ -93,6 +93,26 @@ class UserCharacterService
     }
 
     /**
+     * 層を初めてクリアしたときの、最大MPの加算（`game.first_clear_max_mp_bonus`）。
+     * 呼び出し側が「初回クリア」だけで呼ぶ。現在MPは、直後の全回復（restorePartyToFull）で新しい最大値になる。
+     */
+    public function grantFirstClearMaxMpBonus(User $user, int $floor): void
+    {
+        $bonuses = config("game.first_clear_max_mp_bonus.{$floor}", []);
+        if ($bonuses === []) {
+            return;
+        }
+
+        foreach ($this->ensureParty($user) as $character) {
+            $amount = (int) ($bonuses[$character->characterMaster->code] ?? 0);
+            if ($amount > 0) {
+                $character->max_mp_bonus = (int) $character->max_mp_bonus + $amount;
+                $character->save();
+            }
+        }
+    }
+
+    /**
      * @return Collection<int, UserCharacter>
      */
     public function partyInSlotOrder(User $user): Collection

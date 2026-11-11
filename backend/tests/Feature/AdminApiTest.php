@@ -137,7 +137,7 @@ class AdminApiTest extends TestCase
         // 保存され、プレイヤーの装備画面にも出る（所持扱いになるので、あとで付け直せる）
         $equipment = collect($this->getJson('/api/player/equipment')->assertOk()->json('characters'))->firstWhere('slot_id', 'pc2');
         $this->assertSame('staff_master', $equipment['equipped_weapon']['code']);
-        $this->assertSame(20, $equipment['equipped_weapon']['mag_bonus']);
+        $this->assertSame(24, $equipment['equipped_weapon']['mag_bonus']);
         $this->assertSame('robe_master', $equipment['equipped_armor']['code']);
         $this->assertContains('staff_master', array_column($equipment['owned_weapons'], 'code'));
         $this->assertContains('robe_master', array_column($equipment['owned_armors'], 'code'));

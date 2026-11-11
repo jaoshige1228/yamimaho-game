@@ -289,9 +289,11 @@ class SpellLearningApiTest extends TestCase
         );
 
         $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        // 戦闘中に倒れた味方は、戦闘が終わっても倒れたまま（魔法を使えない）なので、先に全員を全回復しておく
+        app(\App\Services\Player\UserCharacterService::class)->restorePartyToFull($user);
         $party = UserCharacter::query()->where('user_id', $user->id)->get()
             ->keyBy(fn (UserCharacter $c) => $c->characterMaster->code);
-        $party['pc1']->update(['hp' => $party['pc1']->hp, 'mp' => 30]);
+        $party['pc1']->update(['mp' => 30]);
         $party['pc3']->update(['hp' => 10]);
 
         $this->postJson('/api/dungeon/heal', [

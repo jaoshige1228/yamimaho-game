@@ -1,6 +1,4 @@
 <script setup>
-import { ref } from 'vue';
-import { useTypewriterText } from '../../composables/useTypewriterText.js';
 import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const catSrc = publicAssetUrl('/assets/characters/advice_cat.webp');
@@ -10,36 +8,17 @@ const ADVICE_LINES = [
   '能力判定には現在HPの倍率が掛かるんだ。\nつまりHPが低いほど成功率が下がるぞ。',
 ];
 
-const line = ref('');
-const { displayed, isComplete, skip } = useTypewriterText(line);
-
-/** 表示中のセリフとは必ず別のセリフを選ぶ（セリフが1つしかないときは同じものを返す）。 */
-function pickLine() {
-  const others = ADVICE_LINES.filter((l) => l !== line.value);
-  const pool = others.length > 0 ? others : ADVICE_LINES;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function tellAdvice() {
-  // 文字送り中のタップは、ダンジョンのテキストと同じく全文表示にとどめる
-  if (line.value && !isComplete.value) {
-    skip();
-    return;
-  }
-  line.value = pickLine();
-}
+// 画面に入ったとき（このコンポーネントが作られたとき）に 1 回だけ抽選する。
+// タップでは変わらない。画面に入り直すたびに、ランダムで選び直される。
+const line = ADVICE_LINES[Math.floor(Math.random() * ADVICE_LINES.length)];
 </script>
 
 <template>
   <div class="advice-cat">
-    <button type="button" class="advice-cat__icon" aria-label="アドバイス猫" @click="tellAdvice">
+    <div class="advice-cat__icon" role="img" aria-label="アドバイス猫">
       <img :src="catSrc" alt="" draggable="false" />
-    </button>
-    <p v-if="line" class="advice-cat__speech">
-      <!-- 全文ぶんの高さを先に確保し、文字送り中に表示位置がずれないようにする -->
-      <span class="advice-cat__speech-ghost" aria-hidden="true">{{ line }}</span>
-      <span class="advice-cat__speech-text">{{ displayed }}</span>
-    </p>
+    </div>
+    <p class="advice-cat__speech">{{ line }}</p>
   </div>
 </template>
 
@@ -59,9 +38,6 @@ function tellAdvice() {
   border: 2px solid #fff;
   border-radius: 50%;
   background: #000;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 .advice-cat__icon img {
   display: block;
@@ -76,8 +52,8 @@ function tellAdvice() {
   min-width: 0;
   margin: 0;
   padding: 0.5rem 0.75rem;
-  display: grid;
-  align-content: center;
+  display: flex;
+  align-items: center;
   border: 1px solid rgba(200, 176, 255, 0.25);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.5);
@@ -88,12 +64,5 @@ function tellAdvice() {
   font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   white-space: pre-line;
   text-wrap: pretty;
-}
-.advice-cat__speech-ghost,
-.advice-cat__speech-text {
-  grid-area: 1 / 1;
-}
-.advice-cat__speech-ghost {
-  visibility: hidden;
 }
 </style>

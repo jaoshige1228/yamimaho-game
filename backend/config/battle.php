@@ -56,6 +56,14 @@ return [
     /** 回復魔法（effect=heal_mag）の回復量 = 詠唱者の魔力 × この値。戦闘中・探索中の両方で使う */
     'heal_mag_multiplier' => 2,
 
+    /**
+     * 回復魔法（heal_mag）の回復量を、詠唱者のレベルに応じて減らす。キャラのマスターコード => [min_level, multiplier]。
+     * サフィリア（pc1）は Lv20 以上で回復量 0.75 倍。全回復（精霊の水）・蘇生には掛からない。使い魔の回復にも掛からない。
+     */
+    'heal_mag_level_penalty' => [
+        'pc1' => ['min_level' => 20, 'multiplier' => 0.75],
+    ],
+
     /** 蘇生魔法（effect=revive_chance）で復活したときの HP（最大 HP に対する割合 %）。戦闘中・探索中で共通 */
     'revive_hp_percent' => 50,
 

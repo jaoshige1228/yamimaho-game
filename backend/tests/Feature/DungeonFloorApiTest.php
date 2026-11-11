@@ -359,6 +359,83 @@ class DungeonFloorApiTest extends TestCase
         }
     }
 
+    public function test_first_clear_of_floor_3_adds_40_max_mp_to_saphiria_only_once(): void
+    {
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 1, 'unlocked_floor' => 3, 'cleared_floor' => 2, 'step' => 0, 'in_dungeon' => false],
+        );
+        $bonus = fn (): array => UserCharacter::query()->where('user_id', $user->id)->get()
+            ->mapWithKeys(fn (UserCharacter $c) => [$c->characterMaster->code => (int) $c->max_mp_bonus])->all();
+        $before = $bonus();
+
+        $this->winFloor3Boss($user);
+
+        $after = $bonus();
+        $this->assertSame($before['pc1'] + 40, $after['pc1'], 'サフィリアの最大MPが +40');
+        foreach (['pc2', 'pc3', 'pc4'] as $code) {
+            $this->assertSame($before[$code], $after[$code], "{$code} は変わらない");
+        }
+
+        // 待機画面で、増えた最大MPまで全回復している（戦闘中の経験値でレベルが上がっていても成り立つ）
+        $saphiria = UserCharacter::query()->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))->firstOrFail();
+        $levelOnlyMp = app(\App\Services\Growth\LevelGrowthService::class)->statsForLevel($saphiria->characterMaster, $saphiria->level)['mp'];
+        $pc1 = collect($this->getJson('/api/player/party')->assertOk()->json('characters'))->firstWhere('id', 'pc1');
+        $this->assertSame($levelOnlyMp + $before['pc1'] + 40, $pc1['max_mp']);
+        $this->assertSame($pc1['max_mp'], $pc1['mp']);
+
+        // クリア済みの 3 層のボスをもう一度倒しても、増えない
+        $this->winFloor3Boss($user);
+        $this->assertSame($after, $bonus());
+    }
+
+    public function test_clearing_floor_2_does_not_add_the_floor_3_max_mp_bonus(): void
+    {
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 2, 'unlocked_floor' => 2, 'cleared_floor' => 1, 'step' => 0, 'in_dungeon' => false],
+        );
+
+        app(\App\Services\Dungeon\DungeonProgressService::class)->onBossVictory($user, 2);
+
+        $this->assertSame(0, (int) UserCharacter::query()->where('user_id', $user->id)
+            ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))->firstOrFail()->max_mp_bonus);
+    }
+
+    /**
+     * 3 層のボス戦に勝つ。ボスの撃破処理は敵の種類によらないので、攻撃してこないナビを HP1 にして、こぶしで倒す
+     * （ゼロだと、レベル1のパーティが開幕に全滅して操作できなくなることがある）。
+     */
+    private function winFloor3Boss(User $user): void
+    {
+        UserDungeonProgress::query()->where('user_id', $user->id)->update(['floor' => 3, 'in_dungeon' => true, 'step' => 31]);
+
+        $orchestrator = app(BattleOrchestrator::class);
+        $result = $orchestrator->createBattleForUser($user, [[
+            'slot' => 'enemy_1',
+            'master_code' => 'navi',
+            'floor' => 3,
+            'name' => 'ナビ',
+            'sprite' => '3_navi',
+        ]], [
+            'source' => 'dungeon',
+            'floor' => 3,
+            'step' => 31,
+            'boss' => true,
+            'can_flee' => false,
+        ]);
+
+        $state = $result['state'];
+        $state['units']['enemy_1']['hp'] = 1;
+        $state['units']['enemy_1']['evasion_rate'] = 0;
+        $action = $orchestrator->submitPlayerAction($state, 'punch', null, 'enemy_1', $user);
+
+        $this->assertSame('victory', $action['state']['status']);
+    }
+
     private function demoUser(): User
     {
         return User::query()
