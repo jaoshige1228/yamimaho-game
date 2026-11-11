@@ -40,6 +40,7 @@ return [
    */
   'first_defeat_max_mp_bonus' => [
     'inu_moe' => ['pc1' => 10],
+    'dragon' => ['pc1' => 20],
   ],
 
   /**

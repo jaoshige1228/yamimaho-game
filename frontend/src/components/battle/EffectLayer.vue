@@ -39,6 +39,7 @@ function portraitSrc(portrait) {
       v-for="d in floatingDamages"
       :key="d.id"
       class="float-damage"
+      :class="{ 'is-ally': d.ally }"
       :style="{ left: d.x + '%', top: d.y + '%' }"
     >
       {{ d.value }}
@@ -172,6 +173,7 @@ function portraitSrc(portrait) {
     transform: translateX(6px);
   }
 }
+/* ダメージの数字。出てすぐ薄くなり始めると見づらいので、しばらく濃いまま保ってから消える */
 .float-damage {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -179,7 +181,19 @@ function portraitSrc(portrait) {
   font-weight: 800;
   color: #fff;
   text-shadow: 0 2px 8px #000, 0 0 12px #ff4466;
-  animation: floatDamage 0.9s ease forwards;
+  animation: floatDamageHold 1.25s ease-out forwards;
+}
+/* 味方が受けたダメージ: 大きく・太く・赤い字に濃い縁取り。明るい立ち絵や暗い枠の上でも読める */
+.float-damage.is-ally {
+  font-size: 2.1rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #ff4d5e;
+  text-shadow:
+    -2px -2px 0 #1a0408, 2px -2px 0 #1a0408, -2px 2px 0 #1a0408, 2px 2px 0 #1a0408,
+    0 -2px 0 #1a0408, 0 2px 0 #1a0408, -2px 0 0 #1a0408, 2px 0 0 #1a0408,
+    0 3px 10px rgba(0, 0, 0, 0.9),
+    0 0 18px rgba(255, 60, 80, 0.85);
 }
 .float-support {
   position: absolute;

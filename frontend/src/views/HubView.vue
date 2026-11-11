@@ -11,9 +11,6 @@ import '../styles/exploration.css';
 import { publicAssetUrl } from '../utils/publicAssetUrl.js';
 
 const hubBgSrc = publicAssetUrl('/assets/bg/home.webp');
-const emblemSrc = publicAssetUrl('/favicon.svg');
-// 使い魔のメニューには、使い魔の顔を使う
-const familiarSrc = publicAssetUrl('/assets/characters/tukaima_pc1.webp');
 
 const router = useRouter();
 const player = usePlayerStore();
@@ -56,14 +53,6 @@ onMounted(() => loadHubData());
               <HubIcon name="back" class="hub-title-back__icon" />
               <span class="hub-title-back__label">タイトルへ</span>
             </button>
-
-            <div class="hub-logo">
-              <img class="hub-logo__mark" :src="emblemSrc" alt="" draggable="false" />
-              <div class="hub-logo__text">
-                <p class="hub-logo__name">やみまほ</p>
-                <p class="hub-logo__tagline">魔法学園 RPG</p>
-              </div>
-            </div>
           </div>
 
           <nav class="hub-menu" aria-label="ホームのメニュー">
@@ -97,7 +86,7 @@ onMounted(() => loadHubData());
                 aria-label="使い魔の様子を見る"
                 @click="router.push({ name: 'familiar' })"
               >
-                <img class="hub-tile__face" :src="familiarSrc" alt="" draggable="false" />
+                <HubIcon name="familiar" class="hub-tile__icon" />
                 <span class="hub-tile__label">使い魔</span>
               </button>
             </div>
@@ -136,18 +125,13 @@ onMounted(() => loadHubData());
   pointer-events: none;
 }
 
-/* ───────── 上: ロゴとタイトルに戻るボタン ───────── */
+/* ───────── 上: タイトルに戻るボタン ───────── */
 .hub-top {
-  position: relative;
   display: flex;
-  justify-content: center;
-  padding-top: 0.2rem;
+  justify-content: flex-start;
 }
 
 .hub-title-back {
-  position: absolute;
-  top: 0;
-  left: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.15rem;
@@ -172,43 +156,6 @@ onMounted(() => loadHubData());
   background: rgba(40, 24, 72, 0.88);
 }
 
-.hub-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-top: 2.5rem;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.7));
-}
-.hub-logo__mark {
-  display: block;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  box-shadow: 0 0 14px rgba(180, 140, 255, 0.55);
-  user-select: none;
-  -webkit-user-drag: none;
-}
-.hub-logo__text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-}
-.hub-logo__name {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: 0.22em;
-  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  color: #fff3c4;
-  text-shadow: 0 0 12px rgba(255, 213, 74, 0.45);
-}
-.hub-logo__tagline {
-  margin: 0;
-  font-size: 0.66rem;
-  letter-spacing: 0.32em;
-  color: #d9c8ff;
-}
 
 /* ───────── 下: メニュー ───────── */
 .hub-menu {
@@ -299,18 +246,6 @@ onMounted(() => loadHubData());
   font-size: 1.85rem;
   color: #ffd98a;
 }
-.hub-tile__face {
-  display: block;
-  width: 1.85rem;
-  height: 1.85rem;
-  border: 1.5px solid #ffd98a;
-  border-radius: 50%;
-  background: #f3ecff;
-  object-fit: cover;
-  object-position: center 20%;
-  user-select: none;
-  -webkit-user-drag: none;
-}
 .hub-tile__label {
   font-size: 0.78rem;
   font-weight: 700;
@@ -333,38 +268,13 @@ onMounted(() => loadHubData());
   }
 }
 
-/* 画面が低い端末では、ロゴを小さくして、メニューと重ならないようにする */
+/* 画面が低い端末では、メニューを少し小さくする */
 @media (max-height: 700px) {
-  .hub-logo {
-    margin-top: 2.1rem;
-  }
-  .hub-logo__mark {
-    width: 38px;
-    height: 38px;
-  }
-  .hub-logo__name {
-    font-size: 1.45rem;
-  }
   .hub-dive {
     min-height: 54px;
   }
   .hub-tile {
     min-height: 64px;
-  }
-}
-@media (max-height: 640px) {
-  /* 戻るボタンは丸いアイコンだけにして、ロゴと並んでも重ならないようにする */
-  .hub-title-back {
-    padding: 0.25rem 0.45rem;
-  }
-  .hub-title-back__label {
-    display: none;
-  }
-  .hub-logo {
-    margin-top: 0;
-  }
-  .hub-logo__tagline {
-    display: none;
   }
 }
 </style>

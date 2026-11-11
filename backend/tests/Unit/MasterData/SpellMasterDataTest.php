@@ -64,10 +64,10 @@ class SpellMasterDataTest extends TestCase
             $this->assertSame([], array_intersect($spellIds, $provider->spellIdsLearnedByDefeating($character, ['mahou', 'inu_moe'])), $character);
         }
 
-        // イフリーヌとエルドラゴンの両方を倒したあとの並び順（古い魔法は忘れて、強化版に置き換わる）
+        // イフリーヌとエルドラゴンの両方を倒したあとの並び順（爆樹・宇宙樹の気配・土の城壁は強化版に置き換わって忘れる。水の刃・ツルの鞭は忘れない）
         $expected = [
-            'pc1' => ['pc1_heal_water', 'pc1_holy_water', 'pc1_spirit_water', 'pc1_spirit_rainbow', 'pc1_water_fierce_blade', 'pc1_water_veil', 'pc1_water_veil_all'],
-            'pc2' => ['pc2_vine_spear', 'pc2_vine_bind', 'pc2_great_burst_tree', 'pc2_world_tree_breath', 'pc2_world_tree_drop', 'pc2_quick_brew'],
+            'pc1' => ['pc1_heal_water', 'pc1_holy_water', 'pc1_spirit_water', 'pc1_spirit_rainbow', 'pc1_water_blade', 'pc1_water_fierce_blade', 'pc1_water_veil', 'pc1_water_veil_all'],
+            'pc2' => ['pc2_vine_whip', 'pc2_vine_spear', 'pc2_vine_bind', 'pc2_great_burst_tree', 'pc2_world_tree_breath', 'pc2_world_tree_drop', 'pc2_quick_brew'],
             'pc3' => ['pc3_fire_shot', 'pc3_fire_burst', 'pc3_great_explosion', 'pc3_fire_wave', 'pc3_dragon_breath', 'pc3_black_hole', 'pc3_ragaon_beat'],
             'pc4' => ['pc4_stone_shot', 'pc4_rock_fall', 'pc4_meteor_shower', 'pc4_earth_armor', 'pc4_steel_wall', 'pc4_shield_magic', 'pc4_life_ward'],
         ];
@@ -76,11 +76,11 @@ class SpellMasterDataTest extends TestCase
             $this->assertSame($spellIds, $provider->spellIdsForCharacter($character, $all), $character);
         }
 
-        // 忘れるのは、置き換え先を覚えたときだけ
+        // 水の刃（サフィリア）とツルの鞭（ガルデ）は、強化版（水の凶刃・ツルの大槍）を覚えても忘れない
         $this->assertContains('pc1_water_blade', $provider->spellIdsForCharacter('pc1', []));
-        $this->assertContains('pc1_water_blade', $provider->spellIdsForCharacter('pc1', ['pc1_spirit_water']));
-        $this->assertNotContains('pc1_water_blade', $provider->spellIdsForCharacter('pc1', ['pc1_water_fierce_blade']));
-        $this->assertNotContains('pc2_vine_whip', $provider->spellIdsForCharacter('pc2', ['pc2_vine_spear']));
+        $this->assertContains('pc1_water_blade', $provider->spellIdsForCharacter('pc1', ['pc1_water_fierce_blade']));
+        $this->assertContains('pc2_vine_whip', $provider->spellIdsForCharacter('pc2', ['pc2_vine_spear']));
+        // 忘れるのは、置き換え先を覚えたときだけ（爆樹・宇宙樹の気配・土の城壁）
         $this->assertNotContains('pc2_burst_tree', $provider->spellIdsForCharacter('pc2', ['pc2_burst_tree', 'pc2_great_burst_tree']));
         $this->assertNotContains('pc2_world_tree', $provider->spellIdsForCharacter('pc2', ['pc2_world_tree_drop']));
         $this->assertNotContains('pc4_earth_wall', $provider->spellIdsForCharacter('pc4', ['pc4_earth_wall', 'pc4_steel_wall']));
@@ -105,7 +105,7 @@ class SpellMasterDataTest extends TestCase
 
         $blackHole = $provider->findSpell('pc3_black_hole');
         $this->assertSame(
-            [30, 'enemy_all', 'dark', 3.0, 50],
+            [30, 'enemy_all', 'dark', 3.2, 50],
             [$blackHole['mp_cost'], $blackHole['target_type'], $blackHole['element'], $blackHole['coefficient'], $blackHole['power']],
         );
 
@@ -113,7 +113,7 @@ class SpellMasterDataTest extends TestCase
         $this->assertSame([20, 'enemy_single', 'def_down_huge'], [$ragaon['mp_cost'], $ragaon['target_type'], $ragaon['buff']]);
 
         $rockFall = $provider->findSpell('pc4_rock_fall');
-        $this->assertSame([10, 'earth', 3.0], [$rockFall['mp_cost'], $rockFall['element'], $rockFall['coefficient']]);
+        $this->assertSame([10, 'earth', 3.2], [$rockFall['mp_cost'], $rockFall['element'], $rockFall['coefficient']]);
 
         $earthWall = $provider->findSpell('pc4_earth_wall');
         $this->assertSame([20, 'ally_all', 'def_up_small'], [$earthWall['mp_cost'], $earthWall['target_type'], $earthWall['buff']]);

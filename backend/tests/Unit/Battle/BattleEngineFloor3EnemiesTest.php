@@ -63,9 +63,9 @@ class BattleEngineFloor3EnemiesTest extends TestCase
     {
         $masters = new MasterDataProvider;
 
-        // デリート: 敵（プレイヤー側）全員に、1 人ずつ 5% の即死
+        // デリート: 敵（プレイヤー側）全員に、1 人ずつ 4% の即死
         $delete = $masters->findSpell('cleaner_delete');
-        $this->assertSame(['enemy_all', 'instant_death', 5], [$delete['target_type'], $delete['effect'], (int) $delete['power']]);
+        $this->assertSame(['enemy_all', 'instant_death', 4], [$delete['target_type'], $delete['effect'], (int) $delete['power']]);
 
         // ナビの魔法は、2 層の邪教徒より控えめ（回復量少なめ・倍率低め）
         $repair = $masters->findSpell('navi_repair');
@@ -206,8 +206,8 @@ class BattleEngineFloor3EnemiesTest extends TestCase
         $this->assertSame([], $this->eventsOfType($miss['events'], 'damage'));
         $this->assertSame(4, count(array_filter($miss['state']['units'], fn ($u) => $u['side'] === 'ally' && $u['alive'])));
 
-        // 5% ちょうどは当たり、6% は外れ（回避の抽選は毎回外れ）
-        $edge = $this->engine('cleaner_delete', hitRolls: [100, 5, 100, 6, 100, 5, 100, 6])->runEnemyTurnsUntilPlayer($this->cleanerState());
+        // 4% ちょうどは当たり、5% は外れ（回避の抽選は毎回外れ）
+        $edge = $this->engine('cleaner_delete', hitRolls: [100, 4, 100, 5, 100, 4, 100, 5])->runEnemyTurnsUntilPlayer($this->cleanerState());
         $this->assertCount(2, $this->eventsOfType($edge['events'], 'damage'));
     }
 

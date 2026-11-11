@@ -17,8 +17,8 @@ treasure_chest,choose,party_choice,誰が宝箱をこじ開ける？,,,,,,,,,,fo
 treasure_chest,force_open,narration,{chosen_name}は力の限りで宝箱をこじ開ける！\n{stat_check_label}\n成功率：{success_rate}%,,,,,,,,,,,,str_roll
 treasure_chest,str_roll,stat_check,,,,,,,str,3,,,open_success,open_fail,
 treasure_chest,open_success,narration,宝箱は勢いよく開いた！,,,,,,,,,attack,,,item_found
-treasure_chest,item_found,narration,{item:potion_hp_s}を手に入れた！,,,,,,,,,,,,grant_item
-treasure_chest,grant_item,grant_item,,,,,,,potion_hp_s,1,,,,,end
+treasure_chest,item_found,narration,{item:potion_mp_s}を手に入れた！,,,,,,,,,,,,grant_item
+treasure_chest,grant_item,grant_item,,,,,,,potion_mp_s,1,,,,,end
 treasure_chest,open_fail,narration,しかし宝箱はびくともしない！,,,,,,,,,attack,,,fail_dialogue
 treasure_chest,fail_dialogue,dialogue,,chosen,……誰がやっても無理ね、これは,貴様ァ……宝箱まで俺を愚弄するか！,ダメだ、開かないな……悪い,うっ……わたしじゃ……無理……,,,,,,,end
 treasure_chest,end,end,,,,,,,,,,,,,
@@ -107,7 +107,7 @@ trapped_chest,praise,dialogue,,random_ally_except_chosen,あら、中々やる�
 trapped_chest,loot_roll1,chance_branch,,,,,,,,50,,,gold_msg,item_path,
 trapped_chest,gold_path,grant_gold,,,,,,,,400,,,,,end
 trapped_chest,gold_msg,narration,{gold_amount}ゴールドを手に入れた！,,,,,,,,,,,,gold_path
-trapped_chest,item_path,chance_branch,,,,,,,,60,,,hp_path,mp_path,
+trapped_chest,item_path,chance_branch,,,,,,,,60,,,mp_path,hp_path,
 trapped_chest,hp_path,grant_item,,,,,,,potion_hp_s,1,,,,,hp_msg
 trapped_chest,hp_msg,narration,{item:potion_hp_s}を手に入れた！,,,,,,,,,,,,end
 trapped_chest,mp_path,grant_item,,,,,,,potion_mp_s,1,,,,,mp_msg
@@ -123,7 +123,7 @@ safe_chest,react,dialogue,,random_ally,トラップは……ないわね。中�
 safe_chest,loot_roll1,chance_branch,,,,,,,,50,,,gold_msg,loot_roll2,
 safe_chest,gold_path,grant_gold,,,,,,,,200,,,,,end
 safe_chest,gold_msg,narration,{gold_amount}ゴールドを手に入れた！,,,,,,,,,,,,gold_path
-safe_chest,loot_roll2,chance_branch,,,,,,,,60,,,hp_path,mp_path,
+safe_chest,loot_roll2,chance_branch,,,,,,,,60,,,mp_path,hp_path,
 safe_chest,hp_path,grant_item,,,,,,,potion_hp_s,1,,,,,hp_msg
 safe_chest,hp_msg,narration,{item:potion_hp_s}を手に入れた！,,,,,,,,,,,,end
 safe_chest,mp_path,grant_item,,,,,,,potion_mp_s,1,,,,,mp_msg

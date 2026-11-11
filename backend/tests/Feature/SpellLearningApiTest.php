@@ -92,9 +92,9 @@ class SpellLearningApiTest extends TestCase
             ],
             array_map(fn (array $c) => array_column($c['spells'], 'label'), $learned['characters']),
         );
-        // 強化版を覚えたことで忘れる魔法
+        // 強化版を覚えたことで忘れる魔法（水の刃・ツルの鞭は忘れない）
         $this->assertSame(
-            [['水の刃'], ['ツルの鞭', '爆樹', '宇宙樹の気配'], [], ['土の城壁']],
+            [[], ['爆樹', '宇宙樹の気配'], [], ['土の城壁']],
             array_map(fn (array $c) => array_column($c['forgotten'], 'label'), $learned['characters']),
         );
         $this->assertSame(8 + 12, UserCharacterLearnedSpell::query()->count());
@@ -102,11 +102,11 @@ class SpellLearningApiTest extends TestCase
         // 次の戦闘から、並び順どおりに使える（忘れた魔法は出ない）
         $next = $this->postJson('/api/battles/demo-boss')->assertOk()->json('battle_id');
         $this->assertSame(
-            ['pc1_heal_water', 'pc1_holy_water', 'pc1_spirit_water', 'pc1_spirit_rainbow', 'pc1_water_fierce_blade', 'pc1_water_veil', 'pc1_water_veil_all'],
+            ['pc1_heal_water', 'pc1_holy_water', 'pc1_spirit_water', 'pc1_spirit_rainbow', 'pc1_water_blade', 'pc1_water_fierce_blade', 'pc1_water_veil', 'pc1_water_veil_all'],
             $this->allySpells($next, 'pc1'),
         );
         $this->assertSame(
-            ['pc2_vine_spear', 'pc2_vine_bind', 'pc2_great_burst_tree', 'pc2_world_tree_breath', 'pc2_world_tree_drop', 'pc2_quick_brew'],
+            ['pc2_vine_whip', 'pc2_vine_spear', 'pc2_vine_bind', 'pc2_great_burst_tree', 'pc2_world_tree_breath', 'pc2_world_tree_drop', 'pc2_quick_brew'],
             $this->allySpells($next, 'pc2'),
         );
         $this->assertSame(
@@ -133,7 +133,13 @@ class SpellLearningApiTest extends TestCase
 
         $this->assertSame(0, UserCharacterLearnedSpell::query()->count());
         $start = $this->postJson('/api/battles/demo-boss')->assertOk();
-        $this->assertSame(self::BASE_PC1, $this->allySpells($start->json('battle_id'), 'pc1'), '水の刃が戻る');
+        $this->assertSame(self::BASE_PC1, $this->allySpells($start->json('battle_id'), 'pc1'));
+        // 忘れていた宇宙樹の気配（ガルデ）が戻る
+        $this->assertSame(
+            ['pc2_vine_whip', 'pc2_vine_bind', 'pc2_world_tree'],
+            $this->allySpells($start->json('battle_id'), 'pc2'),
+            '忘れていた宇宙樹の気配が戻る',
+        );
     }
 
     public function test_defeating_other_enemies_teaches_nothing(): void
@@ -188,6 +194,34 @@ class SpellLearningApiTest extends TestCase
         $this->winIfrineBattle();
         $this->assertSame(['pc1' => 10, 'pc2' => 0, 'pc3' => 0, 'pc4' => 0], $this->maxMpBonuses());
         $this->assertSame($this->expectedMaxMp(), $this->partyMaxMp());
+    }
+
+    public function test_first_floor2_boss_defeat_adds_twenty_max_mp_to_pc1_only_and_says_nothing(): void
+    {
+        $this->winIfrineBattle();
+        $this->assertSame(['pc1' => 10, 'pc2' => 0, 'pc3' => 0, 'pc4' => 0], $this->maxMpBonuses());
+
+        $first = $this->winFloor2BossBattle();
+
+        // イフリーヌの +10 に、エルドラゴンの +20 が重なる。サフィリア（pc1）だけ
+        $this->assertSame(['pc1' => 30, 'pc2' => 0, 'pc3' => 0, 'pc4' => 0], $this->maxMpBonuses());
+        $this->assertSame($this->expectedMaxMp(), $this->partyMaxMp());
+
+        // 文言・イベントは増やさない
+        $this->assertStringNotContainsString('max_mp', json_encode($first['events']));
+        $this->assertStringNotContainsString('bonus', json_encode($first['events']));
+        $learned = collect($first['events'])->firstWhere('type', 'spells_learned');
+        $this->assertSame(['type', 'characters'], array_keys($learned));
+
+        // 2 回目以降は増えない
+        $this->winFloor2BossBattle();
+        $this->assertSame(['pc1' => 30, 'pc2' => 0, 'pc3' => 0, 'pc4' => 0], $this->maxMpBonuses());
+
+        // リセットで消え、倒し直せばまた加算される
+        $this->postJson('/api/reset')->assertOk();
+        $this->assertSame(['pc1' => 0, 'pc2' => 0, 'pc3' => 0, 'pc4' => 0], $this->maxMpBonuses());
+        $this->winFloor2BossBattle();
+        $this->assertSame(20, $this->maxMpBonuses()['pc1']);
     }
 
     public function test_max_mp_bonus_applies_to_battles_full_restore_and_level_ups(): void

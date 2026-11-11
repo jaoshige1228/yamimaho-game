@@ -6,7 +6,7 @@ defineProps({
   name: {
     type: String,
     required: true,
-    validator: (v) => ['dungeon', 'shop', 'items', 'back'].includes(v),
+    validator: (v) => ['dungeon', 'shop', 'items', 'familiar', 'back'].includes(v),
   },
 });
 </script>
@@ -40,6 +40,14 @@ defineProps({
       <path d="M9 7V6a3 3 0 0 1 6 0v1" />
       <path d="M6 7h12l1 13H5z" />
       <path d="M9.5 12.5a2.5 2.5 0 0 0 5 0" />
+    </template>
+    <!-- 使い魔: 肉球 -->
+    <template v-else-if="name === 'familiar'">
+      <circle cx="6.5" cy="11" r="1.8" />
+      <circle cx="10" cy="6.8" r="1.8" />
+      <circle cx="14" cy="6.8" r="1.8" />
+      <circle cx="17.5" cy="11" r="1.8" />
+      <path d="M12 12.5c-3.2 0-5.5 3-5.5 5.2 0 1.8 1.4 2.3 2.6 2.3 1 0 1.8-.5 2.9-.5s1.9.5 2.9.5c1.200 0 2.6-.5 2.6-2.3 0-2.200-2.3-5.2-5.5-5.2z" />
     </template>
     <!-- 戻る -->
     <template v-else-if="name === 'back'">

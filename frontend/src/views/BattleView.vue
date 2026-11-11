@@ -294,17 +294,24 @@ function flashKindForSpellAnnounce(ev) {
   return 'buff';
 }
 
+/** ダメージの数字が出ている時間（ms）。EffectLayer.vue の .float-damage のアニメーションの長さと合わせる */
+const FLOATING_DAMAGE_MS = 1250;
+
 function showFloatingDamage(targetId, value) {
   const pos = unitPosition(targetId);
+  const isAlly = units.value.find((x) => x.id === targetId)?.side === 'ally';
   floatingDamages.value.push({
     id: `${targetId}-${Date.now()}`,
     value: `-${value}`,
-    x: pos.x,
+    // 味方のダメージは大きな字で出すので、端の味方でも画面からはみ出さないよう、左右に寄せすぎない
+    x: isAlly ? Math.min(Math.max(pos.x, 17), 83) : pos.x,
     y: pos.y,
+    // 味方が受けたダメージは、立ち絵の上でも見えるように強調して出す
+    ally: isAlly,
   });
   setTimeout(() => {
     floatingDamages.value = floatingDamages.value.slice(1);
-  }, 950);
+  }, FLOATING_DAMAGE_MS);
 }
 
 function showFloatingSupport(targetId, text, kind = 'heal') {
@@ -462,7 +469,7 @@ async function playEvents(events) {
       }
     }
     if (ev.type === 'miss') {
-      showActionBanner('ミス！');
+      showActionBanner('攻撃は外れた');
       playSe('miss');
       await delay(280);
       await delay(120);

@@ -22,6 +22,12 @@ const maxLevel = computed(() => status.value?.max_level ?? 9);
 const feedCost = computed(() => status.value?.feed_cost ?? 100);
 const maxReached = computed(() => status.value?.max_reached === true);
 const canFeed = computed(() => !!status.value && !maxReached.value && player.gold >= feedCost.value);
+/** 次のレベルまで、あと魔石が何個か（最大レベルなら null） */
+const stonesToNext = computed(() => status.value?.stones_to_next ?? null);
+/** 「まとめて与える」ボタン（普通は 10 個。最大レベルまでの残りが少ないときは、その数） */
+const bulkCount = computed(() => status.value?.bulk_count ?? 0);
+const bulkCost = computed(() => status.value?.bulk_cost ?? 0);
+const canFeedBulk = computed(() => !!status.value && bulkCount.value > 0 && player.gold >= bulkCost.value);
 
 function applyStatus(data) {
   status.value = data;
@@ -40,13 +46,13 @@ async function load() {
   }
 }
 
-async function feed() {
+async function feed(count = 1) {
   feeding.value = true;
   error.value = '';
   notice.value = '';
   leveledUp.value = false;
   try {
-    const data = await api('/familiar/feed', { method: 'POST' });
+    const data = await api('/familiar/feed', { method: 'POST', body: JSON.stringify({ count }) });
     applyStatus(data);
     notice.value = data.message ?? '';
     leveledUp.value = data.leveled_up === true;
@@ -86,6 +92,9 @@ onMounted(load);
             <span class="level-max">/ {{ maxLevel }}</span>
           </p>
           <p class="stones-line">魔石を与えた数：<strong>{{ status.stones_total }}</strong> 個</p>
+          <p v-if="stonesToNext !== null" class="next-line">
+            レベルアップまで　あと魔石 <strong>{{ stonesToNext }}</strong> 個
+          </p>
         </section>
 
         <section class="feed-panel">
@@ -95,9 +104,18 @@ onMounted(load);
             type="button"
             class="feed-btn"
             :disabled="feeding || !canFeed"
-            @click="feed"
+            @click="feed(1)"
           >
             魔石を与える（{{ feedCost }}G）
+          </button>
+          <button
+            v-if="bulkCount > 0"
+            type="button"
+            class="feed-btn feed-btn--bulk"
+            :disabled="feeding || !canFeedBulk"
+            @click="feed(bulkCount)"
+          >
+            魔石を{{ bulkCount }}個与える（{{ bulkCost }}G）
           </button>
           <p v-if="maxReached" class="feed-hint">使い魔はこれ以上強くならない。</p>
           <p v-else-if="player.gold < feedCost" class="feed-hint">ゴールドが足りない。</p>
@@ -211,6 +229,15 @@ onMounted(load);
   color: #ffd98a;
   font-size: 0.95rem;
 }
+.next-line {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #d4c4ff;
+}
+.next-line strong {
+  color: #fff0b0;
+  font-size: 1rem;
+}
 
 .ability-list {
   width: 100%;
@@ -284,6 +311,12 @@ onMounted(load);
 .feed-btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+/* まとめて与えるボタンは、1 個のボタンより控えめな色にして、押し間違いを減らす */
+.feed-btn--bulk {
+  border-color: rgba(255, 217, 138, 0.8);
+  background: rgba(48, 30, 96, 0.85);
+  color: #ffe9b8;
 }
 .feed-hint {
   margin: 0;

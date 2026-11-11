@@ -42,6 +42,26 @@
   }
 }
 
+/* ダメージの数字: 最初に少し大きく出て、約 7 割の間は濃いまま保ち、最後に上へ流れて消える */
+@keyframes floatDamageHold {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.45);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 22px)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 44px)) scale(1.1);
+  }
+}
+
 @keyframes bannerPop {
   0% {
     opacity: 0;

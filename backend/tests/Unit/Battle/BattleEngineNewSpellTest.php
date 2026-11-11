@@ -111,13 +111,13 @@ class BattleEngineNewSpellTest extends TestCase
         $result = $this->engine()->applyPlayerAction($state, 'pc3', 'spell', 'pc3_black_hole');
         $units = $result['state']['units'];
 
-        // (魔力20 - 防御5/2) × 3.0 = 52
+        // (魔力20 - 防御5/2) × 3.2 = 56
         $damages = array_values(array_filter($result['events'], fn ($e) => $e['type'] === 'damage' && $e['target'] !== 'pc3'));
         $this->assertCount(2, $damages);
-        $this->assertSame(52, $damages[0]['value']);
+        $this->assertSame(56, $damages[0]['value']);
         $this->assertSame('dark', $damages[0]['element']);
-        $this->assertSame(448, $units['enemy_1']['hp']);
-        $this->assertSame(448, $units['enemy_2']['hp']);
+        $this->assertSame(444, $units['enemy_1']['hp']);
+        $this->assertSame(444, $units['enemy_2']['hp']);
 
         // 自分の HP を最大 HP の半分（50）消費する。対象が 2 体でも 1 回だけ
         $self = array_values(array_filter($result['events'], fn ($e) => $e['type'] === 'damage' && $e['target'] === 'pc3'));
@@ -162,7 +162,7 @@ class BattleEngineNewSpellTest extends TestCase
         $this->assertEqualsCanonicalizing(['enemy_1', 'pc3'], $targets);
     }
 
-    public function test_rock_fall_deals_earth_damage_with_coefficient_three(): void
+    public function test_rock_fall_deals_earth_damage_with_its_coefficient(): void
     {
         $state = $this->state('pc4', 'pc4_rock_fall');
         $state['units']['enemy_1']['hp'] = 500;
@@ -171,8 +171,8 @@ class BattleEngineNewSpellTest extends TestCase
         $result = $this->engine()->applyPlayerAction($state, 'pc4', 'spell', 'pc4_rock_fall', 'enemy_1');
         $damage = collect($result['events'])->firstWhere('type', 'damage');
 
-        // (魔力20 - 防御5/2) × 3.0 = 52
-        $this->assertSame(52, $damage['value']);
+        // (魔力20 - 防御5/2) × 3.2 = 56
+        $this->assertSame(56, $damage['value']);
         $this->assertSame('earth', $damage['element']);
         // 消費MP 10（開始時 30）
         $this->assertSame(20, $result['state']['units']['pc4']['mp']);

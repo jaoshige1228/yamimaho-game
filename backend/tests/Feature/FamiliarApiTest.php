@@ -120,6 +120,98 @@ class FamiliarApiTest extends TestCase
         $this->assertSame(220, (int) UserFamiliar::query()->firstOrFail()->stones_total);
     }
 
+    public function test_status_tells_how_many_stones_are_left_until_the_next_level(): void
+    {
+        $user = $this->user(gold: 100000);
+
+        // Lv0 → Lv1 は 2 個、Lv1 → Lv2 は 4 個（前のレベルアップからの数）
+        $this->assertSame(2, $this->getJson('/api/familiar')->json('stones_to_next'));
+
+        $this->postJson('/api/familiar/feed')->assertOk()->assertJsonPath('stones_to_next', 1);
+        $this->postJson('/api/familiar/feed')->assertOk()->assertJsonPath('stones_to_next', 4);
+        $this->postJson('/api/familiar/feed')->assertOk()->assertJsonPath('stones_to_next', 3);
+
+        // 最大レベルでは出さない
+        UserFamiliar::query()->where('user_id', $user->id)->update(['level' => 9, 'stones_progress' => 0]);
+        $this->assertNull($this->getJson('/api/familiar')->json('stones_to_next'));
+    }
+
+    public function test_feeding_ten_stones_at_once_costs_1000_gold_and_can_level_up_several_times(): void
+    {
+        $user = $this->user(gold: 1000);
+
+        $status = $this->getJson('/api/familiar')->assertOk()->json();
+        $this->assertSame([10, 1000, true], [$status['bulk_count'], $status['bulk_cost'], $status['can_feed_bulk']]);
+
+        // Lv0 から 10 個: 2 個で Lv1、続く 4 個で Lv2、残り 4 個は Lv3 に向けた途中（あと 4 個）
+        $response = $this->postJson('/api/familiar/feed', ['count' => 10])->assertOk()
+            ->assertJsonPath('fed', 10)
+            ->assertJsonPath('leveled_up', true)
+            ->assertJsonPath('message', '魔石を10個与えた。使い魔がレベルアップした！（Lv0→Lv2）');
+
+        $this->assertSame([2, 10, 4, 0], [
+            $response->json('level'), $response->json('stones_total'), $response->json('stones_to_next'), $response->json('gold'),
+        ]);
+        $this->assertSame(0, (new PartyGoldService)->getGold($user->fresh()));
+    }
+
+    public function test_feeding_ten_stones_without_a_level_up_says_so_plainly(): void
+    {
+        $this->user(gold: 1000);
+        \App\Models\UserFamiliar::query()->create(['user_id' => User::query()->firstOrFail()->id, 'level' => 5, 'stones_total' => 40, 'stones_progress' => 0]);
+
+        // Lv5 → Lv6 は 20 個。10 個ではまだ上がらない
+        $this->postJson('/api/familiar/feed', ['count' => 10])->assertOk()
+            ->assertJsonPath('leveled_up', false)
+            ->assertJsonPath('message', '魔石を10個与えた。')
+            ->assertJsonPath('stones_to_next', 10);
+    }
+
+    public function test_feeding_ten_stones_without_enough_gold_fails_and_changes_nothing(): void
+    {
+        $user = $this->user(gold: 999);
+
+        $status = $this->getJson('/api/familiar')->assertOk()->json();
+        $this->assertFalse($status['can_feed_bulk']);
+        $this->assertTrue($status['can_feed'], '1 個ならあげられる');
+
+        $this->postJson('/api/familiar/feed', ['count' => 10])->assertStatus(422)->assertJsonPath('message', 'ゴールドが足りません。');
+
+        $this->assertSame(999, (new PartyGoldService)->getGold($user->fresh()));
+        $this->assertSame(0, UserFamiliar::query()->sum('stones_total'));
+    }
+
+    public function test_bulk_feeding_stops_at_the_max_level_and_only_charges_for_the_stones_used(): void
+    {
+        $user = $this->user(gold: 1000);
+        // Lv8 で、Lv9 まであと 5 個
+        UserFamiliar::query()->create(['user_id' => $user->id, 'level' => 8, 'stones_total' => 135, 'stones_progress' => 75]);
+
+        $status = $this->getJson('/api/familiar')->assertOk()->json();
+        $this->assertSame([5, 500, 5], [$status['bulk_count'], $status['bulk_cost'], $status['stones_to_next']]);
+
+        $response = $this->postJson('/api/familiar/feed', ['count' => 10])->assertOk()->assertJsonPath('fed', 5);
+        $this->assertSame([9, true, 500, 0], [
+            $response->json('level'), $response->json('max_reached'), $response->json('gold'), $response->json('bulk_count'),
+        ]);
+        $this->assertSame(140, (int) UserFamiliar::query()->firstOrFail()->stones_total);
+    }
+
+    public function test_the_stone_count_must_be_between_one_and_ten(): void
+    {
+        $user = $this->user(gold: 100000);
+
+        foreach ([0, 11, -1, 'abc', 2.5] as $bad) {
+            $this->postJson('/api/familiar/feed', ['count' => $bad])->assertStatus(422);
+        }
+        $this->assertSame(100000, (new PartyGoldService)->getGold($user->fresh()));
+
+        // 省略は 1 個、1 と 10 はそのまま通る
+        $this->postJson('/api/familiar/feed')->assertOk()->assertJsonPath('fed', 1);
+        $this->postJson('/api/familiar/feed', ['count' => 1])->assertOk()->assertJsonPath('fed', 1);
+        $this->postJson('/api/familiar/feed', ['count' => 10])->assertOk()->assertJsonPath('fed', 10);
+    }
+
     public function test_reset_clears_the_familiar(): void
     {
         $user = $this->user(gold: 1000);

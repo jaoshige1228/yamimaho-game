@@ -208,7 +208,7 @@ class DungeonEventFloorOverridesTest extends TestCase
         $this->assertCount(4, $options);
         foreach ($options as $option) {
             $this->assertSame(
-                min(95, (int) ceil(round($option['str'] * 1.35, 6))),
+                min(95, (int) ceil(round($option['str'] * 1.215, 6))),
                 $option['success_rate'],
                 "str {$option['str']}",
             );
@@ -224,7 +224,7 @@ class DungeonEventFloorOverridesTest extends TestCase
         $this->assertSame(1, preg_match('/成功率：(\d+)%/u', $text, $m), $text);
 
         $speeds = $this->party()->map(fn (UserCharacter $c) => (int) $c->spd);
-        $this->assertContains((int) $m[1], $speeds->map(fn (int $spd) => min(95, (int) ceil(round($spd * 1.15, 6))))->all());
+        $this->assertContains((int) $m[1], $speeds->map(fn (int $spd) => min(95, (int) ceil(round($spd * 1.035, 6))))->all());
     }
 
     public function test_floor_two_treasure_chest_rates_use_2_3_multiplier_rounded_up(): void
@@ -397,8 +397,8 @@ class DungeonEventFloorOverridesTest extends TestCase
     public static function rewardItemCases(): array
     {
         return [
-            '1層 宝箱（筋力判定）' => [1, 'treasure_chest', 'potion_hp_s', 'HP回復薬を手に入れた！'],
-            '2層 宝箱（筋力判定）' => [2, 'treasure_chest', 'potion_hp_m', 'HP回復薬（中）を手に入れた！'],
+            '1層 宝箱（筋力判定）' => [1, 'treasure_chest', 'potion_mp_s', 'MP回復薬を手に入れた！'],
+            '2層 宝箱（筋力判定）' => [2, 'treasure_chest', 'potion_mp_m', 'MP回復薬（中）を手に入れた！'],
             '1層 宝箱（トラップあり・HP）' => [1, 'trapped_chest_hp', 'potion_hp_s', 'HP回復薬を手に入れた！'],
             '2層 宝箱（トラップあり・HP）' => [2, 'trapped_chest_hp', 'potion_hp_m', 'HP回復薬（中）を手に入れた！'],
             '1層 宝箱（トラップあり・MP）' => [1, 'trapped_chest_mp', 'potion_mp_s', 'MP回復薬を手に入れた！'],
@@ -409,7 +409,7 @@ class DungeonEventFloorOverridesTest extends TestCase
             '2層 宝箱（無条件・MP）' => [2, 'safe_chest_mp', 'potion_mp_m', 'MP回復薬（中）を手に入れた！'],
             '1層 スフィンクス' => [1, 'sphinx_quiz', 'potion_hp_s', 'HP回復薬を手に入れた！'],
             '2層 スフィンクス' => [2, 'sphinx_quiz', 'potion_hp_m', 'HP回復薬（中）を手に入れた！'],
-            '3層 宝箱（筋力判定）' => [3, 'treasure_chest', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
+            '3層 宝箱（筋力判定）' => [3, 'treasure_chest', 'potion_mp_l', 'MP回復薬（強）を手に入れた！'],
             '3層 宝箱（トラップあり・HP）' => [3, 'trapped_chest_hp', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
             '3層 宝箱（トラップあり・MP）' => [3, 'trapped_chest_mp', 'potion_mp_l', 'MP回復薬（強）を手に入れた！'],
             '3層 宝箱（無条件・HP）' => [3, 'safe_chest_hp', 'potion_hp_l', 'HP回復薬（強）を手に入れた！'],
@@ -426,10 +426,10 @@ class DungeonEventFloorOverridesTest extends TestCase
         // chance_branch は test_roll（<= 成功率なら当たり）で出し分ける。判定は成功させる
         [$eventCode, $roll] = match ($scenario) {
             'treasure_chest' => ['treasure_chest', null],
-            'trapped_chest_hp' => ['trapped_chest', 55],     // ゴールド(50%)を外し、アイテム 60% のうち HP 薬を当てる
-            'trapped_chest_mp' => ['trapped_chest', 70],     // ゴールド(50%)もHP薬(60%)も外す
-            'safe_chest_hp' => ['safe_chest', 55],           // ゴールド(50%)を外し、アイテム 60% を当てる
-            'safe_chest_mp' => ['safe_chest', 90],           // ゴールドもHP薬も外す
+            'trapped_chest_hp' => ['trapped_chest', 70],     // ゴールド(50%)を外し、アイテム 60% のうち MP 薬も外す（= HP 薬）
+            'trapped_chest_mp' => ['trapped_chest', 55],     // ゴールド(50%)を外し、アイテム 60% のうち MP 薬を当てる
+            'safe_chest_hp' => ['safe_chest', 90],           // ゴールドも MP 薬も外す（= HP 薬）
+            'safe_chest_mp' => ['safe_chest', 55],           // ゴールド(50%)を外し、アイテム 60% のうち MP 薬を当てる
             'sphinx_quiz' => ['sphinx_quiz', null],
         };
         if ($eventCode === 'trapped_chest') {
@@ -444,6 +444,76 @@ class DungeonEventFloorOverridesTest extends TestCase
             "{$floor}層 {$scenario}\n".implode("\n---\n", $texts),
         );
         $this->assertTrue(collect($texts)->contains(fn ($t) => $t === $message), "{$message} が出ない\n".implode("\n---\n", $texts));
+    }
+
+    public function test_mp_potions_are_more_likely_than_hp_potions(): void
+    {
+        // 判定にはすべて成功するものとして、各イベントで薬が出る確率を、ノードのつながりから計算する
+        $nodes = DungeonEventNode::query()->get()->keyBy(fn (DungeonEventNode $n) => $n->event_code.'/'.$n->node_key);
+
+        $dist = function (string $event, ?string $key) use (&$dist, $nodes): array {
+            if ($key === null || $key === '') {
+                return [];
+            }
+            $node = $nodes->get($event.'/'.$key);
+            $this->assertNotNull($node, "{$event}/{$key}");
+
+            return match ($node->node_type) {
+                'grant_item' => [(string) $node->stat_attr => 1.0],
+                'end' => [],
+                'chance_branch' => $this->mixDistributions(
+                    $dist($event, $node->next_on_success),
+                    $dist($event, $node->next_on_fail),
+                    ((int) $node->stat_multiplier) / 100,
+                ),
+                'stat_check', 'party_choice', 'party_choice_skip' => $dist($event, $node->next_on_success ?: $node->next_default),
+                default => $dist($event, $node->next_default),
+            };
+        };
+
+        $start = ['treasure_chest' => 'found', 'trapped_chest' => 'found', 'safe_chest' => 'found', 'sphinx_quiz' => 'intro'];
+        $result = [];
+        foreach ($start as $event => $key) {
+            $result[$event] = $dist($event, $key);
+        }
+
+        // 宝箱（筋力）は MP 薬だけ。トラップあり・無条件の宝箱は MP 薬が 30%・HP 薬が 20%（残りはゴールド）。スフィンクスは半々
+        $this->assertEqualsWithDelta(1.0, $result['treasure_chest']['potion_mp_s'] ?? 0, 0.0001);
+        $this->assertArrayNotHasKey('potion_hp_s', $result['treasure_chest']);
+        foreach (['trapped_chest', 'safe_chest'] as $event) {
+            $this->assertEqualsWithDelta(0.3, $result[$event]['potion_mp_s'], 0.0001, $event);
+            $this->assertEqualsWithDelta(0.2, $result[$event]['potion_hp_s'], 0.0001, $event);
+        }
+        $this->assertEqualsWithDelta($result['sphinx_quiz']['potion_hp_s'], $result['sphinx_quiz']['potion_mp_s'], 0.0001);
+
+        // イベントが選ばれる重み（宝箱 10・トラップあり 10・無条件 8・スフィンクス 5）で合わせても、MP 薬のほうが多い
+        $weights = ['treasure_chest' => 10, 'trapped_chest' => 10, 'safe_chest' => 8, 'sphinx_quiz' => 5];
+        $hp = $mp = 0.0;
+        foreach ($weights as $event => $weight) {
+            $hp += $weight * ($result[$event]['potion_hp_s'] ?? 0);
+            $mp += $weight * ($result[$event]['potion_mp_s'] ?? 0);
+        }
+        $this->assertGreaterThan($hp, $mp);
+        $this->assertEqualsWithDelta(17.9, $mp, 0.0001);
+        $this->assertEqualsWithDelta(6.1, $hp, 0.0001);
+    }
+
+    /**
+     * @param  array<string, float>  $onSuccess
+     * @param  array<string, float>  $onFail
+     * @return array<string, float>
+     */
+    private function mixDistributions(array $onSuccess, array $onFail, float $successRate): array
+    {
+        $mixed = [];
+        foreach ($onSuccess as $item => $p) {
+            $mixed[$item] = ($mixed[$item] ?? 0) + $p * $successRate;
+        }
+        foreach ($onFail as $item => $p) {
+            $mixed[$item] = ($mixed[$item] ?? 0) + $p * (1 - $successRate);
+        }
+
+        return $mixed;
     }
 
     public function test_every_reward_item_and_placeholder_points_at_an_existing_item(): void

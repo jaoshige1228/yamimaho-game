@@ -108,12 +108,17 @@
   text-align: left;
 }
 
-/* ダイスロールのログ（本文の 1 行目）。成功は薄い青、失敗は薄い赤 */
+/* ダイスロールのログ（本文の 1 行目）。成功は薄い青、失敗は薄い赤。細字で、少し透かして本文より控えめにする。出目だけ太字 */
 .story-text-window__dice {
   display: block;
   margin-bottom: 0.2rem;
-  font-weight: 700;
+  font-weight: 300;
   letter-spacing: 0.01em;
+  opacity: 0.9;
+}
+
+.story-text-window__dice-roll {
+  font-weight: 700;
 }
 
 .story-text-window__dice--success {

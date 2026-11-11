@@ -32,15 +32,15 @@ class BattleEngineSecondBossSpellsTest extends TestCase
 
         $this->assertSame([20, 'ally_single', 'heal_full'], [$row('pc1_spirit_water')['mp_cost'], $row('pc1_spirit_water')['target_type'], $row('pc1_spirit_water')['effect']]);
         $this->assertSame([26, 'ally_all', 'heal_mag', 2.2], [$row('pc1_spirit_rainbow')['mp_cost'], $row('pc1_spirit_rainbow')['target_type'], $row('pc1_spirit_rainbow')['effect'], $row('pc1_spirit_rainbow')['coefficient']]);
-        $this->assertSame([12, 'enemy_single', 'damage', 'water', 3.0], [$row('pc1_water_fierce_blade')['mp_cost'], $row('pc1_water_fierce_blade')['target_type'], $row('pc1_water_fierce_blade')['effect'], $row('pc1_water_fierce_blade')['element'], $row('pc1_water_fierce_blade')['coefficient']]);
+        $this->assertSame([12, 'enemy_single', 'damage', 'water', 3.2], [$row('pc1_water_fierce_blade')['mp_cost'], $row('pc1_water_fierce_blade')['target_type'], $row('pc1_water_fierce_blade')['effect'], $row('pc1_water_fierce_blade')['element'], $row('pc1_water_fierce_blade')['coefficient']]);
 
-        $this->assertSame([12, 'enemy_single', 'damage', 'wood', 3.0], [$row('pc2_vine_spear')['mp_cost'], $row('pc2_vine_spear')['target_type'], $row('pc2_vine_spear')['effect'], $row('pc2_vine_spear')['element'], $row('pc2_vine_spear')['coefficient']]);
+        $this->assertSame([12, 'enemy_single', 'damage', 'wood', 3.2], [$row('pc2_vine_spear')['mp_cost'], $row('pc2_vine_spear')['target_type'], $row('pc2_vine_spear')['effect'], $row('pc2_vine_spear')['element'], $row('pc2_vine_spear')['coefficient']]);
         $this->assertSame([26, 'enemy_all', 'debuff_def', 'def_down_big'], [$row('pc2_great_burst_tree')['mp_cost'], $row('pc2_great_burst_tree')['target_type'], $row('pc2_great_burst_tree')['effect'], $row('pc2_great_burst_tree')['buff']]);
         $this->assertSame([40, 'ally_single', 'revive_full'], [$row('pc2_world_tree_drop')['mp_cost'], $row('pc2_world_tree_drop')['target_type'], $row('pc2_world_tree_drop')['effect']]);
         $this->assertSame([14, 'ally_single', 'heal_mag', 2.5, 'skill'], [$row('pc2_quick_brew')['mp_cost'], $row('pc2_quick_brew')['target_type'], $row('pc2_quick_brew')['effect'], $row('pc2_quick_brew')['coefficient'], $row('pc2_quick_brew')['cast_style']]);
 
         $this->assertSame([24, 'enemy_all', 'damage', 'fire', 2.4], [$row('pc3_dragon_breath')['mp_cost'], $row('pc3_dragon_breath')['target_type'], $row('pc3_dragon_breath')['effect'], $row('pc3_dragon_breath')['element'], $row('pc3_dragon_breath')['coefficient']]);
-        $this->assertSame([20, 'enemy_single', 'damage', 'fire', 3.6], [$row('pc3_great_explosion')['mp_cost'], $row('pc3_great_explosion')['target_type'], $row('pc3_great_explosion')['effect'], $row('pc3_great_explosion')['element'], $row('pc3_great_explosion')['coefficient']]);
+        $this->assertSame([20, 'enemy_single', 'damage', 'fire', 4.5], [$row('pc3_great_explosion')['mp_cost'], $row('pc3_great_explosion')['target_type'], $row('pc3_great_explosion')['effect'], $row('pc3_great_explosion')['element'], $row('pc3_great_explosion')['coefficient']]);
 
         $this->assertSame([14, 'enemy_all', 'damage', 'earth', 1.7], [$row('pc4_meteor_shower')['mp_cost'], $row('pc4_meteor_shower')['target_type'], $row('pc4_meteor_shower')['effect'], $row('pc4_meteor_shower')['element'], $row('pc4_meteor_shower')['coefficient']]);
         $this->assertSame([28, 'ally_all', 'buff_def', 'def_up'], [$row('pc4_steel_wall')['mp_cost'], $row('pc4_steel_wall')['target_type'], $row('pc4_steel_wall')['effect'], $row('pc4_steel_wall')['buff']]);
@@ -140,9 +140,9 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         // [魔法, 使うキャラ, 敵1体あたりのダメージ, 敵に当たる数]
         // 敵の防御5 → (魔力 - 5/2) × 係数。魔力は pc1 = 15、ほか = 20
         return [
-            '水の凶刃 (魔力15 × 3.0)' => ['pc1_water_fierce_blade', 'pc1', 37, 1],
-            'ツルの大槍 (魔力20 × 3.0)' => ['pc2_vine_spear', 'pc2', 52, 1],
-            '大爆発 (魔力20 × 3.6)' => ['pc3_great_explosion', 'pc3', 63, 1],
+            '水の凶刃 (魔力15 × 3.2)' => ['pc1_water_fierce_blade', 'pc1', 40, 1],
+            'ツルの大槍 (魔力20 × 3.2)' => ['pc2_vine_spear', 'pc2', 56, 1],
+            '大爆発 (魔力20 × 4.5)' => ['pc3_great_explosion', 'pc3', 78, 1],
             '竜の息吹き (魔力20 × 2.4)' => ['pc3_dragon_breath', 'pc3', 42, 2],
             '流星群 (魔力20 × 1.7)' => ['pc4_meteor_shower', 'pc4', 29, 2],
         ];

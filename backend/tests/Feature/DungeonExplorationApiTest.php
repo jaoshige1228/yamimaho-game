@@ -124,7 +124,7 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertNotEmpty($slotId);
 
         $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
-        $potionId = ItemMaster::query()->where('code', 'potion_hp_s')->value('id');
+        $potionId = ItemMaster::query()->where('code', 'potion_mp_s')->value('id');
         $beforeQty = (int) (UserItem::query()
             ->where('user_id', $user->id)
             ->where('item_master_id', $potionId)
@@ -144,7 +144,7 @@ class DungeonExplorationApiTest extends TestCase
         $afterRoll->assertJsonPath('segment.kind', 'story');
         $afterRoll->assertJsonPath('segment.lines.0.text', fn ($text) => str_contains((string) $text, '開いた'));
         $afterRoll->assertJsonPath('segment.lines', fn ($lines) => collect($lines)->contains(
-            fn ($line) => str_contains((string) ($line['text'] ?? ''), 'HP回復薬'),
+            fn ($line) => str_contains((string) ($line['text'] ?? ''), 'MP回復薬'),
         ));
 
         $afterQty = (int) (UserItem::query()
