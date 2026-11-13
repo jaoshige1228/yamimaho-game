@@ -41,6 +41,7 @@ class MasterDataSeeder extends Seeder
                     'mag_bonus' => (int) $row['mag_bonus'],
                     'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
                     'price' => ($row['price'] ?? '') !== '' ? (int) $row['price'] : null,
+                    'unlock_floor' => (int) ($row['unlock_floor'] ?? 0),
                 ],
             );
         }
@@ -53,6 +54,7 @@ class MasterDataSeeder extends Seeder
                     'def_bonus' => (int) $row['def_bonus'],
                     'description' => ($row['description'] ?? '') !== '' ? $row['description'] : null,
                     'price' => ($row['price'] ?? '') !== '' ? (int) $row['price'] : null,
+                    'unlock_floor' => (int) ($row['unlock_floor'] ?? 0),
                 ],
             );
         }

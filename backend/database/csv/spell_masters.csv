@@ -47,9 +47,9 @@ rift_life_ward,命の加護,味方全体に加護を与える。戦闘不能に�
 rift_great_explosion,大爆発,火属性の強力な爆発。敵一体に特大ダメージ。,26,enemy_single,damage,fire,2.2,,,
 rift_ragaon_beat,ラグオンビート,闇魔法。敵の表皮に亀裂を走らせる。3ターンの間、敵一体の防御力を3段階下げる。,20,enemy_single,debuff_def,,,,def_down_3,
 rift_black_hole,ブラックホール,闇属性の重力球。敵全体に大ダメージ。,30,enemy_all,damage,dark,1.2,,,
-rift_evil_infinity,悪魔級殲滅魔法,悪魔級の殲滅魔法（イーヴィルインフィニティ）。詠唱を終えると、敵全体に超特大ダメージ。,99,enemy_all,damage,dark,2.6,,,
+rift_evil_infinity,悪魔級殲滅魔法,悪魔級の殲滅魔法（イーヴィルインフィニティ）。詠唱を終えると、敵全体に超特大ダメージ。,99,enemy_all,damage,dark,3.12,,,
 rift_resentment_melody,怨恨の旋律,怨みの旋律を奏でる。3ターンの間、敵全体の防御力を2段階下げる。,24,enemy_all,debuff_def,,,,def_down_2,skill
-rift_counter_melody,逆襲の旋律,逆襲の旋律を奏でる。3ターンの間、味方全体の攻撃力を2段階上げる。,24,ally_all,buff,,,,atk_up_2,skill
+rift_counter_melody,逆襲の旋律,逆襲の旋律を奏でる。3ターンの間、味方全体の攻撃力を1段階上げる。,24,ally_all,buff,,,,atk_up_1,skill
 rift_world_tree_drop,宇宙樹の雫,ユグドラシルの雫を感じる。戦闘不能になった味方一体を確実にHP半分で蘇生する。,40,ally_single,revive_chance,,,100,,
 rift_vine_whip,ツルの鞭,木のツルで打つ。敵一体にダメージ。,8,enemy_single,damage,wood,1.0,,,
 rift_vine_spear,ツルの大槍,木のツルを槍のように束ねて突く。敵一体に大ダメージ。,14,enemy_single,damage,wood,2.0,,,

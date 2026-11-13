@@ -3,9 +3,19 @@ import { publicAssetUrl } from '../../utils/publicAssetUrl.js';
 
 const catSrc = publicAssetUrl('/assets/characters/advice_cat.webp');
 
+// 2 文あるセリフは、文の区切りで改行する（\n。white-space: pre-line）
 const ADVICE_LINES = [
-  'HPやMPがきつくなってきたら、潔く撤退するのも一つの手だ。',
-  '能力判定には現在HPの倍率が掛かるんだ。\nつまりHPが低いほど成功率が下がるぞ。',
+  'ダンジョン内での能力判定には、現在HPの倍率が掛かるんだ。\nつまりHPが減ってるほど成功率が下がるぞ。',
+  '撤退すれば所持金が少し減るけど、HPとMPは全回復する。\nしんどくなったら撤退もアリだな。',
+  'みんなのデフォルトの回避率は5%だ。\n敵の通常攻撃や魔法が外れたんだとしたら、クリティカルが出たってことだな。',
+  '敵から逃げるのは100%成功するぞ。\nただ、ボス戦では逃げられないから要注意だ。',
+  '……zzz',
+  '層を突破すると武具屋のラインナップが更新されるぞ。',
+  '防御や攻撃のバフ/デバフは最大3段階まで重ねがけ可能だ。\n回避バフだけは重ねがけできないぞ。',
+  'こぶしとキックは筋力、魔法は魔力によって威力が決まるぞ。',
+  '素早さは行動順にだけ影響する。\n回避とかには特に関係がないな。',
+  '体力、知力、精神力は戦闘では特に影響しないぞ。',
+  'ブラウザバックは結構バグるから、あんまりしないでくれ。',
 ];
 
 // 画面に入ったとき（このコンポーネントが作られたとき）に 1 回だけ抽選する。
@@ -58,10 +68,9 @@ const line = ADVICE_LINES[Math.floor(Math.random() * ADVICE_LINES.length)];
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.5);
   color: #f8f4ff;
-  /* 狭い画面でも、1 文が 1 行に収まりやすいように、画面幅に合わせて少し小さくする */
+  /* 狭い画面でも読みやすいように、画面幅に合わせて少し小さくする。フォントは指定しない（ページの既定のフォント） */
   font-size: clamp(0.72rem, 3.25vw, 0.8rem);
   line-height: 1.5;
-  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   white-space: pre-line;
   text-wrap: pretty;
 }

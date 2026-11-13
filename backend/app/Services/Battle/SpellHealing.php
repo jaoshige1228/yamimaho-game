@@ -12,7 +12,7 @@ final class SpellHealing
      * coefficient が空の魔法は config/battle.php の heal_mag_multiplier を使う。
      *
      * レベルによる補正（config/battle.php の heal_mag_level_penalty）: 詠唱者が $casterCode のキャラで、
-     * レベルが min_level 以上なら、回復量に multiplier を掛ける（サフィリアは Lv20 以上で 0.75 倍）。
+     * レベルが min_level 以上なら、回復量に multiplier を掛ける（サフィリアは Lv22 以上で 0.75 倍）。
      * 全回復（heal_full）・蘇生は回復量の式を通らないので、この補正は受けない。
      *
      * @param  array<string, mixed>  $spell

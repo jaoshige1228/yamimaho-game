@@ -6,6 +6,8 @@ use App\Models\ArmorMaster;
 use App\Models\User;
 use App\Models\UserCharacter;
 use App\Models\WeaponMaster;
+use App\Services\Dungeon\DungeonProgressService;
+use Illuminate\Database\Eloquent\Collection;
 
 class EquipmentShopService
 {
@@ -14,7 +16,34 @@ class EquipmentShopService
         private readonly PartyGoldService $gold = new PartyGoldService,
         private readonly EquipmentOwnershipService $ownership = new EquipmentOwnershipService,
         private readonly EquipmentService $equipment = new EquipmentService,
+        private readonly DungeonProgressService $progress = new DungeonProgressService,
     ) {}
+
+    /**
+     * 売り物の条件: 価格が付いていて、必要な層（unlock_floor）を突破していること。
+     * 層を突破するごとに、熟練（1 層）・大魔導（2 層）・究極（3 層）のシリーズが並ぶ。
+     *
+     * @param  class-string<WeaponMaster|ArmorMaster>  $model
+     * @return Collection<int, WeaponMaster|ArmorMaster>
+     */
+    private function onSale(string $model, int $clearedFloor): Collection
+    {
+        return $model::query()
+            ->whereNotNull('price')
+            ->where('price', '>', 0)
+            ->where('unlock_floor', '<=', $clearedFloor)
+            ->orderBy('price')
+            ->get();
+    }
+
+    /** 買えるか（価格が付いていて、必要な層を突破している）。 */
+    private function isPurchasable(WeaponMaster|ArmorMaster|null $item, int $clearedFloor): bool
+    {
+        return $item !== null
+            && $item->price !== null
+            && $item->price > 0
+            && (int) $item->unlock_floor <= $clearedFloor;
+    }
 
     /**
      * @return array<string, mixed>
@@ -22,16 +51,9 @@ class EquipmentShopService
     public function catalog(User $user): array
     {
         $party = $this->characters->partyInSlotOrder($user);
-        $weapons = WeaponMaster::query()
-            ->whereNotNull('price')
-            ->where('price', '>', 0)
-            ->orderBy('price')
-            ->get();
-        $armors = ArmorMaster::query()
-            ->whereNotNull('price')
-            ->where('price', '>', 0)
-            ->orderBy('price')
-            ->get();
+        $clearedFloor = $this->progress->getClearedFloor($user);
+        $weapons = $this->onSale(WeaponMaster::class, $clearedFloor);
+        $armors = $this->onSale(ArmorMaster::class, $clearedFloor);
 
         $characters = [];
         foreach ($party as $slotId => $character) {
@@ -83,7 +105,7 @@ class EquipmentShopService
 
         if ($kind === 'weapon') {
             $weapon = WeaponMaster::query()->where('code', $code)->first();
-            if ($weapon === null || $weapon->price === null || $weapon->price <= 0) {
+            if (! $this->isPurchasable($weapon, $this->progress->getClearedFloor($user))) {
                 throw new \InvalidArgumentException('この武器は購入できません。');
             }
             if ($this->ownership->ownsWeapon($character, $code)) {
@@ -104,7 +126,7 @@ class EquipmentShopService
 
         if ($kind === 'armor') {
             $armor = ArmorMaster::query()->where('code', $code)->first();
-            if ($armor === null || $armor->price === null || $armor->price <= 0) {
+            if (! $this->isPurchasable($armor, $this->progress->getClearedFloor($user))) {
                 throw new \InvalidArgumentException('この防具は購入できません。');
             }
             if ($this->ownership->ownsArmor($character, $code)) {

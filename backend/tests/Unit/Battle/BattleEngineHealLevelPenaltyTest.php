@@ -9,7 +9,7 @@ use App\Services\MasterData\MasterDataProvider;
 use Tests\TestCase;
 
 /**
- * サフィリア（pc1）は Lv20 以上のとき、回復魔法（heal_mag）の回復量が 0.75 倍。
+ * サフィリア（pc1）は Lv22 以上のとき、回復魔法（heal_mag）の回復量が 0.75 倍。
  * 全回復（精霊の水）・ほかのキャラの回復魔法には関係ない。
  */
 class BattleEngineHealLevelPenaltyTest extends TestCase
@@ -24,27 +24,27 @@ class BattleEngineHealLevelPenaltyTest extends TestCase
         );
     }
 
-    public function test_the_penalty_is_configured_for_saphiria_from_level_20(): void
+    public function test_the_penalty_is_configured_for_saphiria_from_level_22(): void
     {
-        $this->assertSame(['min_level' => 20, 'multiplier' => 0.75], config('battle.heal_mag_level_penalty.pc1'));
+        $this->assertSame(['min_level' => 22, 'multiplier' => 0.75], config('battle.heal_mag_level_penalty.pc1'));
         $this->assertNull(config('battle.heal_mag_level_penalty.pc2'));
     }
 
-    public function test_heal_amount_formula_applies_the_penalty_from_level_20_only_to_saphiria(): void
+    public function test_heal_amount_formula_applies_the_penalty_from_level_22_only_to_saphiria(): void
     {
         $holy = (new MasterDataProvider)->findSpell('pc1_holy_water'); // 倍率 2.5
 
         $this->assertSame(250, SpellHealing::healMagAmount(100.0, $holy));
-        $this->assertSame(250, SpellHealing::healMagAmount(100.0, $holy, 'pc1', 19));
-        $this->assertSame(187, SpellHealing::healMagAmount(100.0, $holy, 'pc1', 20), '250 × 0.75 = 187.5 の切り捨て');
+        $this->assertSame(250, SpellHealing::healMagAmount(100.0, $holy, 'pc1', 21));
+        $this->assertSame(187, SpellHealing::healMagAmount(100.0, $holy, 'pc1', 22), '250 × 0.75 = 187.5 の切り捨て');
         $this->assertSame(187, SpellHealing::healMagAmount(100.0, $holy, 'pc1', 50));
         $this->assertSame(250, SpellHealing::healMagAmount(100.0, $holy, 'pc2', 30), 'サフィリア以外は変わらない');
         $this->assertSame(250, SpellHealing::healMagAmount(100.0, $holy, null, 30));
     }
 
-    public function test_saphiria_heals_less_in_battle_from_level_20(): void
+    public function test_saphiria_heals_less_in_battle_from_level_22(): void
     {
-        foreach ([[19, 250], [20, 187], [30, 187]] as [$level, $expected]) {
+        foreach ([[20, 250], [21, 250], [22, 187], [30, 187]] as [$level, $expected]) {
             $state = $this->state('pc1', 'pc1_holy_water', $level);
             $state['units']['pc2']['hp'] = 100;
 
@@ -58,12 +58,12 @@ class BattleEngineHealLevelPenaltyTest extends TestCase
     public function test_every_saphiria_heal_mag_spell_is_reduced_including_the_all_ally_one(): void
     {
         // 癒しの水 1.7 → 127.5 切り捨て 127 / 精霊の虹 2.2（味方全体）→ 165
-        $state = $this->state('pc1', 'pc1_heal_water', 20);
+        $state = $this->state('pc1', 'pc1_heal_water', 22);
         $state['units']['pc2']['hp'] = 100;
         $result = $this->engine()->applyPlayerAction($state, 'pc1', 'spell', 'pc1_heal_water', 'pc2');
         $this->assertSame(127, collect($result['events'])->firstWhere('type', 'heal')['value']);
 
-        $state = $this->state('pc1', 'pc1_spirit_rainbow', 20);
+        $state = $this->state('pc1', 'pc1_spirit_rainbow', 22);
         $state['units']['pc2']['hp'] = 100;
         $state['units']['pc3']['hp'] = 100;
         $result = $this->engine()->applyPlayerAction($state, 'pc1', 'spell', 'pc1_spirit_rainbow');

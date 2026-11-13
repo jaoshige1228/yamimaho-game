@@ -191,7 +191,7 @@ class DungeonHealApiTest extends TestCase
         $this->assertSame(100, $party['mp']);
     }
 
-    public function test_saphiria_heal_spell_is_reduced_to_75_percent_from_level_20_in_the_dungeon(): void
+    public function test_saphiria_heal_spell_is_reduced_to_75_percent_from_level_22_in_the_dungeon(): void
     {
         $this->postJson('/api/battles/demo')->assertOk();
         BattleState::query()->delete();
@@ -206,7 +206,7 @@ class DungeonHealApiTest extends TestCase
         $byCode('pc3')->update(['level' => 30]);
         $mag = (float) app(\App\Services\Player\EquipmentService::class)->effectiveCombatStats($byCode('pc1'))['mag'];
 
-        foreach ([[19, 1.0], [20, 0.75]] as [$level, $penalty]) {
+        foreach ([[21, 1.0], [22, 0.75]] as [$level, $penalty]) {
             $byCode('pc1')->update(['level' => $level, 'mp' => 50]);
             $byCode('pc3')->update(['hp' => 10]);
             $expected = (int) floor($mag * 1.7 * $penalty);

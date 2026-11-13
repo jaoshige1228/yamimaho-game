@@ -369,7 +369,7 @@ class BattleEngine
         $text = $this->chargeMessage($skillCode, 'start', $name);
         $state['log'][] = $text;
 
-        return [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null)];
+        return [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null, enemySkill: true)];
     }
 
     /**
@@ -389,14 +389,14 @@ class BattleEngine
             $text = $this->chargeMessage($skillCode, 'chant', $name);
             $state['log'][] = $text;
 
-            return [$this->announceEvent($actorId, $text)];
+            return [$this->announceEvent($actorId, $text, enemySkill: true)];
         }
 
         unset($state['units'][$actorId]['charge']);
         $spell = $this->factory->findSpell($skillCode);
         $text = $this->chargeMessage($skillCode, 'fire', $name);
         $state['log'][] = $text;
-        $events = [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null)];
+        $events = [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null, enemySkill: true)];
         foreach ($this->resolveEnemySpellTargets($spell, $state['units'], $actorId) as $tid) {
             $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $skillCode));
         }
@@ -439,7 +439,7 @@ class BattleEngine
         }
 
         // 魔法は「〜は〜を唱えた！」だけを告知する（技名の告知と重なるため出さない）
-        $events = $actionType === 'spell' ? [] : [$this->announceEvent($actorId, $announceText)];
+        $events = $actionType === 'spell' ? [] : [$this->announceEvent($actorId, $announceText, enemySkill: $skill['skill_code'] !== 'attack')];
 
         if ($targetType === 'ally_all') {
             foreach ($this->resolveEnemySkillTargets('ally_all', $state['units']) as $tid) {
@@ -479,6 +479,7 @@ class BattleEngine
                 $this->spellAnnounceText($actor['name'], $spell),
                 isset($spell['element']) && $spell['element'] !== '' ? (string) $spell['element'] : null,
                 isset($spell['effect']) && $spell['effect'] !== '' ? (string) $spell['effect'] : null,
+                enemySkill: true,
             );
 
             foreach ($targets as $tid) {
@@ -1408,8 +1409,13 @@ class BattleEngine
         string $text,
         ?string $spellElement = null,
         ?string $spellEffect = null,
+        bool $enemySkill = false,
     ): array {
         $event = ['type' => 'announce', 'actor' => $actorId, 'text' => $text];
+        // 敵の通常攻撃以外の技・魔法の告知。画面は、この告知を長めに残し、効果が出るまでの間も少し長くする
+        if ($enemySkill) {
+            $event['skill'] = true;
+        }
         if ($spellElement !== null && $spellElement !== '') {
             $event['spell_element'] = $spellElement;
         }

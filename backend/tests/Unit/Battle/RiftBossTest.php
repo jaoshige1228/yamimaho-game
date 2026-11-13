@@ -112,7 +112,7 @@ class RiftBossTest extends TestCase
         $this->assertSame(['enemy_all', 'damage'], [$spell('rift_evil_infinity')['target_type'], $spell('rift_evil_infinity')['effect']]);
         $this->assertGreaterThan($spell('rift_black_hole')['coefficient'], $spell('rift_evil_infinity')['coefficient'] * 2, '超特大（大ダメージのブラックホールより上）');
         $this->assertSame(['enemy_all', 'debuff_def', 'def_down_2', 'skill'], [$spell('rift_resentment_melody')['target_type'], $spell('rift_resentment_melody')['effect'], $spell('rift_resentment_melody')['buff'], $spell('rift_resentment_melody')['cast_style']]);
-        $this->assertSame(['ally_all', 'buff', 'atk_up_2', 'skill'], [$spell('rift_counter_melody')['target_type'], $spell('rift_counter_melody')['effect'], $spell('rift_counter_melody')['buff'], $spell('rift_counter_melody')['cast_style']]);
+        $this->assertSame(['ally_all', 'buff', 'atk_up_1', 'skill'], [$spell('rift_counter_melody')['target_type'], $spell('rift_counter_melody')['effect'], $spell('rift_counter_melody')['buff'], $spell('rift_counter_melody')['cast_style']]);
         $this->assertSame(['ally_single', 'revive_chance', 100], [$spell('rift_world_tree_drop')['target_type'], $spell('rift_world_tree_drop')['effect'], $spell('rift_world_tree_drop')['power']]);
         $this->assertSame(['ally_single', 'heal_mag', 'skill'], [$spell('rift_quick_brew')['target_type'], $spell('rift_quick_brew')['effect'], $spell('rift_quick_brew')['cast_style']]);
         $this->assertSame(['ally_single', 'heal_mag'], [$spell('rift_spirit_water')['target_type'], $spell('rift_spirit_water')['effect']]);
@@ -229,6 +229,10 @@ class RiftBossTest extends TestCase
         $this->assertStringContainsString('唱え', $legend(7)[0]['text']);
         $this->assertStringNotContainsString('唱え', $legend(6)[0]['text']);
         $this->assertSame('dark', $legend(7)[0]['spell_element']);
+        // 詠唱の 3 つの告知も、敵の技の告知として、画面が長めに残す
+        foreach ([5, 6, 7] as $round) {
+            $this->assertTrue($legend($round)[0]['skill'], "{$round} ターン目の告知");
+        }
     }
 
     public function test_the_evil_spell_is_cancelled_when_the_legend_mage_is_defeated_while_chanting(): void
@@ -250,19 +254,18 @@ class RiftBossTest extends TestCase
         $this->assertNotContains('伝説の魔法使いは悪魔級殲滅魔法（イーヴィルインフィニティ）を唱え終えた！', $texts);
     }
 
-    public function test_the_evil_spell_leaves_a_full_hp_level_35_party_with_two_or_three_tenths(): void
+    public function test_the_evil_spell_is_heavy_but_never_lethal_for_a_full_hp_level_35_party(): void
     {
-        // 満タンのレベル35・フル装備のパーティーに、悪魔級殲滅魔法を撃つ。対策なしでも致命傷にならず、HP が 2〜3 割残る
-        $clean = $this->evilSpellRemainingRatios(defenseStage: 0);
-        foreach ($clean as $id => $ratio) {
-            $this->assertGreaterThanOrEqual(0.2, $ratio, "{$id} は耐える（致命傷にならない）");
-            $this->assertLessThanOrEqual(0.4, $ratio, "{$id} は HP の 6 割以上を失う（超特大ダメージ）");
+        // 満タンのレベル35・フル装備のパーティーに、悪魔級殲滅魔法を撃つ。対策なしでも致命傷にならない（魔力 ×0.9・威力 ×1.2 の調整後は、HP の約 3〜4 割が残る）
+        foreach ($this->evilSpellRemainingRatios(defenseStage: 0) as $id => $ratio) {
+            $this->assertGreaterThanOrEqual(0.25, $ratio, "{$id} は耐える（致命傷にならない）");
+            $this->assertLessThanOrEqual(0.45, $ratio, "{$id} は HP の 5 割以上を失う（超特大ダメージ）");
         }
 
-        // 実際の戦闘では、奏楽の怨恨の旋律（防御-2段階）が効いている。さらにラグオンビート（-3段階）が重なっても、耐える
+        // 実際の戦闘では、奏楽の怨恨の旋律（防御-2段階）が効いている。さらにラグオンビート（-3段階）が重なっても、ぎりぎり耐える（HP の約 1〜2 割が残る）
         foreach ([-2, -3] as $stage) {
             foreach ($this->evilSpellRemainingRatios(defenseStage: $stage) as $id => $ratio) {
-                $this->assertGreaterThanOrEqual(0.12, $ratio, "{$id}: 防御{$stage}段階でも耐える");
+                $this->assertGreaterThanOrEqual(0.08, $ratio, "{$id}: 防御{$stage}段階でも耐える");
                 $this->assertLessThanOrEqual(0.3, $ratio, "{$id}: 防御{$stage}段階では HP の 7 割以上を失う");
             }
         }
@@ -303,7 +306,7 @@ class RiftBossTest extends TestCase
         $state = $this->roundOf($engine, $result['state']);
         $result = $engine->runEnemyTurnsUntilPlayer($state); // 2 ターン目: 逆襲の旋律
         foreach (['enemy_1', 'enemy_2', 'enemy_3', 'enemy_4'] as $id) {
-            $this->assertSame(2, $this->stageSum($result['state']['units'][$id], 'atk'), "{$id} は攻撃 2 段階上昇");
+            $this->assertSame(1, $this->stageSum($result['state']['units'][$id], 'atk'), "{$id} は攻撃 1 段階上昇");
         }
     }
 

@@ -54,6 +54,16 @@ const actionBanners = ref([]);
 /** 使い魔の支援のバナー（顔つき）。同時に1つだけ */
 const familiarBanner = ref(null);
 const displayHp = ref({});
+/**
+ * バッジ（防御↑↓・攻撃↑↓・回避・加護・無敵）の表示用の状態。
+ * state は敵の行動などのイベントを再生する前に、先に最新になる。それをそのままバッジに出すと、敵の手番が始まった瞬間に
+ * 全員のバフ・デバフが一斉に付いて見える（戦闘開始直後から敵にバッジが付く）。そのため、イベントの再生に合わせて
+ * （魔法や特技を使ったと表示した時点で）バッジを付ける。再生が終わったら state に合わせる（持続が切れたものを消す）。
+ * @type {import('vue').Ref<Record<string, {buffs: Record<string, number>, stages: {def: number, atk: number}, damage_shield: boolean, life_ward: boolean}>>}
+ */
+const displayBadges = ref({});
+/** バッジの表示状態を決めたか（決める前は、バッジなしで描く。state の最新のバッジを一瞬でも出さないため） */
+const badgesReady = ref(false);
 /** 逃げて画面から消えた敵の ID（逃走イベントの再生に合わせて増える） */
 const fledIds = ref([]);
 /** @type {import('vue').Ref<'hidden' | 'entering' | 'ready'>} */
@@ -69,6 +79,13 @@ const resultStep = ref('rewards');
 
 const state = computed(() => battle.state);
 const units = computed(() => state.value?.units ?? []);
+/** 画面に出すユニット。バッジだけ、再生に合わせた表示用の状態に差し替える */
+const displayUnits = computed(() =>
+  units.value.map((unit) => {
+    const badges = badgesReady.value ? displayBadges.value[unit.id] : emptyBadges();
+    return badges ? { ...unit, ...badges } : unit;
+  }),
+);
 const currentActor = computed(() => state.value?.current_actor);
 const displayCurrentActor = computed(() => {
   if (busy.value && visualCurrentActor.value) {
@@ -355,12 +372,62 @@ function showFamiliarBanner(text, portrait, ms = FAMILIAR_BANNER_MS) {
   }, ms);
 }
 
-function showActionBanner(text) {
+/** 告知のバナーが出ている時間（ms）。EffectLayer.vue の .action-banner のアニメーションの長さと合わせる */
+const ACTION_BANNER_MS = 1100;
+/** 敵の通常攻撃以外の技・魔法の告知は、これだけ長く残す（ms）。.action-banner.is-long のアニメーションの長さと合わせる */
+const ENEMY_SKILL_BANNER_EXTRA_MS = 700;
+/** 敵の通常攻撃以外の技・魔法は、効果音と告知が出てから、ダメージ・効果が出るまでの間をこれだけ長くする（ms） */
+const ENEMY_SKILL_EFFECT_EXTRA_DELAY_MS = 200;
+
+function showActionBanner(text, long = false) {
   const id = `${Date.now()}-${Math.random()}`;
-  actionBanners.value = [{ id, text }];
+  actionBanners.value = [{ id, text, long }];
   setTimeout(() => {
     actionBanners.value = actionBanners.value.filter((b) => b.id !== id);
-  }, 1100);
+  }, long ? ACTION_BANNER_MS + ENEMY_SKILL_BANNER_EXTRA_MS : ACTION_BANNER_MS);
+}
+
+function emptyBadges() {
+  return { buffs: {}, stages: { def: 0, atk: 0 }, damage_shield: false, life_ward: false };
+}
+
+/** バッジの表示を、いまの state に合わせる（イベント再生が終わったあと・再読み込み時） */
+function syncDisplayBadges() {
+  displayBadges.value = Object.fromEntries(
+    units.value.map((unit) => [
+      unit.id,
+      {
+        buffs: { ...(unit.buffs ?? {}) },
+        stages: { def: unit.stages?.def ?? 0, atk: unit.stages?.atk ?? 0 },
+        damage_shield: Boolean(unit.damage_shield),
+        life_ward: Boolean(unit.life_ward),
+      },
+    ]),
+  );
+  badgesReady.value = true;
+}
+
+/** バッジの表示を、全員なし（戦闘の始まり）にする。そこからイベントの再生に合わせて付いていく */
+function resetDisplayBadges() {
+  displayBadges.value = Object.fromEntries(units.value.map((unit) => [unit.id, emptyBadges()]));
+  badgesReady.value = true;
+}
+
+/** buff_applied を再生したときに、そのユニットのバッジを付ける（防御・攻撃は段階を足す） */
+function applyBadgeForBuff(ev) {
+  const badges = displayBadges.value[ev.target];
+  if (!badges) return;
+  if (ev.stat) {
+    const current = badges.stages[ev.stat] ?? 0;
+    badges.stages[ev.stat] = Math.max(-3, Math.min(3, current + Number(ev.applied ?? ev.delta ?? 0)));
+  } else if (ev.buff) {
+    badges.buffs[ev.buff] = 3;
+  }
+}
+
+function setBadgeFlag(unitId, key, value) {
+  const badges = displayBadges.value[unitId];
+  if (badges) badges[key] = value;
 }
 
 function syncDisplayHp(force = false) {
@@ -460,14 +527,17 @@ async function playEvents(events) {
       await delay(120);
     }
     if (ev.type === 'announce') {
-      showActionBanner(ev.text);
+      // 敵の通常攻撃以外の技・魔法（「〇〇は△△を唱えた！」「〇〇の△△！」）は、文字を長く残し、効果が出るまでも少し長くする
+      const enemySkill = ev.skill === true;
+      const extraDelay = enemySkill ? ENEMY_SKILL_EFFECT_EXTRA_DELAY_MS : 0;
+      showActionBanner(ev.text, enemySkill);
       const isSpell = isSpellAnnounce(ev);
       if (isSpell) {
         showFlash(flashKindForSpellAnnounce(ev));
         playSe('magic');
-        await delay(SPELL_CAST_ANNOUNCE_DELAY_MS);
+        await delay(SPELL_CAST_ANNOUNCE_DELAY_MS + extraDelay);
       } else {
-        await delay(360);
+        await delay(360 + extraDelay);
       }
     }
     if (ev.type === 'miss') {
@@ -491,6 +561,7 @@ async function playEvents(events) {
       await delay(120);
     }
     if (ev.type === 'shield_break') {
+      setBadgeFlag(ev.target, 'damage_shield', false);
       showActionBanner('シールドが砕けた！');
       await showSupportEffect(ev.target, 'shield');
       await delay(120);
@@ -503,6 +574,7 @@ async function playEvents(events) {
       await delay(120);
     }
     if (ev.type === 'buff_applied') {
+      applyBadgeForBuff(ev);
       // 防御・攻撃は delta（段階。マイナスなら下がる）で、回避など delta の無い効果は常にバフ扱い
       const isDebuff = Number(ev.delta ?? 0) < 0;
       showFloatingSupport(ev.target, isDebuff ? '▼' : '▲', isDebuff ? 'debuff' : 'buff');
@@ -511,6 +583,7 @@ async function playEvents(events) {
       await delay(120);
     }
     if (ev.type === 'shield_applied') {
+      setBadgeFlag(ev.target, 'damage_shield', true);
       showFloatingSupport(ev.target, '盾', 'shield');
       playSe('success');
       await showSupportEffect(ev.target, 'shield');
@@ -528,12 +601,14 @@ async function playEvents(events) {
       await delay(FAMILIAR_BANNER_MS);
     }
     if (ev.type === 'life_ward_applied') {
+      setBadgeFlag(ev.target, 'life_ward', true);
       showFloatingSupport(ev.target, '加護', 'shield');
       playSe('success');
       await showSupportEffect(ev.target, 'shield');
       await delay(120);
     }
     if (ev.type === 'life_ward_triggered') {
+      setBadgeFlag(ev.target, 'life_ward', false);
       showActionBanner(`${unitName(ev.target)}は命の加護で踏みとどまった！`);
       playSe('success');
       await showSupportEffect(ev.target, 'shield');
@@ -655,6 +730,12 @@ async function initBattle() {
       partyPhase.value = 'hidden';
     }
     syncDisplayHp(true);
+    // 再生するイベントがあるのは新しい戦闘（バッジなしから、再生に合わせて付いていく）。なければ途中からなので state に合わせる
+    if (battle.pendingEvents.length > 0) {
+      resetDisplayBadges();
+    } else {
+      syncDisplayBadges();
+    }
     await tryPlayBgm({ restart: startedNew });
     if (playPartyEntrance) {
       await runPartyEntrance();
@@ -665,6 +746,7 @@ async function initBattle() {
     }
     await playEvents(events);
     syncDisplayHp(true);
+    syncDisplayBadges();
     syncFledDisplay();
   } catch (e) {
     battle.error = e.message;
@@ -683,6 +765,7 @@ async function afterAction() {
     const events = battle.dequeueEvents();
     await playEvents(events);
     syncDisplayHp(true);
+    syncDisplayBadges();
     syncFledDisplay();
     if (state.value?.status === 'fled') {
       leaveBattleFled();
@@ -780,6 +863,7 @@ async function retry() {
     await battle.startDemo();
     router.replace({ name: 'battle', params: { id: battle.battleId } });
     syncDisplayHp(true);
+    resetDisplayBadges();
     await tryPlayBgm({ restart: true });
     await runPartyEntrance();
     const events = battle.dequeueEvents();
@@ -788,6 +872,7 @@ async function retry() {
     }
     await playEvents(events);
     syncDisplayHp(true);
+    syncDisplayBadges();
     syncFledDisplay();
   } catch (e) {
     battle.error = e.message;
@@ -865,7 +950,7 @@ watch(
 
     <main v-if="state" class="battle-stage">
       <BattleField
-        :units="units"
+        :units="displayUnits"
         :display-hp="displayHp"
         :buff-icons="buffIcons"
         :party-phase="partyPhase"

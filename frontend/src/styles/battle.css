@@ -81,6 +81,26 @@
   }
 }
 
+/* bannerPop と同じ出る・消える速さで、表示したままの時間だけ長い（1.8 秒。出る 0.16 秒・消える 0.27 秒） */
+@keyframes bannerPopLong {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.9);
+  }
+  9% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.05);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.95);
+  }
+}
+
 @keyframes flashWater {
   0% {
     background: rgba(80, 160, 255, 0.55);

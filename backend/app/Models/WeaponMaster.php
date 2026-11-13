@@ -14,6 +14,7 @@ class WeaponMaster extends Model
         'mag_bonus',
         'description',
         'price',
+        'unlock_floor',
     ];
 
     /** @return HasMany<UserCharacter, $this> */

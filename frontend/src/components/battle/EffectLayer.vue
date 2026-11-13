@@ -22,6 +22,7 @@ function portraitSrc(portrait) {
       v-for="b in actionBanners"
       :key="b.id"
       class="action-banner"
+      :class="{ 'is-long': b.long }"
     >
       {{ b.text }}
     </div>
@@ -125,6 +126,10 @@ function portraitSrc(portrait) {
   line-height: 1.35;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
   animation: bannerPop 1.1s ease forwards;
+}
+/* 敵の通常攻撃以外の技・魔法の告知は、1.1 秒 + 0.7 秒 = 1.8 秒残す（出る・消える速さは同じで、表示したままの時間だけ延ばす） */
+.action-banner.is-long {
+  animation: bannerPopLong 1.8s ease forwards;
 }
 /* 使い魔の支援: 戦場の上のほうに、左端に使い魔の顔が少しはみ出す幅広のバナー */
 .familiar-banner {
