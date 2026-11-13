@@ -57,7 +57,7 @@ class BattleEngineHealLevelPenaltyTest extends TestCase
 
     public function test_every_saphiria_heal_mag_spell_is_reduced_including_the_all_ally_one(): void
     {
-        // 癒しの水 1.7 → 127.5 切り捨て 127 / 精霊の虹 2.2（味方全体）→ 165
+        // 癒しの水 1.7 → 127.5 切り捨て 127 / 精霊の虹 1.87（味方全体）→ 140.25 切り捨て 140
         $state = $this->state('pc1', 'pc1_heal_water', 22);
         $state['units']['pc2']['hp'] = 100;
         $result = $this->engine()->applyPlayerAction($state, 'pc1', 'spell', 'pc1_heal_water', 'pc2');
@@ -68,7 +68,7 @@ class BattleEngineHealLevelPenaltyTest extends TestCase
         $state['units']['pc3']['hp'] = 100;
         $result = $this->engine()->applyPlayerAction($state, 'pc1', 'spell', 'pc1_spirit_rainbow');
         $this->assertSame(
-            ['pc2' => 165, 'pc3' => 165],
+            ['pc2' => 140, 'pc3' => 140],
             collect($result['events'])->where('type', 'heal')->pluck('value', 'target')->all(),
         );
     }

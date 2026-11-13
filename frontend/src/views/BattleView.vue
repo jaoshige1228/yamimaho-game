@@ -125,6 +125,9 @@ const isBossBattle = computed(
     || route.query.mid_boss === '1',
 );
 
+/** 空間の裂け目のボス戦（4人の魔法使い）。敵の魔法の詠唱に専用の効果音を鳴らす */
+const isRiftBattle = computed(() => state.value?.meta?.rift === true);
+
 const floor1BossSprite = computed(
   () => state.value?.meta?.boss === true && Number(state.value?.meta?.floor) === 1,
 );
@@ -534,7 +537,8 @@ async function playEvents(events) {
       const isSpell = isSpellAnnounce(ev);
       if (isSpell) {
         showFlash(flashKindForSpellAnnounce(ev));
-        playSe('magic');
+        // 裂け目のボス戦だけ、敵の詠唱は専用の音（PC の詠唱や、ほかの戦闘の敵は今までどおり magic）
+        playSe(isRiftBattle.value && String(ev.actor).startsWith('enemy') ? 'enemy_magic' : 'magic');
         await delay(SPELL_CAST_ANNOUNCE_DELAY_MS + extraDelay);
       } else {
         await delay(360 + extraDelay);
@@ -553,6 +557,10 @@ async function playEvents(events) {
       playSe('damage');
       await delay(300);
       applyDisplayHpDelta(ev.target, -ev.value);
+      // 戦闘不能になった（表示 HP が 0 になった）ユニットは、バフ・デバフのバッジがすべて消える（サーバーの state も同じ）
+      if ((displayHp.value[ev.target] ?? 1) <= 0 && displayBadges.value[ev.target]) {
+        displayBadges.value[ev.target] = emptyBadges();
+      }
       shakeTarget.value = null;
       if (ev.instant_death) {
         showActionBanner('即死！');
@@ -578,7 +586,8 @@ async function playEvents(events) {
       // 防御・攻撃は delta（段階。マイナスなら下がる）で、回避など delta の無い効果は常にバフ扱い
       const isDebuff = Number(ev.delta ?? 0) < 0;
       showFloatingSupport(ev.target, isDebuff ? '▼' : '▲', isDebuff ? 'debuff' : 'buff');
-      playSe('success');
+      // PC にデバフが入ったときは、成功の音ではなくデバフの音を鳴らす
+      playSe(isDebuff && !String(ev.target).startsWith('enemy') ? 'debahu' : 'success');
       await showSupportEffect(ev.target, isDebuff ? 'debuff' : 'buff');
       await delay(120);
     }

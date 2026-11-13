@@ -231,7 +231,8 @@ class DungeonExplorationService
                         $floor,
                         $step,
                         $codes,
-                        (bool) ($segment['rift'] ?? false) ? ['rift' => true] : [],
+                        // 空間の裂け目の戦闘は、専用の BGM（last_boss.mp3）。meta.bgm の値は frontend の BGM_TRACKS のキー
+                        (bool) ($segment['rift'] ?? false) ? ['rift' => true, 'bgm' => 'last_boss'] : [],
                     ),
                     ['party' => $this->partyPayload($user)],
                 );

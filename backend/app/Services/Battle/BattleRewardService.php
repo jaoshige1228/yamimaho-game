@@ -50,11 +50,8 @@ class BattleRewardService
                 $character->mp = max(0, (int) ($unit['mp'] ?? 0));
                 $character->save();
 
-                // 経験値は、戦闘終了時に生きている味方だけに入る
-                if (! ($unit['alive'] ?? false)) {
-                    continue;
-                }
-
+                // 経験値は、戦闘不能のまま戦闘を終えた味方にも入る。上の保存で HP は 0 になっているので、
+                // レベルアップしても（最大HPの増加分が足されても）復活しない（LevelGrowthService::grantExp）
                 if ($expEach > 0) {
                     $levelEvents = $this->growth->grantExp($character, $expEach);
                     $character->save();

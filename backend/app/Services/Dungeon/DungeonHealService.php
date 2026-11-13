@@ -112,7 +112,7 @@ class DungeonHealService
             throw new \InvalidArgumentException('回復できる対象がいません。');
         }
 
-        DB::transaction(function () use ($caster, $targets, $spell, $effect, $mpCost): void {
+        DB::transaction(function () use ($caster, $targets, $spell, $spellId, $effect, $mpCost): void {
             foreach ($targets as $member) {
                 $maxHp = $this->growth->statsForCharacter($member)['hp'];
                 match ($effect) {
@@ -120,7 +120,7 @@ class DungeonHealService
                         $member,
                         $maxHp,
                         // 戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する
-                        SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell, $caster->characterMaster->code, (int) $caster->level),
+                        SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($caster)['mag'], $spell, $caster->characterMaster->code, (int) $caster->level, $spellId),
                     ),
                     'heal' => $this->applyHpHeal($member, $maxHp, (int) ($spell['power'] ?? 0)),
                     'heal_full' => $this->applyHpHeal($member, $maxHp, $maxHp),
@@ -170,7 +170,7 @@ class DungeonHealService
                         && $character->mp >= (int) ($spell['mp_cost'] ?? 0),
                     // 画面に出す「回復量の見込み」。戦闘中と同じく、武器の魔力ボーナスを含む実効魔力で計算する。全回復・蘇生は null
                     'amount' => match ($effect) {
-                        'heal_mag' => SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($character)['mag'], $spell, $character->characterMaster->code, (int) $character->level),
+                        'heal_mag' => SpellHealing::healMagAmount((float) $this->equipment->effectiveCombatStats($character)['mag'], $spell, $character->characterMaster->code, (int) $character->level, $spellId),
                         'heal' => (int) ($spell['power'] ?? 0),
                         default => null,
                     },

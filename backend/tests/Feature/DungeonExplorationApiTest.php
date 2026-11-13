@@ -572,6 +572,7 @@ class DungeonExplorationApiTest extends TestCase
         );
         $this->assertTrue($state['meta']['boss']);
         $this->assertTrue($state['meta']['rift']);
+        $this->assertSame('last_boss', $state['meta']['bgm'], '裂け目のボス戦の BGM（last_boss.mp3）。どの層から入っても同じ');
         $this->assertFalse($state['meta']['can_flee']);
         $this->assertSame($expectedFloor, (int) $state['meta']['floor']);
     }

@@ -10,6 +10,9 @@ namespace App\Services\Battle;
  */
 class FamiliarSupport
 {
+    /** 行動の weight が config に無いときの値（config/familiar.php の actions.*.weight） */
+    private const DEFAULT_WEIGHT = 10;
+
     /** @var (callable(int, int): int)|null */
     private $roll;
 
@@ -100,7 +103,8 @@ class FamiliarSupport
      *
      * 1. Lv9 で戦闘不能の味方がいれば、必ず蘇生
      * 2. 攻撃バフが使える かつ 傷ついている味方がいない かつ 生存している味方の誰にもバフが付いていない → 必ず攻撃バフ
-     * 3. それ以外は、解放済みで成立する行動からランダムに1つ（回復は傷ついた味方がいるときだけ）
+     * 3. それ以外は、解放済みで成立する行動から、weight の比で1つ選ぶ（回復は傷ついた味方がいるときだけ）。
+     *    単体回復の対象は、傷ついた味方のうち HP の割合がいちばん低い1人
      *
      * @param  array<string, array<string, mixed>>  $units
      * @return array{action: string, kind: string, targets: list<string>, portrait: string}|null
@@ -146,11 +150,11 @@ class FamiliarSupport
                 return null;
             }
 
-            $chosen = $this->pick($options);
+            $chosen = $this->pickWeighted($options, $actions);
             $action = $actions[$chosen];
             $targets = match ($action['kind']) {
                 'damage' => $action['scope'] === 'all' ? $enemies : [$this->pick($enemies)],
-                'heal' => $action['scope'] === 'all' ? $aliveAllies : [$this->pick($woundedAllies)],
+                'heal' => $action['scope'] === 'all' ? $aliveAllies : [$this->mostWounded($units, $woundedAllies)],
                 default => $aliveAllies,
             };
         }
@@ -196,6 +200,59 @@ class FamiliarSupport
         }
 
         return false;
+    }
+
+    /**
+     * 選択肢を、config/familiar.php の actions.*.weight の比で1つ選ぶ（weight が大きいほど選ばれやすい）。
+     * 乱数は 1〜weight の合計の整数を1回だけ使い、選択肢の並び順に weight を数えていって、当たった行動を選ぶ。
+     *
+     * @param  list<string>  $names  選択肢（actions のキー）
+     * @param  array<string, array<string, mixed>>  $actions
+     */
+    private function pickWeighted(array $names, array $actions): string
+    {
+        $names = array_values($names);
+        $weights = array_map(
+            fn (string $name): int => max(1, (int) ($actions[$name]['weight'] ?? self::DEFAULT_WEIGHT)),
+            $names,
+        );
+
+        $point = $this->roll(1, array_sum($weights));
+        foreach ($names as $i => $name) {
+            $point -= $weights[$i];
+            if ($point <= 0) {
+                return $name;
+            }
+        }
+
+        return $names[array_key_last($names)];
+    }
+
+    /**
+     * 傷ついた味方のうち、いちばん傷ついている1人（HP の割合 = 現在HP ÷ 最大HP が最も低い人）。
+     * 割合が同じなら失った HP が多い人、それも同じなら先に並んでいる人。
+     *
+     * @param  array<string, array<string, mixed>>  $units
+     * @param  list<string>  $woundedIds  傷ついている生存者の ID（1人以上）
+     */
+    private function mostWounded(array $units, array $woundedIds): string
+    {
+        $best = $woundedIds[0];
+        foreach (array_slice($woundedIds, 1) as $id) {
+            $hp = (int) $units[$id]['hp'];
+            $max = max(1, (int) $units[$id]['max_hp']);
+            $bestHp = (int) $units[$best]['hp'];
+            $bestMax = max(1, (int) $units[$best]['max_hp']);
+
+            // 割合の比較は、分数のまま掛け算で行う（hp/max < bestHp/bestMax ⇔ hp×bestMax < bestHp×max）
+            $left = $hp * $bestMax;
+            $right = $bestHp * $max;
+            if ($left < $right || ($left === $right && ($max - $hp) > ($bestMax - $bestHp))) {
+                $best = $id;
+            }
+        }
+
+        return $best;
     }
 
     /**

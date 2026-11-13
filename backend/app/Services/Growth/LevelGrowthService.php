@@ -116,6 +116,12 @@ class LevelGrowthService
     }
 
     /**
+     * 経験値を足して、閾値を超えた分だけレベルを上げる。
+     *
+     * レベルが上がると最大HP・最大MPが増え、現在のHP・MPも増加分だけ増える（実質的な回復）。
+     * ただし**戦闘不能（HP 0）のキャラは、HP を 0 のまま**にする（レベルアップで復活しない）。
+     * 戦闘不能のキャラの最大HPは増えるので、蘇生したときにその分が反映される。MP は生きているキャラと同じく増加分が足される。
+     *
      * @return list<array<string, mixed>>
      */
     public function grantExp(UserCharacter $character, int $amount): array
@@ -127,6 +133,8 @@ class LevelGrowthService
         $character->exp += $amount;
         $events = [];
         $master = $character->characterMaster;
+        // 経験値を足す前に、戦闘不能（HP 0）かを見ておく（レベルアップの途中で HP が増えても、判定は変わらない）
+        $isDown = (int) $character->hp <= 0;
         $maxLevel = $this->levels->maxLevel();
 
         while ($character->level < $maxLevel) {
@@ -139,7 +147,9 @@ class LevelGrowthService
             $character->level = $nextLevel;
             $after = $this->statsForCharacter($character);
 
-            $character->hp = min($after['hp'], $character->hp + max(0, $after['hp'] - $before['hp']));
+            $character->hp = $isDown
+                ? 0
+                : min($after['hp'], $character->hp + max(0, $after['hp'] - $before['hp']));
             $character->mp = min($after['mp'], $character->mp + max(0, $after['mp'] - $before['mp']));
             $character->str = $after['str'];
             $character->mag = $after['mag'];

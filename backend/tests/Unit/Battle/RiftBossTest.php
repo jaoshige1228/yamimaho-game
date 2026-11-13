@@ -195,7 +195,7 @@ class RiftBossTest extends TestCase
         $this->assertFalse($hit['state']['units']['enemy_4']['life_ward']);
     }
 
-    public function test_the_legend_mage_starts_the_evil_spell_on_turn_5_and_fires_on_turn_7(): void
+    public function test_the_legend_mage_starts_the_evil_spell_on_turn_4_and_fires_on_turn_6(): void
     {
         $engine = $this->engine();
         $state = $this->realState();
@@ -207,37 +207,37 @@ class RiftBossTest extends TestCase
         ));
         $normal = ['伝説の魔法使いは大爆発を唱えた！', '伝説の魔法使いはラグオンビートを唱えた！', '伝説の魔法使いはブラックホールを唱えた！'];
 
-        foreach ([1, 2, 3, 4, 8, 9] as $round) {
+        foreach ([1, 2, 3, 7, 8, 9] as $round) {
             $this->assertContains($legend($round)[0]['text'], $normal, "{$round} ターン目は通常の魔法");
         }
-        $this->assertSame('伝説の魔法使いはおぞましい魔法を唱えようとしている……。', $legend(5)[0]['text']);
-        $this->assertSame('伝説の魔法使いはおぞましい魔法を詠唱し始めた！', $legend(6)[0]['text']);
-        $this->assertSame('伝説の魔法使いは悪魔級殲滅魔法（イーヴィルインフィニティ）を唱え終えた！', $legend(7)[0]['text']);
+        $this->assertSame('伝説の魔法使いはおぞましい魔法を唱えようとしている……。', $legend(4)[0]['text']);
+        $this->assertSame('伝説の魔法使いはおぞましい魔法を詠唱し始めた！', $legend(5)[0]['text']);
+        $this->assertSame('伝説の魔法使いは悪魔級殲滅魔法（イーヴィルインフィニティ）を唱え終えた！', $legend(6)[0]['text']);
 
-        // 5・6 ターン目は、ほかの行動をしない（ダメージも出さない）。7 ターン目に生きている味方全員へダメージ
-        foreach ([5, 6] as $round) {
+        // 4・5 ターン目は、ほかの行動をしない（ダメージも出さない）。6 ターン目に生きている味方全員へダメージ
+        foreach ([4, 5] as $round) {
             $this->assertCount(1, $legend($round), "{$round} ターン目は告知 1 つだけ");
             $this->assertSame([], $this->eventsBy($rounds[$round]['events'], 'enemy_2', 'damage'));
         }
-        $damaged = array_column($this->eventsBy($rounds[7]['events'], 'enemy_2', 'damage'), 'target');
+        $damaged = array_column($this->eventsBy($rounds[6]['events'], 'enemy_2', 'damage'), 'target');
         $this->assertEqualsCanonicalizing(['pc1', 'pc2', 'pc3', 'pc4'], $damaged);
-        $this->assertSame([], $this->eventsBy($rounds[8]['events'], 'enemy_2', 'damage', onlyType: 'spell_charge'));
+        $this->assertSame([], $this->eventsBy($rounds[7]['events'], 'enemy_2', 'damage', onlyType: 'spell_charge'));
         // 唱え終えたあとの詠唱の状態は残らない
-        $this->assertArrayNotHasKey('charge', $rounds[9]['state']['units']['enemy_2']);
+        $this->assertArrayNotHasKey('charge', $rounds[8]['state']['units']['enemy_2']);
         // 演出: 1 つ目と 3 つ目は「唱え」を含む（魔法のフラッシュと効果音が出る）
-        $this->assertStringContainsString('唱え', $legend(5)[0]['text']);
-        $this->assertStringContainsString('唱え', $legend(7)[0]['text']);
-        $this->assertStringNotContainsString('唱え', $legend(6)[0]['text']);
-        $this->assertSame('dark', $legend(7)[0]['spell_element']);
+        $this->assertStringContainsString('唱え', $legend(4)[0]['text']);
+        $this->assertStringContainsString('唱え', $legend(6)[0]['text']);
+        $this->assertStringNotContainsString('唱え', $legend(5)[0]['text']);
+        $this->assertSame('dark', $legend(6)[0]['spell_element']);
         // 詠唱の 3 つの告知も、敵の技の告知として、画面が長めに残す
-        foreach ([5, 6, 7] as $round) {
+        foreach ([4, 5, 6] as $round) {
             $this->assertTrue($legend($round)[0]['skill'], "{$round} ターン目の告知");
         }
     }
 
     public function test_the_evil_spell_is_cancelled_when_the_legend_mage_is_defeated_while_chanting(): void
     {
-        $texts = $this->announceTextsWhenLegendIsDefeatedAfterRound(5, allowRevive: false);
+        $texts = $this->announceTextsWhenLegendIsDefeatedAfterRound(4, allowRevive: false);
 
         $this->assertContains('伝説の魔法使いはおぞましい魔法を唱えようとしている……。', $texts);
         $this->assertNotContains('伝説の魔法使いはおぞましい魔法を詠唱し始めた！', $texts, '倒れたら行動しない');
@@ -247,7 +247,7 @@ class RiftBossTest extends TestCase
     public function test_a_revived_legend_mage_does_not_resume_the_interrupted_spell(): void
     {
         // 奏楽の魔法使いが宇宙樹の雫で蘇生させても、詠唱は中断されたまま（続きから唱えたりしない）
-        $texts = $this->announceTextsWhenLegendIsDefeatedAfterRound(5, allowRevive: true);
+        $texts = $this->announceTextsWhenLegendIsDefeatedAfterRound(4, allowRevive: true);
 
         $this->assertContains('奏楽の魔法使いは宇宙樹の雫を唱えた！', $texts);
         $this->assertNotContains('伝説の魔法使いはおぞましい魔法を詠唱し始めた！', $texts);

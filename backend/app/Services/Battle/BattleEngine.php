@@ -857,7 +857,7 @@ class BattleEngine
                 if (! $target['alive'] || $target['hp'] >= $target['max_hp']) {
                     break;
                 }
-                $amount = SpellHealing::healMagAmount((float) $actor['mag'], $spell, $actor['master_code'] ?? null, (int) ($actor['level'] ?? 1));
+                $amount = SpellHealing::healMagAmount((float) $actor['mag'], $spell, $actor['master_code'] ?? null, (int) ($actor['level'] ?? 1), $spellId);
                 $healed = min($amount, $target['max_hp'] - $target['hp']);
                 $target['hp'] += $healed;
                 $events[] = ['type' => 'heal', 'actor' => $actorId, 'target' => $targetId, 'value' => $healed];
@@ -1092,8 +1092,9 @@ class BattleEngine
 
         if ($target['hp'] === 0) {
             $target['alive'] = false;
-            // 詠唱の途中で倒れたら、詠唱は中断される（蘇生しても、続きからは唱えない）
-            unset($target['charge']);
+            // 戦闘不能になったら、バフ・デバフはすべて消える。詠唱の途中で倒れたら、詠唱も中断される
+            // （蘇生しても、どちらも戻らない。蘇生後は何も付いていない状態から始まる）
+            $this->clearEffectsOnDown($target);
             if (($target['side'] ?? '') === 'enemy') {
                 if (! isset($state['meta'])) {
                     $state['meta'] = [];
@@ -1111,6 +1112,21 @@ class BattleEngine
         }
 
         return $events;
+    }
+
+    /**
+     * 戦闘不能になったユニットから、バフ・デバフを残らず取り除く（敵味方どちらも）。
+     * 防御・攻撃の段階（stages。バフもデバフも）、回避固定などの buffs、命の加護、魔法障壁、敵の詠唱の途中経過（charge）。
+     *
+     * @param  array<string, mixed>  $unit
+     */
+    private function clearEffectsOnDown(array &$unit): void
+    {
+        $unit['buffs'] = [];
+        $unit['stages'] = [];
+        $unit['life_ward'] = false;
+        $unit['damage_shield'] = false;
+        unset($unit['charge']);
     }
 
     /**

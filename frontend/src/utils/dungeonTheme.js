@@ -36,12 +36,14 @@ export function dungeonBgmTrack(floor) {
 }
 
 /**
- * 戦闘中の BGM のキー。中ボス戦（broken）は層に関係なく共通で、通常戦・ボス戦は層ごとに変えられる。
+ * 戦闘中の BGM のキー。中ボス戦（broken）と空間の裂け目のボス戦（last_boss）は層に関係なく共通で、通常戦・ボス戦は層ごとに変えられる。
+ * 戦闘の meta.bgm に BGM のキーが入っているもの（'broken' / 'last_boss'）は、それを優先する。
  *
  * @param {{ floor?: number | string | null, boss?: boolean, midBoss?: boolean, bgm?: string | null }} [options]
  */
 export function battleBgmTrack({ floor = null, boss = false, midBoss = false, bgm = null } = {}) {
   if (midBoss || bgm === 'broken') return 'broken';
+  if (bgm === 'last_boss') return 'last_boss';
   if (boss) return FLOOR_BOSS_BGM_TRACKS[floor] ?? 'boss';
   return FLOOR_BATTLE_BGM_TRACKS[floor] ?? 'battle';
 }

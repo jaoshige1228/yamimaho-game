@@ -12,7 +12,9 @@ use Tests\TestCase;
  *
  * テストでは、最後に動くユニット（pc4）がこぶしを出す → 次は先頭の敵 → 「一周した」という形で支援を起こす。
  * 乱数の並びは familiarRoll に渡す: [確率, 行動の選択, 対象の選択, 顔の選択]。
- * 注入した値は範囲内に丸められるので、0 を渡せば「いちばん最初」を選ぶ。
+ * 注入した値は範囲内に丸められる。行動の選択は 1〜（選択肢の weight の合計）の整数で、選択肢を並び順に weight ぶんずつ数えた
+ * 位置に当たった行動を選ぶ（actionRoll で、狙った行動の位置を求める）。小さい値（0・1）は「いちばん最初」の行動になる。
+ * 単体回復の対象は乱数を使わない（いちばん傷ついた味方）ので、その場合は [確率, 行動, 顔] の並びになる。
  */
 class FamiliarSupportTest extends TestCase
 {
@@ -105,8 +107,8 @@ class FamiliarSupportTest extends TestCase
 
     public function test_heal_is_not_an_option_when_nobody_is_wounded(): void
     {
-        // Lv2 の選択肢は [敵単体, 味方単体回復]。誰も傷ついていなければ回復は選択肢にない（出目1でも敵単体）
-        $result = $this->roundEnd($this->state(level: 2), [1, 1, 0, 0]);
+        // Lv2 の選択肢は [敵単体, 味方単体回復]。誰も傷ついていなければ回復は選択肢にない（出目が最大でも敵単体）
+        $result = $this->roundEnd($this->state(level: 2), [1, 99, 0, 0]);
 
         $this->assertSame('敵に攻撃を繰り出した！', collect($result['events'])->firstWhere('type', 'familiar_action')['text']);
         $this->assertSame(0, $this->countType($result['events'], 'heal', 'familiar'));
@@ -117,8 +119,8 @@ class FamiliarSupportTest extends TestCase
         $state = $this->state(level: 2);
         $state['units']['pc3']['hp'] = 10; // 傷ついているのはグレンだけ
 
-        // 出目: 確率, 行動 = 2番目(回復), 対象 = 傷ついた味方の最初, 顔
-        $result = $this->roundEnd($state, [1, 1, 0, 0]);
+        // 出目: 確率, 行動 = 回復（選択肢 [敵単体, 味方単体回復] の 2 番目）, 顔（対象はいちばん傷ついた味方なので乱数なし）
+        $result = $this->roundEnd($state, [1, $this->actionRoll(['enemy_single', 'ally_single_heal'], 'ally_single_heal'), 0]);
 
         $action = collect($result['events'])->firstWhere('type', 'familiar_action');
         $this->assertSame('火に応急手当した！', $action['text']);
@@ -189,7 +191,7 @@ class FamiliarSupportTest extends TestCase
         $state['units']['enemy_3'] = $this->enemy('enemy_3');
 
         // Lv4 の選択肢は [敵単体, 回復(なし), 敵全体] → 傷ついた味方がいないので [敵単体, 敵全体]。2番目 = 敵全体
-        $result = $this->roundEnd($state, [1, 1, 0, 0]);
+        $result = $this->roundEnd($state, [1, $this->actionRoll(['enemy_single', 'enemy_all'], 'enemy_all'), 0, 0]);
 
         $this->assertSame('次々と敵全体に攻撃！', collect($result['events'])->firstWhere('type', 'familiar_action')['text']);
         $targets = collect($result['events'])->where('type', 'damage')->where('actor', 'familiar')->pluck('target')->all();
@@ -207,7 +209,7 @@ class FamiliarSupportTest extends TestCase
         $state['units']['pc3']['alive'] = false;
 
         // Lv5 の選択肢は [敵単体, 味方単体回復, 敵全体, 味方全体回復] → 4番目
-        $result = $this->roundEnd($state, [1, 3, 0, 0]);
+        $result = $this->roundEnd($state, [1, $this->actionRoll(['enemy_single', 'ally_single_heal', 'enemy_all', 'ally_all_heal'], 'ally_all_heal'), 0, 0]);
 
         $this->assertSame('味方全員に回復魔法を唱えた！', collect($result['events'])->firstWhere('type', 'familiar_action')['text']);
         $heals = collect($result['events'])->where('type', 'heal')->pluck('value', 'target')->all();
@@ -377,8 +379,8 @@ class FamiliarSupportTest extends TestCase
         $units['pc1']['hp'] = 10; // 傷ついた味方がいれば回復が選択肢に入る（バフの必ず発動も起きない）
 
         $texts = [];
-        for ($i = 0; $i < 12; $i++) {
-            // 最初の乱数（行動の選択）の出目だけを順に変えて、出てくる行動を集める。ほかの乱数（対象・顔）は最初を選ぶ
+        for ($i = 1; $i <= 100; $i++) {
+            // 最初の乱数（行動の選択）の出目だけを順に変えて（weight の合計より大きければ最後に丸められる）、出てくる行動を集める。ほかの乱数（対象・顔）は最初を選ぶ
             $calls = 0;
             $roll = static function (int $min, int $max) use ($i, &$calls): int {
                 return $calls++ === 0 ? min($i, $max) : $min;
@@ -515,5 +517,131 @@ class FamiliarSupportTest extends TestCase
             'statuses' => [],
             'spells' => [],
         ];
+    }
+
+    // ---- 単体回復の対象と、行動の選ばれやすさ ----
+
+    public function test_single_heal_targets_the_most_wounded_ally_not_a_random_one(): void
+    {
+        $state = $this->state(level: 2);
+        $state['units']['pc1']['hp'] = 90; // 90%
+        $state['units']['pc2']['hp'] = 20; // 20%（いちばん傷ついている）
+        $state['units']['pc3']['hp'] = 55; // 55%
+        // pc4 は満タン
+
+        // 対象の乱数に何を渡しても（最初でも最後でも）、いちばん傷ついたガルデ（pc2）を回復する
+        foreach ([0, 1, 2, 99] as $targetRoll) {
+            $result = $this->roundEnd($state, [1, $this->actionRoll(['enemy_single', 'ally_single_heal'], 'ally_single_heal'), $targetRoll, 0]);
+
+            $this->assertSame('木に応急手当した！', collect($result['events'])->firstWhere('type', 'familiar_action')['text'], "対象の出目 {$targetRoll}");
+            $heal = collect($result['events'])->firstWhere('type', 'heal');
+            $this->assertSame(['familiar', 'pc2'], [$heal['actor'], $heal['target']], "対象の出目 {$targetRoll}");
+            $this->assertSame(1, $this->countType($result['events'], 'heal', 'familiar'), '単体回復は 1 人だけ');
+        }
+    }
+
+    public function test_single_heal_compares_the_hp_ratio_and_then_the_lost_hp(): void
+    {
+        $decide = function (array $units): string {
+            // 行動は単体回復（Lv2 の選択肢 [敵単体, 味方単体回復]）に固定。乱数は常に最大 = 「最後」を選ぶ
+            $roll = static fn (int $min, int $max): int => $max;
+            $decision = (new FamiliarSupport($roll))->decide($units, 2);
+            $this->assertSame('ally_single_heal', $decision['action']);
+            $this->assertCount(1, $decision['targets']);
+
+            return $decision['targets'][0];
+        };
+
+        // HP の割合が低い人が優先（失った HP の絶対量ではなく割合）: pc1 = 500/1000（50%・失った 500）、pc2 = 40/100（40%・失った 60）
+        $units = $this->state(level: 2)['units'];
+        $units['pc1']['max_hp'] = 1000;
+        $units['pc1']['hp'] = 500;
+        $units['pc2']['hp'] = 40;
+        $this->assertSame('pc2', $decide($units));
+
+        // 割合が同じなら、失った HP が多い人: pc1 = 100/200（失った 100）、pc3 = 50/100（失った 50）
+        $units = $this->state(level: 2)['units'];
+        $units['pc1']['max_hp'] = 200;
+        $units['pc1']['hp'] = 100;
+        $units['pc3']['hp'] = 50;
+        $this->assertSame('pc1', $decide($units));
+
+        // 完全に同じなら、先に並んでいる人
+        $units = $this->state(level: 2)['units'];
+        $units['pc2']['hp'] = 50;
+        $units['pc3']['hp'] = 50;
+        $this->assertSame('pc2', $decide($units));
+
+        // 戦闘不能の味方は対象にならない（傷ついている「生存者」の中から選ぶ）。HP 0 の pc1 ではなく、HP 60% の pc4
+        $units = $this->state(level: 2)['units'];
+        $units['pc1']['hp'] = 0;
+        $units['pc1']['alive'] = false;
+        $units['pc4']['hp'] = 60;
+        $this->assertSame('pc4', $decide($units));
+    }
+
+    public function test_heal_and_attack_buff_are_chosen_more_often_than_the_attacks(): void
+    {
+        $actions = (array) config('familiar.actions');
+        // 回復・攻撃バフの weight は、ダメージの weight より大きい（「若干」= 1.3 倍）
+        $this->assertSame(10, $actions['enemy_single']['weight']);
+        $this->assertSame(10, $actions['enemy_all']['weight']);
+        foreach (['ally_single_heal', 'ally_all_heal', 'ally_attack_buff'] as $name) {
+            $this->assertSame(13, $actions[$name]['weight'], $name);
+        }
+
+        // Lv6 で、傷ついた味方がいて、全部の行動が選択肢にあるとき。抽選の出目を 1〜合計 まで全部数えて、割合を確かめる
+        $units = $this->state(level: 6)['units'];
+        $units['pc1']['hp'] = 10;
+        $total = 10 + 13 + 10 + 13 + 13;
+        $counts = [];
+        for ($point = 1; $point <= $total; $point++) {
+            $calls = 0;
+            $roll = static function (int $min, int $max) use ($point, &$calls): int {
+                return $calls++ === 0 ? min($point, $max) : $min;
+            };
+            $action = (new FamiliarSupport($roll))->decide($units, 6)['action'];
+            $counts[$action] = ($counts[$action] ?? 0) + 1;
+        }
+
+        $this->assertSame([
+            'enemy_single' => 10,
+            'ally_single_heal' => 13,
+            'enemy_all' => 10,
+            'ally_all_heal' => 13,
+            'ally_attack_buff' => 13,
+        ], $counts, '出目の数 = weight');
+        // 以前は 5 つとも 20%。回復（単体＋全体）は 40% → 約 44%、攻撃バフは 20% → 約 22%、攻撃は 40% → 約 34%
+        $this->assertEqualsWithDelta(0.441, ($counts['ally_single_heal'] + $counts['ally_all_heal']) / $total, 0.001);
+        $this->assertEqualsWithDelta(0.220, $counts['ally_attack_buff'] / $total, 0.001);
+        $this->assertEqualsWithDelta(0.339, ($counts['enemy_single'] + $counts['enemy_all']) / $total, 0.001);
+    }
+
+    public function test_every_selectable_action_has_a_positive_weight(): void
+    {
+        foreach ((array) config('familiar.actions') as $name => $action) {
+            if ($action['kind'] === 'revive') {
+                continue; // 蘇生は「必ず蘇生」のときだけ。抽選には入らない
+            }
+            $this->assertGreaterThan(0, (int) ($action['weight'] ?? 0), "{$name} に weight がある");
+        }
+    }
+
+    /**
+     * 選択肢（並び順）の中で、狙った行動に当たる抽選の出目（その行動の weight の範囲の先頭）を求める。
+     *
+     * @param  list<string>  $options  選択肢の並び（config/familiar.php の actions の順）
+     */
+    private function actionRoll(array $options, string $target): int
+    {
+        $position = 1;
+        foreach ($options as $name) {
+            if ($name === $target) {
+                return $position;
+            }
+            $position += (int) config("familiar.actions.{$name}.weight");
+        }
+
+        $this->fail("{$target} は選択肢にない");
     }
 }

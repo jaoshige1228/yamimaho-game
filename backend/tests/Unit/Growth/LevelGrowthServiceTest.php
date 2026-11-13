@@ -239,4 +239,45 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame(166, $character->exp);
         $this->assertCount(3, $events);
     }
+
+    public function test_grant_exp_does_not_revive_a_downed_character_but_still_heals_a_living_one(): void
+    {
+        $this->seed(\Database\Seeders\MasterDataSeeder::class);
+
+        $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
+        $growth = new LevelGrowthService;
+        $stats = $growth->statsForLevel($master, 1);
+
+        // 1 ユーザーにつき同じキャラは 1 人なので、ユーザーを分けて 2 人作る
+        $make = fn (int $hp): UserCharacter => tap(UserCharacter::query()->create([
+            'user_id' => User::factory()->create()->id,
+            'character_master_id' => $master->id,
+            'level' => 1,
+            'exp' => 0,
+            'hp' => $hp,
+            'mp' => 5,
+            'str' => $stats['str'],
+            'mag' => $stats['mag'],
+            'def' => $stats['def'],
+            'spd' => $stats['spd'],
+            'know' => $stats['know'],
+            'spirit' => $stats['spirit'],
+        ]), fn (UserCharacter $c) => $c->setRelation('characterMaster', $master));
+
+        $after = $growth->statsForLevel($master, 4);
+        $hpGain = $after['hp'] - $stats['hp'];
+
+        // 戦闘不能（HP 0）: 3 段階レベルアップしても HP は 0 のまま。最大HPは増え、MP は増加分が足される
+        $down = $make(0);
+        $growth->grantExp($down, 166);
+        $this->assertSame(4, $down->level);
+        $this->assertSame(0, $down->hp, 'レベルアップで復活しない');
+        $this->assertSame($after['hp'], $growth->statsForCharacter($down)['hp']);
+        $this->assertSame(5 + ($after['mp'] - $stats['mp']), $down->mp);
+
+        // 生きている（HP 1）: 今までどおり、最大HPの増加分だけ HP が増える
+        $living = $make(1);
+        $growth->grantExp($living, 166);
+        $this->assertSame(1 + $hpGain, $living->hp);
+    }
 }

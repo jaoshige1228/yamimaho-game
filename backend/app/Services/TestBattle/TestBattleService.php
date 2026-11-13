@@ -227,6 +227,7 @@ class TestBattleService
                 'boss' => true,
                 'rift' => true,
                 'can_flee' => false,
+                'bgm' => 'last_boss',
             ],
             'encounter' => ['boss_encounter' => true],
         ];

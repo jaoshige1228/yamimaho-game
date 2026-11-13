@@ -9,6 +9,8 @@ const BGM_TRACKS = {
   battle: publicAssetUrl('/assets/audio/bgm/RetroRoman_Battle3.mp3'),
   boss: publicAssetUrl('/assets/audio/bgm/boss_battle_2.mp3'),
   broken: publicAssetUrl('/assets/audio/bgm/broken.mp3'),
+  // 空間の裂け目のボス戦（戦闘の meta.bgm = 'last_boss'）
+  last_boss: publicAssetUrl('/assets/audio/bgm/last_boss.mp3'),
   battle_floor3: publicAssetUrl('/assets/audio/bgm/Lapislazuli.mp3'),
   boss_floor3: publicAssetUrl('/assets/audio/bgm/carnation.mp3'),
 };
@@ -17,9 +19,13 @@ const SE_TRACKS = {
   cursor: publicAssetUrl('/assets/audio/se/cursor.mp3'),
   attack_before: publicAssetUrl('/assets/audio/se/attack_before.mp3'),
   magic: publicAssetUrl('/assets/audio/se/magic.mp3'),
+  // 空間の裂け目のボス戦で、敵が魔法を唱えるときに鳴らす（PC の詠唱は magic のまま）
+  enemy_magic: publicAssetUrl('/assets/audio/se/enemy_magic.mp3'),
   damage: publicAssetUrl('/assets/audio/se/damage.mp3'),
   miss: publicAssetUrl('/assets/audio/se/miss.mp3'),
   success: publicAssetUrl('/assets/audio/se/success.mp3'),
+  // PC にデバフ（防御ダウンなど）が入ったときに鳴らす
+  debahu: publicAssetUrl('/assets/audio/se/debahu.mp3'),
   heal: publicAssetUrl('/assets/audio/se/heal.mp3'),
   tukaima: publicAssetUrl('/assets/audio/se/tukaima.mp3'),
 };
@@ -53,9 +59,11 @@ const SE_SOURCE_LEVELS = {
   cursor: { lufs: -29.6, peak: -5.2 },
   attack_before: { lufs: -20.6, peak: -5.8 },
   magic: { lufs: -13.2, peak: -5.0 },
+  enemy_magic: { lufs: -17.9, peak: -10.1 },
   damage: { lufs: -17.7, peak: -5.7 },
   miss: { lufs: -21.9, peak: -9.1 },
   success: { lufs: -16.4, peak: -6.4 },
+  debahu: { lufs: -18.3, peak: -3.4 },
   tukaima: { lufs: -17.4, peak: -9.4 },
 };
 /** 音源ごとの音量差をこの値に揃える（SE スライダー 1.0 のときの音量） */

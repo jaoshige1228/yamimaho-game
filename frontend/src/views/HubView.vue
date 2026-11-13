@@ -123,6 +123,9 @@ onMounted(() => loadHubData());
   padding: 0.5rem 0.75rem 0.9rem;
   /* 空いている所のタップは背景に素通しにし、ボタンだけを押せるようにする */
   pointer-events: none;
+  /* ボタンの背景色（不透明度 0.9）。「ダンジョンに潜る」と下の 3 つのタイルは同じ色 */
+  --hub-btn-bg: linear-gradient(to bottom, rgba(36, 20, 68, 0.9), rgba(16, 8, 34, 0.9));
+  --hub-btn-bg-hover: linear-gradient(to bottom, rgba(54, 32, 98, 0.9), rgba(26, 14, 52, 0.9));
 }
 
 /* ───────── 上: タイトルに戻るボタン ───────── */
@@ -139,7 +142,7 @@ onMounted(() => loadHubData());
   padding: 0.25rem 0.8rem 0.25rem 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
-  background: rgba(12, 8, 24, 0.7);
+  background: rgba(12, 8, 24, 0.9);
   color: #f8f4ff;
   font-size: 0.75rem;
   font-weight: 700;
@@ -153,7 +156,7 @@ onMounted(() => loadHubData());
   font-size: 1.1rem;
 }
 .hub-title-back:hover {
-  background: rgba(40, 24, 72, 0.88);
+  background: rgba(40, 24, 72, 0.9);
 }
 
 
@@ -176,7 +179,7 @@ onMounted(() => loadHubData());
   padding: 0.6rem 1.25rem;
   border: 2px solid #ffe08a;
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(120, 70, 210, 0.95), rgba(64, 28, 130, 0.95));
+  background: var(--hub-btn-bg);
   color: #fff;
   font-family: 'Hiragino Sans', system-ui, sans-serif;
   cursor: pointer;
@@ -228,7 +231,7 @@ onMounted(() => loadHubData());
   padding: 0.5rem 0.25rem;
   border: 1px solid rgba(200, 176, 255, 0.5);
   border-radius: 14px;
-  background: linear-gradient(to bottom, rgba(36, 20, 68, 0.88), rgba(16, 8, 34, 0.9));
+  background: var(--hub-btn-bg);
   color: #f8f4ff;
   font-family: 'Hiragino Sans', system-ui, sans-serif;
   cursor: pointer;
@@ -237,7 +240,7 @@ onMounted(() => loadHubData());
   pointer-events: auto;
 }
 .hub-tile:hover {
-  background: linear-gradient(to bottom, rgba(54, 32, 98, 0.92), rgba(26, 14, 52, 0.92));
+  background: var(--hub-btn-bg-hover);
 }
 .hub-tile:active {
   transform: translateY(1px);

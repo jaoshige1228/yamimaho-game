@@ -50,32 +50,34 @@ return [
      * kind    … damage（敵にダメージ）/ heal（味方を回復）/ buff（攻撃バフ）/ revive（蘇生）
      * scope   … single（単体）/ all（全体）
      * base / upgraded … 係数（ダメージ・回復は「パーティーの平均魔力 × 係数」）。upgraded は Lv8 以降
+     * weight … 「必ず発動」の条件に当てはまらないとき、選択肢の中から選ばれやすさ。大きいほど選ばれやすい
+     *          （選択肢の weight の合計に対する割合。ダメージ = 10、回復・攻撃バフ = 13 で、回復とバフを 1.3 倍選ばれやすくしている）
      * message … 発動したときのメッセージ（{target} は対象の名前）
      */
     'actions' => [
         'enemy_single' => [
-            'level' => 1, 'kind' => 'damage', 'scope' => 'single',
+            'level' => 1, 'kind' => 'damage', 'scope' => 'single', 'weight' => 10,
             'base' => 1.4, 'upgraded' => 2.0,
             'message' => '敵に攻撃を繰り出した！',
         ],
         'ally_single_heal' => [
-            'level' => 2, 'kind' => 'heal', 'scope' => 'single',
+            'level' => 2, 'kind' => 'heal', 'scope' => 'single', 'weight' => 13,
             'base' => 1.6, 'upgraded' => 2.2,
             'message' => '{target}に応急手当した！',
         ],
         'enemy_all' => [
-            'level' => 4, 'kind' => 'damage', 'scope' => 'all',
+            'level' => 4, 'kind' => 'damage', 'scope' => 'all', 'weight' => 10,
             'base' => 1.0, 'upgraded' => 1.6,
             'message' => '次々と敵全体に攻撃！',
         ],
         'ally_all_heal' => [
-            'level' => 5, 'kind' => 'heal', 'scope' => 'all',
+            'level' => 5, 'kind' => 'heal', 'scope' => 'all', 'weight' => 13,
             'base' => 1.2, 'upgraded' => 1.6,
             'message' => '味方全員に回復魔法を唱えた！',
         ],
         // 攻撃バフは段階制（config/battle.php の stage / buffs）。Lv6〜7 は攻撃1段階（×1.2）、Lv8 以降は2段階（×1.4）
         'ally_attack_buff' => [
-            'level' => 6, 'kind' => 'buff', 'scope' => 'all',
+            'level' => 6, 'kind' => 'buff', 'scope' => 'all', 'weight' => 13,
             'base' => 'atk_up_1', 'upgraded' => 'atk_up_2',
             'message' => '味方全員に強化魔法を唱えた！',
         ],

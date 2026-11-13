@@ -49,6 +49,7 @@ class TestBattleApiTest extends TestCase
         );
         $this->assertTrue($response->json('state.meta.boss'));
         $this->assertTrue($response->json('state.meta.rift'));
+        $this->assertSame('last_boss', $response->json('state.meta.bgm'), '裂け目のボス戦の BGM（last_boss.mp3）');
         $this->assertSame('test', $response->json('state.meta.source'));
         // 4 人とも先手（開幕の敵フェーズで行動する）なので、その行動のイベントが返る
         $this->assertContains('turn_start', array_column($response->json('events'), 'type'));

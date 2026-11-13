@@ -2,7 +2,7 @@ enemy_code,rule,skill_code,value
 rift_mercy,turns,rift_life_ward,1
 rift_mercy,turns,rift_steel_wall,2
 rift_mercy,every,rift_steel_wall,5/3
-rift_legend,turns,rift_evil_infinity,5
+rift_legend,turns,rift_evil_infinity,4
 rift_music,ally_fallen_once,rift_world_tree_drop,
 rift_music,turns,rift_resentment_melody,1|5|10
 rift_music,turns,rift_counter_melody,2|7|12

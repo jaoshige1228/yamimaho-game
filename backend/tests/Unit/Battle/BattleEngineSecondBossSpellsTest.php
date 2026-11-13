@@ -33,7 +33,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $row = fn (string $code): array => $masters->findSpell($code);
 
         $this->assertSame([24, 'ally_single', 'heal_full'], [$row('pc1_spirit_water')['mp_cost'], $row('pc1_spirit_water')['target_type'], $row('pc1_spirit_water')['effect']]);
-        $this->assertSame([32, 'ally_all', 'heal_mag', 2.2], [$row('pc1_spirit_rainbow')['mp_cost'], $row('pc1_spirit_rainbow')['target_type'], $row('pc1_spirit_rainbow')['effect'], $row('pc1_spirit_rainbow')['coefficient']]);
+        $this->assertSame([32, 'ally_all', 'heal_mag', 1.87], [$row('pc1_spirit_rainbow')['mp_cost'], $row('pc1_spirit_rainbow')['target_type'], $row('pc1_spirit_rainbow')['effect'], $row('pc1_spirit_rainbow')['coefficient']]);
         $this->assertSame([12, 'enemy_single', 'damage', 'water', 3.2], [$row('pc1_water_fierce_blade')['mp_cost'], $row('pc1_water_fierce_blade')['target_type'], $row('pc1_water_fierce_blade')['effect'], $row('pc1_water_fierce_blade')['element'], $row('pc1_water_fierce_blade')['coefficient']]);
 
         $this->assertSame([12, 'enemy_single', 'damage', 'wood', 3.2], [$row('pc2_vine_spear')['mp_cost'], $row('pc2_vine_spear')['target_type'], $row('pc2_vine_spear')['effect'], $row('pc2_vine_spear')['element'], $row('pc2_vine_spear')['coefficient']]);
@@ -99,11 +99,11 @@ class BattleEngineSecondBossSpellsTest extends TestCase
 
         $result = $this->engine()->applyPlayerAction($state, 'pc1', 'spell', 'pc1_spirit_rainbow');
 
-        // 魔力 15 × 2.2 = 33（切り捨て）。不足ぶんまでしか回復しない
+        // 魔力 15 × 1.87 = 28（切り捨て）。不足ぶんまでしか回復しない
         $heals = collect($result['events'])->where('type', 'heal')->pluck('value', 'target')->all();
-        $this->assertSame(['pc1' => 20, 'pc2' => 33], $heals);
+        $this->assertSame(['pc1' => 20, 'pc2' => 28], $heals);
         $units = $result['state']['units'];
-        $this->assertSame([50, 43, 50], [$units['pc1']['hp'], $units['pc2']['hp'], $units['pc3']['hp']]);
+        $this->assertSame([50, 38, 50], [$units['pc1']['hp'], $units['pc2']['hp'], $units['pc3']['hp']]);
         $this->assertSame(0, $units['pc4']['hp']);
         $this->assertFalse($units['pc4']['alive'], '倒れた味方は戻らない');
         $this->assertSame(8, $units['pc1']['mp']);

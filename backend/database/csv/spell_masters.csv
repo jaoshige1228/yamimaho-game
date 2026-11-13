@@ -24,7 +24,7 @@ cult_def_up,闇の加護,闇の力で仲間を包む。3ターンの間、味方
 cult_def_down,闇の呪縛,呪いの言葉で敵の動きを鈍らせる。3ターンの間、敵全体の防御力を1段階下げる。,20,enemy_all,debuff_def,,,,def_down_1,
 cult_heal,闇の癒し,闇の力で傷を癒す。味方一体のHPを中回復。,12,ally_single,heal_mag,,2.5,,,
 pc1_spirit_water,精霊の水,治癒効果のある水をゴシャー。味方一体のHPを全回復。,24,ally_single,heal_full,,,,,
-pc1_spirit_rainbow,精霊の虹,治癒効果のある水を振りまく。味方全員のHPを中回復。,32,ally_all,heal_mag,,2.2,,,
+pc1_spirit_rainbow,精霊の虹,治癒効果のある水を振りまく。味方全員のHPを中回復。,32,ally_all,heal_mag,,1.87,,,
 pc1_water_fierce_blade,水の凶刃,超水圧の刃で敵を切り裂く。敵一体に大ダメージ。,12,enemy_single,damage,water,3.2,,,
 pc2_vine_spear,ツルの大槍,鋭く伸びたツルが敵を貫く。敵一体に大ダメージ。,12,enemy_single,damage,wood,3.2,,,
 pc2_great_burst_tree,大爆樹,敵全員に木のツルを纏わせ、動きを鈍らせる。3ターンの間、敵全体の防御力を2段階下げる。,32,enemy_all,debuff_def,,,,def_down_2,
@@ -53,9 +53,9 @@ rift_counter_melody,逆襲の旋律,逆襲の旋律を奏でる。3ターンの�
 rift_world_tree_drop,宇宙樹の雫,ユグドラシルの雫を感じる。戦闘不能になった味方一体を確実にHP半分で蘇生する。,40,ally_single,revive_chance,,,100,,
 rift_vine_whip,ツルの鞭,木のツルで打つ。敵一体にダメージ。,8,enemy_single,damage,wood,1.0,,,
 rift_vine_spear,ツルの大槍,木のツルを槍のように束ねて突く。敵一体に大ダメージ。,14,enemy_single,damage,wood,2.0,,,
-rift_quick_brew,迅速調合,周囲の植物でその場で回復薬を調合する。味方一体のHPを小回復。,14,ally_single,heal_mag,,1.0,,,skill
-rift_spirit_water,精霊の水,精霊の水で癒す。味方一体のHPを中回復。,16,ally_single,heal_mag,,2.0,,,
-rift_spirit_rainbow,精霊の虹,癒しの水を振りまく。味方全員のHPを小回復。,24,ally_all,heal_mag,,1.0,,,
+rift_quick_brew,迅速調合,周囲の植物でその場で回復薬を調合する。味方一体のHPを小回復。,14,ally_single,heal_mag,,2.0,,,skill
+rift_spirit_water,精霊の水,精霊の水で癒す。味方一体のHPを中回復。,16,ally_single,heal_mag,,4.0,,,
+rift_spirit_rainbow,精霊の虹,癒しの水を振りまく。味方全員のHPを小回復。,24,ally_all,heal_mag,,2.0,,,
 rift_water_blade,水の刃,水の刃で斬る。敵一体にダメージ。,8,enemy_single,damage,water,1.0,,,
 rift_water_fierce_blade,水の凶刃,水の凶刃で斬り裂く。敵一体に大ダメージ。,14,enemy_single,damage,water,2.0,,,
 rift_devil_illusion,悪魔の幻影群,悪魔の幻影を生み出し、敵を惑わせる。3ターンの間、味方全体の回避率が20%に固定される。,26,ally_all,buff_evasion_set,,,,evasion_set_20,
