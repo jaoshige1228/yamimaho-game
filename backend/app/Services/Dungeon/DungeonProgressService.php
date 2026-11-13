@@ -29,6 +29,12 @@ class DungeonProgressService
         return (int) ($this->findOrCreate($user)->unlocked_floor ?? 1);
     }
 
+    /** 全ての層（最終層まで）を踏破したか */
+    public function hasClearedAllFloors(User $user): bool
+    {
+        return $this->getClearedFloor($user) >= DungeonFloorConfig::maxFloor();
+    }
+
     /** クリア済みの最深層（0 = 未クリア） */
     public function getClearedFloor(User $user): int
     {
@@ -68,6 +74,7 @@ class DungeonProgressService
             'step' => (int) $record->step,
             'unlocked_floor' => (int) $record->unlocked_floor,
             'cleared_floor' => (int) $record->cleared_floor,
+            'all_floors_cleared' => (int) $record->cleared_floor >= DungeonFloorConfig::maxFloor(),
             'max_floor' => DungeonFloorConfig::maxFloor(),
             'playable_floor' => DungeonFloorConfig::playableFloor(),
             'boss_step' => DungeonFloorConfig::bossStep((int) $record->floor),

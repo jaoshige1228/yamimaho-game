@@ -15,6 +15,8 @@ use Tests\TestCase;
  */
 class BattleEngineSecondBossSpellsTest extends TestCase
 {
+    use StageHelpers;
+
     private function engine(): BattleEngine
     {
         return new BattleEngine(
@@ -35,7 +37,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $this->assertSame([12, 'enemy_single', 'damage', 'water', 3.2], [$row('pc1_water_fierce_blade')['mp_cost'], $row('pc1_water_fierce_blade')['target_type'], $row('pc1_water_fierce_blade')['effect'], $row('pc1_water_fierce_blade')['element'], $row('pc1_water_fierce_blade')['coefficient']]);
 
         $this->assertSame([12, 'enemy_single', 'damage', 'wood', 3.2], [$row('pc2_vine_spear')['mp_cost'], $row('pc2_vine_spear')['target_type'], $row('pc2_vine_spear')['effect'], $row('pc2_vine_spear')['element'], $row('pc2_vine_spear')['coefficient']]);
-        $this->assertSame([32, 'enemy_all', 'debuff_def', 'def_down_big'], [$row('pc2_great_burst_tree')['mp_cost'], $row('pc2_great_burst_tree')['target_type'], $row('pc2_great_burst_tree')['effect'], $row('pc2_great_burst_tree')['buff']]);
+        $this->assertSame([32, 'enemy_all', 'debuff_def', 'def_down_2'], [$row('pc2_great_burst_tree')['mp_cost'], $row('pc2_great_burst_tree')['target_type'], $row('pc2_great_burst_tree')['effect'], $row('pc2_great_burst_tree')['buff']]);
         $this->assertSame([50, 'ally_single', 'revive_full'], [$row('pc2_world_tree_drop')['mp_cost'], $row('pc2_world_tree_drop')['target_type'], $row('pc2_world_tree_drop')['effect']]);
         $this->assertSame([14, 'ally_single', 'heal_mag', 2.5, 'skill'], [$row('pc2_quick_brew')['mp_cost'], $row('pc2_quick_brew')['target_type'], $row('pc2_quick_brew')['effect'], $row('pc2_quick_brew')['coefficient'], $row('pc2_quick_brew')['cast_style']]);
 
@@ -43,11 +45,11 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $this->assertSame([26, 'enemy_single', 'damage', 'fire', 4.5], [$row('pc3_great_explosion')['mp_cost'], $row('pc3_great_explosion')['target_type'], $row('pc3_great_explosion')['effect'], $row('pc3_great_explosion')['element'], $row('pc3_great_explosion')['coefficient']]);
 
         $this->assertSame([14, 'enemy_all', 'damage', 'earth', 1.7], [$row('pc4_meteor_shower')['mp_cost'], $row('pc4_meteor_shower')['target_type'], $row('pc4_meteor_shower')['effect'], $row('pc4_meteor_shower')['element'], $row('pc4_meteor_shower')['coefficient']]);
-        $this->assertSame([36, 'ally_all', 'buff_def', 'def_up'], [$row('pc4_steel_wall')['mp_cost'], $row('pc4_steel_wall')['target_type'], $row('pc4_steel_wall')['effect'], $row('pc4_steel_wall')['buff']]);
+        $this->assertSame([36, 'ally_all', 'buff_def', 'def_up_2'], [$row('pc4_steel_wall')['mp_cost'], $row('pc4_steel_wall')['target_type'], $row('pc4_steel_wall')['effect'], $row('pc4_steel_wall')['buff']]);
         $this->assertSame([26, 'ally_single', 'life_ward'], [$row('pc4_life_ward')['mp_cost'], $row('pc4_life_ward')['target_type'], $row('pc4_life_ward')['effect']]);
 
-        $this->assertSame(0.65, config('battle.buffs.def_down_big.multiplier'));
-        $this->assertSame(1.4, config('battle.buffs.def_up.multiplier'));
+        $this->assertSame(0.65, config('battle.stage.multipliers.def')[-2]);
+        $this->assertSame(1.4, config('battle.stage.multipliers.def')[2]);
     }
 
     public function test_spirit_water_fully_heals_one_ally(): void
@@ -168,7 +170,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         }
     }
 
-    public function test_great_burst_tree_lowers_every_enemys_defense_to_065(): void
+    public function test_great_burst_tree_lowers_every_enemys_defense_by_two_stages(): void
     {
         $state = $this->state('pc2', 'pc2_great_burst_tree');
         $state['units']['pc2']['mp'] = 50;
@@ -176,14 +178,14 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $result = $this->engine()->applyPlayerAction($state, 'pc2', 'spell', 'pc2_great_burst_tree');
 
         $units = $result['state']['units'];
-        $this->assertSame(3, $units['enemy_1']['buffs']['def_down_big']);
-        $this->assertSame(3, $units['enemy_2']['buffs']['def_down_big']);
-        $this->assertArrayNotHasKey('def_down_big', $units['pc1']['buffs']);
+        $this->assertSame(-2, $this->stageSum($units['enemy_1'], 'def'));
+        $this->assertSame(-2, $this->stageSum($units['enemy_2'], 'def'));
+        $this->assertSame(0, $this->stageSum($units['pc1'], 'def'));
 
-        // 防御 100 の敵は 65 として計算される
+        // 防御 100 の敵は 65 として計算される（2段階ダウン = ×0.65）
         $method = new \ReflectionMethod(BattleEngine::class, 'effectiveStat');
         $method->setAccessible(true);
-        $this->assertEqualsWithDelta(65.0, $method->invoke($this->engine(), ['def' => 100, 'buffs' => ['def_down_big' => 3]], 'def'), 0.0001);
+        $this->assertEqualsWithDelta(65.0, $method->invoke($this->engine(), array_merge($units['enemy_1'], ['def' => 100]), 'def'), 0.0001);
     }
 
     public function test_world_tree_drop_always_revives_with_full_hp(): void
@@ -242,7 +244,7 @@ class BattleEngineSecondBossSpellsTest extends TestCase
         $this->assertSame('水は癒しの水を唱えた！', collect($result['events'])->firstWhere('type', 'announce')['text']);
     }
 
-    public function test_steel_wall_raises_defense_of_every_living_ally_by_forty_percent(): void
+    public function test_steel_wall_raises_defense_of_every_living_ally_by_two_stages(): void
     {
         $state = $this->state('pc4', 'pc4_steel_wall');
         $state['units']['pc4']['mp'] = 50;
@@ -253,13 +255,15 @@ class BattleEngineSecondBossSpellsTest extends TestCase
 
         $units = $result['state']['units'];
         foreach (['pc1', 'pc2'] as $id) {
-            $this->assertSame(3, $units[$id]['buffs']['def_up'], $id);
+            $this->assertSame(2, $this->stageSum($units[$id], 'def'), $id);
+            $this->assertSame(3, $units[$id]['stages'][0]['turns'], $id);
         }
-        // 唱えた本人は、行動の終わりに自分のバフが1ターン減る（ほかの魔法と同じ）
-        $this->assertSame(2, $units['pc4']['buffs']['def_up']);
-        $this->assertArrayNotHasKey('def_up', $units['pc3']['buffs'], '倒れた味方にはかからない');
-        $this->assertArrayNotHasKey('def_up', $units['enemy_1']['buffs']);
-        $this->assertSame(1.4, config('battle.buffs.def_up.multiplier'));
+        // 唱えた本人は、行動の終わりに自分の効果の持続が1ターン減る（ほかの魔法と同じ）
+        $this->assertSame(2, $this->stageSum($units['pc4'], 'def'));
+        $this->assertSame(2, $units['pc4']['stages'][0]['turns']);
+        $this->assertSame(0, $this->stageSum($units['pc3'], 'def'), '倒れた味方にはかからない');
+        $this->assertSame(0, $this->stageSum($units['enemy_1'], 'def'));
+        $this->assertSame(1.4, config('battle.stage.multipliers.def')[2]);
     }
 
     public function test_life_ward_marks_the_ally_and_shows_in_the_public_state(): void

@@ -73,10 +73,10 @@ return [
             'base' => 1.2, 'upgraded' => 1.6,
             'message' => '味方全員に回復魔法を唱えた！',
         ],
-        // 係数は config/battle.php の buffs（atk_up_familiar = 1.2 / atk_up_familiar_large = 1.3）
+        // 攻撃バフは段階制（config/battle.php の stage / buffs）。Lv6〜7 は攻撃1段階（×1.2）、Lv8 以降は2段階（×1.4）
         'ally_attack_buff' => [
             'level' => 6, 'kind' => 'buff', 'scope' => 'all',
-            'base' => 'atk_up_familiar', 'upgraded' => 'atk_up_familiar_large',
+            'base' => 'atk_up_1', 'upgraded' => 'atk_up_2',
             'message' => '味方全員に強化魔法を唱えた！',
         ],
         'revive' => [

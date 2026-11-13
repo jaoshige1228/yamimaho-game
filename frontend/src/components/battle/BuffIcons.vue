@@ -1,15 +1,10 @@
 <script setup>
 import { computed } from 'vue';
 
+// 防御・攻撃のバフ／デバフは「段階」（-3〜+3）。バッジの矢印の数が段階の大きさ（防御↑↑ = 2段階上昇、防御↓↓↓ = 3段階低下）
+const STAGE_LABELS = { def: '防御', atk: '攻撃' };
+
 const ICON_LABELS = {
-  def_up: '防御↑',
-  def_up_large: '防御↑↑',
-  def_down: '防御↓',
-  def_down_large: '防御↓↓',
-  atk_up: '攻撃↑',
-  atk_up_large: '攻撃↑↑',
-  atk_down: '攻撃↓',
-  atk_down_large: '攻撃↓↓',
   evasion: '回避',
   invincible: '無敵',
   life_ward: '加護',
@@ -17,13 +12,25 @@ const ICON_LABELS = {
 
 const props = defineProps({
   buffs: { type: Object, default: () => ({}) },
+  /** 防御・攻撃の現在の段階 { def, atk }（-3〜+3。0 は表示しない） */
+  stages: { type: Object, default: () => ({}) },
   buffIcons: { type: Object, default: () => ({}) },
   damageShield: { type: Boolean, default: false },
   lifeWard: { type: Boolean, default: false },
 });
 
+function stageLabel(stat, stage) {
+  return `${STAGE_LABELS[stat]}${(stage > 0 ? '↑' : '↓').repeat(Math.abs(stage))}`;
+}
+
 const entries = computed(() => {
   const list = [];
+  for (const stat of ['def', 'atk']) {
+    const stage = Number(props.stages?.[stat] ?? 0);
+    if (stage !== 0) {
+      list.push({ key: `stage_${stat}`, label: stageLabel(stat, stage), isEvasion: false, isInvincible: false });
+    }
+  }
   if (props.damageShield) {
     list.push({ key: 'damage_shield', label: ICON_LABELS.invincible, isEvasion: false, isInvincible: true });
   }

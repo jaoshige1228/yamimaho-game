@@ -32,7 +32,7 @@ floor,code,name,weight,event_type,start_node_key,skip_epilogue
 3,treasure_chest,宝箱,10,party_choice_stat_check,found,0
 3,healing_spring,回復の泉,3,restore_party,intro,0
 3,suspicious_spring,あやしい回復の泉,9,taster_choice,intro,0
-3,mysterious_presence,謎の気配,0,hidden_boss_rift,intro,0
+3,mysterious_presence,謎の気配,8,hidden_boss_rift,intro,0
 3,rainbow_spring,虹色の回復の泉,1,restore_party,intro,0
 3,gold_pickup,お金取得,10,gold_pickup,react,0
 3,flash_flood,鉄砲水,5,stat_check_party_spirit,intro,0

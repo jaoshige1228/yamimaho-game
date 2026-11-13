@@ -13,6 +13,7 @@ const enteringFloor = ref(null);
 const error = ref('');
 const unlockedFloor = ref(1);
 const playableFloor = ref(1);
+const allFloorsCleared = ref(false);
 
 const enterableFloors = computed(() => {
   const max = Math.min(unlockedFloor.value, playableFloor.value);
@@ -26,6 +27,7 @@ async function loadDungeonOptions() {
     const data = await api('/dungeon', { method: 'GET' });
     unlockedFloor.value = data.unlocked_floor ?? 1;
     playableFloor.value = data.playable_floor ?? 1;
+    allFloorsCleared.value = data.all_floors_cleared === true;
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -82,6 +84,9 @@ onMounted(() => loadDungeonOptions());
           {{ enteringFloor === floor ? '入場中…' : `${floor}層に潜る` }}
         </button>
       </div>
+
+      <!-- 最終層まで踏破したら、画面の下のほうに出す -->
+      <p v-if="allFloorsCleared" class="all-cleared">全ての層を踏破した</p>
     </main>
   </div>
 </template>
@@ -154,5 +159,30 @@ onMounted(() => loadDungeonOptions());
 .floor-enter-btn:disabled {
   opacity: 0.55;
   cursor: default;
+}
+.all-cleared {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  width: min(360px, 100%);
+  /* 余白を上に寄せて、画面の下のほうに置く */
+  margin: auto 0 0;
+  padding-top: 1.5rem;
+  color: #ffe08a;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 10px rgba(255, 210, 110, 0.45);
+}
+.all-cleared::before,
+.all-cleared::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 224, 138, 0.7));
+}
+.all-cleared::after {
+  background: linear-gradient(to left, transparent, rgba(255, 224, 138, 0.7));
 }
 </style>

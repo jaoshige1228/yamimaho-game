@@ -48,6 +48,24 @@ class DungeonFloorConfig
         return array_values(array_filter($codes, fn ($code) => is_string($code) && $code !== ''));
     }
 
+    /**
+     * 探索イベントの start_battle ノードが指す、戦闘のセット（config の dungeon.event_battles）。
+     * セットに無い名前（単体の敵コード）なら null。
+     *
+     * @return array{enemy_codes: list<string>, rift: bool}|null
+     */
+    public static function eventBattle(string $name): ?array
+    {
+        $battle = config('game.dungeon.event_battles', [])[$name] ?? null;
+        if (! is_array($battle)) {
+            return null;
+        }
+
+        $codes = array_values(array_filter((array) ($battle['enemy_codes'] ?? []), fn ($code) => is_string($code) && $code !== ''));
+
+        return $codes === [] ? null : ['enemy_codes' => $codes, 'rift' => (bool) ($battle['rift'] ?? false)];
+    }
+
     public static function midBossStep(int $floor): ?int
     {
         $floors = config('game.dungeon.floors', []);

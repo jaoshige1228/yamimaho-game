@@ -26,7 +26,7 @@ class BattleEngineDebuffTest extends TestCase
 
         $attacker = ['str' => 20, 'mag' => 10, 'def' => 5, 'buffs' => []];
         $defender = ['str' => 10, 'mag' => 10, 'def' => 20, 'buffs' => []];
-        $debuffed = ['str' => 10, 'mag' => 10, 'def' => 20, 'buffs' => ['def_down' => 3]];
+        $debuffed = ['str' => 10, 'mag' => 10, 'def' => 20, 'buffs' => [], 'stages' => [['stat' => 'def', 'amount' => -1, 'turns' => 3, 'source' => 'test']]];
 
         $method = new \ReflectionMethod(BattleEngine::class, 'calcDamage');
         $method->setAccessible(true);
@@ -35,8 +35,10 @@ class BattleEngineDebuffTest extends TestCase
         $lowered = $method->invoke($engine, $attacker, $debuffed, 'str', 1.0);
 
         $this->assertGreaterThan($normal, $lowered);
+        // 防御1段階ダウン（×0.8）: 防御 20 → 16 なので 20 − 16 / 2 = 12
+        $this->assertSame(0.8, config('battle.stage.multipliers.def')[-1]);
         $this->assertSame(10, $normal);
-        $this->assertSame(13, $lowered);
+        $this->assertSame(12, $lowered);
     }
 
     public function test_def_up_reduces_physical_damage(): void
@@ -48,7 +50,7 @@ class BattleEngineDebuffTest extends TestCase
 
         $attacker = ['str' => 20, 'mag' => 10, 'def' => 5, 'buffs' => []];
         $defender = ['str' => 10, 'mag' => 10, 'def' => 20, 'buffs' => []];
-        $buffed = ['str' => 10, 'mag' => 10, 'def' => 20, 'buffs' => ['def_up' => 3]];
+        $buffed = ['str' => 10, 'mag' => 10, 'def' => 20, 'buffs' => [], 'stages' => [['stat' => 'def', 'amount' => 1, 'turns' => 3, 'source' => 'test']]];
 
         $method = new \ReflectionMethod(BattleEngine::class, 'calcDamage');
         $method->setAccessible(true);
@@ -57,10 +59,10 @@ class BattleEngineDebuffTest extends TestCase
         $raised = $method->invoke($engine, $attacker, $buffed, 'str', 1.0);
 
         $this->assertLessThan($normal, $raised);
-        // 土の鎧（def_up ×1.4）: 防御 20 → 28 なので 20 − 28 / 2 = 6
-        $this->assertSame(1.4, config('battle.buffs.def_up.multiplier'));
+        // 防御1段階アップ（×1.2）: 防御 20 → 24 なので 20 − 24 / 2 = 8
+        $this->assertSame(1.2, config('battle.stage.multipliers.def')[1]);
         $this->assertSame(10, $normal);
-        $this->assertSame(6, $raised);
+        $this->assertSame(8, $raised);
     }
 
     public function test_vine_bind_applies_def_down_and_increases_follow_up_damage(): void
@@ -128,7 +130,7 @@ class BattleEngineDebuffTest extends TestCase
         $state = $bind['state'];
 
         $this->assertContains('buff_applied', array_column($bind['events'], 'type'));
-        $this->assertSame(3, $state['units']['enemy_1']['buffs']['def_down'] ?? null);
+        $this->assertSame([['stat' => 'def', 'amount' => -1, 'turns' => 3, 'source' => 'pc2_vine_bind']], $state['units']['enemy_1']['stages'] ?? null);
 
         $state['current_actor'] = 'pc2';
         $state['awaiting_input'] = true;
@@ -137,6 +139,6 @@ class BattleEngineDebuffTest extends TestCase
         $damage = collect($punch['events'])->firstWhere('type', 'damage');
 
         $this->assertNotNull($damage);
-        $this->assertSame(13, $damage['value']);
+        $this->assertSame(12, $damage['value']);
     }
 }

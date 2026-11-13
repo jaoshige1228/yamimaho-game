@@ -26,6 +26,9 @@ class MasterDataProvider
     /** @var array<string, list<array<string, mixed>>>|null */
     private ?array $enemySkillCache = null;
 
+    /** @var array<string, list<array{rule: string, skill_code: string, value: string}>>|null */
+    private ?array $enemySkillRuleCache = null;
+
     /** @var array<string, array<string, mixed>>|null */
     private ?array $weaponCache = null;
 
@@ -185,6 +188,30 @@ class MasterDataProvider
         $this->enemySkillCache = $grouped;
 
         return $this->enemySkillCache;
+    }
+
+    /**
+     * その敵の行動ルール（enemy_skill_rules.csv の行。CSV の上の行ほど優先。ルールがなければ空）。
+     * rule: turns（value = 「1|5|10」のようなターンの一覧）／ every（value = 「5/3」= 5 ターン目から 3 ターンごと）／
+     *       ally_fallen_once（味方が倒れていたら、戦闘で 1 回だけ）／ heal_below（value = %。回復は、HP がそれ未満の味方がいるときだけ）
+     *
+     * @return list<array{rule: string, skill_code: string, value: string}>
+     */
+    public function enemySkillRulesFor(string $enemyCode): array
+    {
+        if ($this->enemySkillRuleCache === null) {
+            $grouped = [];
+            foreach (CsvMasterReader::read('enemy_skill_rules.csv') as $row) {
+                $grouped[(string) $row['enemy_code']][] = [
+                    'rule' => (string) $row['rule'],
+                    'skill_code' => (string) ($row['skill_code'] ?? ''),
+                    'value' => (string) ($row['value'] ?? ''),
+                ];
+            }
+            $this->enemySkillRuleCache = $grouped;
+        }
+
+        return $this->enemySkillRuleCache[$enemyCode] ?? [];
     }
 
     /**

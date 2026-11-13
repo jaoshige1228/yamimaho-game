@@ -69,12 +69,23 @@ class EnemySkillPicker
             }
         }
 
+        return $this->toSkill($chosen);
+    }
+
+    /**
+     * 技の行（enemy_skills.csv）を、エンジンに渡す形にそろえる。
+     *
+     * @param  array<string, mixed>  $row
+     * @return array{skill_code: string, label: string, action_type: string, target_type: string, coefficient: float}
+     */
+    public function toSkill(array $row): array
+    {
         return [
-            'skill_code' => (string) $chosen['skill_code'],
-            'label' => (string) $chosen['label'],
-            'action_type' => (string) $chosen['action_type'],
-            'target_type' => (string) $chosen['target_type'],
-            'coefficient' => (float) $chosen['coefficient'],
+            'skill_code' => (string) $row['skill_code'],
+            'label' => (string) $row['label'],
+            'action_type' => (string) $row['action_type'],
+            'target_type' => (string) $row['target_type'],
+            'coefficient' => (float) $row['coefficient'],
         ];
     }
 

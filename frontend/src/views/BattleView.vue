@@ -297,12 +297,14 @@ function flashKindForSpellAnnounce(ev) {
 /** ダメージの数字が出ている時間（ms）。EffectLayer.vue の .float-damage のアニメーションの長さと合わせる */
 const FLOATING_DAMAGE_MS = 1250;
 
-function showFloatingDamage(targetId, value) {
+/** ダメージの数字（miss = true のときは、ダメージの代わりに白い「miss」を同じ位置・同じ動きで出す） */
+function showFloatingDamage(targetId, value, miss = false) {
   const pos = unitPosition(targetId);
   const isAlly = units.value.find((x) => x.id === targetId)?.side === 'ally';
   floatingDamages.value.push({
     id: `${targetId}-${Date.now()}`,
-    value: `-${value}`,
+    value: miss ? 'miss' : `-${value}`,
+    miss,
     // 味方のダメージは大きな字で出すので、端の味方でも画面からはみ出さないよう、左右に寄せすぎない
     x: isAlly ? Math.min(Math.max(pos.x, 17), 83) : pos.x,
     y: pos.y,
@@ -469,7 +471,8 @@ async function playEvents(events) {
       }
     }
     if (ev.type === 'miss') {
-      showActionBanner('攻撃は外れた');
+      // 外れたときは、ダメージの数字と同じように、狙われたユニットの位置に白い「miss」を出す
+      showFloatingDamage(ev.target, 0, true);
       playSe('miss');
       await delay(280);
       await delay(120);
@@ -500,7 +503,8 @@ async function playEvents(events) {
       await delay(120);
     }
     if (ev.type === 'buff_applied') {
-      const isDebuff = String(ev.buff ?? '').includes('down');
+      // 防御・攻撃は delta（段階。マイナスなら下がる）で、回避など delta の無い効果は常にバフ扱い
+      const isDebuff = Number(ev.delta ?? 0) < 0;
       showFloatingSupport(ev.target, isDebuff ? '▼' : '▲', isDebuff ? 'debuff' : 'buff');
       playSe('success');
       await showSupportEffect(ev.target, isDebuff ? 'debuff' : 'buff');

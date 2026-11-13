@@ -53,10 +53,12 @@ class BattleEngineBossSkillsTest extends TestCase
         }
 
         $up = $masters->findSpell('cult_def_up');
-        $this->assertSame(['ally_all', 'buff_def', 'def_up_small'], [$up['target_type'], $up['effect'], $up['buff']]);
+        $this->assertSame(['ally_all', 'buff_def', 'def_up_1'], [$up['target_type'], $up['effect'], $up['buff']]);
+        $this->assertStringContainsString('防御力を1段階上げる', $up['description']);
 
         $down = $masters->findSpell('cult_def_down');
-        $this->assertSame(['enemy_all', 'debuff_def', 'def_down_small'], [$down['target_type'], $down['effect'], $down['buff']]);
+        $this->assertSame(['enemy_all', 'debuff_def', 'def_down_1'], [$down['target_type'], $down['effect'], $down['buff']]);
+        $this->assertStringContainsString('防御力を1段階下げる', $down['description']);
 
         $heal = $masters->findSpell('cult_heal');
         $this->assertSame(['ally_single', 'heal_mag', 2.5], [$heal['target_type'], $heal['effect'], $heal['coefficient']]);
@@ -112,12 +114,14 @@ class BattleEngineBossSkillsTest extends TestCase
 
         $buffed = $this->eventsOfType($result['events'], 'buff_applied');
         $this->assertEqualsCanonicalizing(['enemy_1', 'enemy_2'], array_column($buffed, 'target'));
-        $this->assertSame(['def_up_small', 'def_up_small'], array_column($buffed, 'buff'));
+        $this->assertSame(['def_up_1', 'def_up_1'], array_column($buffed, 'buff'));
 
-        $units = $result['state']['units'];
-        $this->assertGreaterThan(0, $units['enemy_2']['buffs']['def_up_small']);
-        $this->assertArrayNotHasKey('def_up_small', $units['enemy_3']['buffs'], '倒れた味方にはかからない');
-        $this->assertSame([], $units['pc1']['buffs']);
+        // 防御1段階上昇（×1.2）。倒れた味方・プレイヤーにはかからない
+        $stage = fn (string $id): int => array_sum(array_column($result['state']['units'][$id]['stages'] ?? [], 'amount'));
+        $this->assertSame(1, $stage('enemy_1'));
+        $this->assertSame(1, $stage('enemy_2'));
+        $this->assertSame(0, $stage('enemy_3'), '倒れた味方にはかからない');
+        $this->assertSame(0, $stage('pc1'));
         $this->assertSame('邪教徒 Aは闇の加護を唱えた！', collect($result['events'])->firstWhere('type', 'announce')['text']);
     }
 
@@ -127,9 +131,11 @@ class BattleEngineBossSkillsTest extends TestCase
 
         $debuffed = $this->eventsOfType($result['events'], 'buff_applied');
         $this->assertEqualsCanonicalizing(['pc1', 'pc2'], array_column($debuffed, 'target'));
-        $this->assertSame(['def_down_small', 'def_down_small'], array_column($debuffed, 'buff'));
-        $this->assertSame(3, $result['state']['units']['pc1']['buffs']['def_down_small']);
-        $this->assertSame([], $result['state']['units']['enemy_2']['buffs']);
+        $this->assertSame(['def_down_1', 'def_down_1'], array_column($debuffed, 'buff'));
+        $units = $result['state']['units'];
+        $this->assertSame([-1], array_column($units['pc1']['stages'], 'amount'));
+        $this->assertSame(3, $units['pc1']['stages'][0]['turns']);
+        $this->assertSame([], $units['enemy_2']['stages'] ?? []);
     }
 
     public function test_cultist_heal_targets_the_most_wounded_ally_for_mag_times_2_5(): void

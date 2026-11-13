@@ -2,8 +2,7 @@
 import { computed } from 'vue';
 import BuffIcons from './BuffIcons.vue';
 import UnitBars from './UnitBars.vue';
-import { enemySpriteAssetKey } from '../../utils/enemySprite';
-import { characterSpriteUrls, publicAssetUrl } from '../../utils/publicAssetUrl.js';
+import { enemySpriteAssetKey, enemySpriteUrl } from '../../utils/enemySprite';
 
 const props = defineProps({
   units: { type: Array, required: true },
@@ -44,11 +43,7 @@ function isDisplayFled(unit) {
 const emit = defineEmits(['select']);
 
 function spriteUrl(unit) {
-  const key = enemySpriteAssetKey(unit);
-  if (key.startsWith('npc_')) {
-    return characterSpriteUrls(key).webp;
-  }
-  return publicAssetUrl(`/assets/enemies/${key}.png`);
+  return enemySpriteUrl(unit);
 }
 
 /**
@@ -136,8 +131,10 @@ function onSlotClick(unit) {
         />
         <BuffIcons
           :buffs="unit.buffs"
+          :stages="unit.stages"
           :buff-icons="buffIcons"
           :damage-shield="unit.damage_shield"
+          :life-ward="unit.life_ward"
         />
       </div>
       <UnitBars :hp="displayHpFor(unit)" :max-hp="unit.max_hp" />

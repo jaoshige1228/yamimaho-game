@@ -63,6 +63,25 @@ return [
     'dialogue_event_rate' => 9,
     'flavor_narrative_rate' => 1,
     /**
+     * 全ての層を踏破したあとの、探索イベントの重み（イベントコード => 重み）。
+     * dungeon_events.csv の重みの代わりに、全ての層でこの値を使う（CSV にそのイベントがある層だけ）。
+     */
+    'all_cleared_event_weights' => [
+      'mysterious_presence' => 16,
+    ],
+    /**
+     * 探索イベントの start_battle ノード（dungeon_event_nodes.csv の next_default）に書ける、戦闘のセット。
+     * キー = next_default に書く名前。enemy_codes = 戦う敵（左から enemy_1, enemy_2…。enemy_masters.csv のコード。層は問わない）。
+     * rift = true の戦闘は、勝ったときの文言が「空間の裂け目の主たちを退けた！」になる。
+     * ここに無い値は、今までどおり単体の敵コード（その層の enemy_masters の行）として扱う。
+     */
+    'event_battles' => [
+      'rift' => [
+        'enemy_codes' => ['rift_mercy', 'rift_legend', 'rift_music', 'rift_guide'],
+        'rift' => true,
+      ],
+    ],
+    /**
      * 層ごとの設定。boss_step に到達した「進む」でボス戦（通常抽選は行わない）
      */
     'floors' => [

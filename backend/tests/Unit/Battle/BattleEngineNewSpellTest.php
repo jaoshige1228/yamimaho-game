@@ -11,6 +11,8 @@ use Tests\TestCase;
  */
 class BattleEngineNewSpellTest extends TestCase
 {
+    use StageHelpers;
+
     private function engine(): BattleEngine
     {
         return new BattleEngine(
@@ -77,10 +79,12 @@ class BattleEngineNewSpellTest extends TestCase
         $result = $this->engine()->applyPlayerAction($state, 'pc2', 'spell', 'pc2_burst_tree');
         $units = $result['state']['units'];
 
-        $this->assertSame(3, $units['enemy_1']['buffs']['def_down_small']);
-        $this->assertSame(3, $units['enemy_2']['buffs']['def_down_small']);
-        $this->assertArrayNotHasKey('def_down_small', $units['pc1']['buffs']);
-        $this->assertSame(0.8, config('battle.buffs.def_down_small.multiplier'));
+        // 敵全体の防御が1段階下がる（×0.8）。味方には効かない
+        $this->assertSame(-1, $this->stageSum($units['enemy_1'], 'def'));
+        $this->assertSame(-1, $this->stageSum($units['enemy_2'], 'def'));
+        $this->assertSame(3, $units['enemy_1']['stages'][0]['turns']);
+        $this->assertSame(0, $this->stageSum($units['pc1'], 'def'));
+        $this->assertSame(0.8, config('battle.stage.multipliers.def')[-1]);
     }
 
     public function test_world_tree_breath_always_revives_with_half_hp(): void
@@ -149,15 +153,18 @@ class BattleEngineNewSpellTest extends TestCase
     public function test_ragaon_beat_lowers_defense_of_target_and_caster(): void
     {
         $state = $this->state('pc3', 'pc3_ragaon_beat');
+        $state['units']['pc3']['mp'] = 40; // 消費MP 35
 
         $result = $this->engine()->applyPlayerAction($state, 'pc3', 'spell', 'pc3_ragaon_beat', 'enemy_1');
         $units = $result['state']['units'];
 
-        $this->assertArrayHasKey('def_down_huge', $units['enemy_1']['buffs']);
-        $this->assertArrayHasKey('def_down_huge', $units['pc3']['buffs']);
-        $this->assertArrayNotHasKey('def_down_huge', $units['enemy_2']['buffs']);
-        $this->assertArrayNotHasKey('def_down_huge', $units['pc1']['buffs']);
-        $this->assertSame(0.5, config('battle.buffs.def_down_huge.multiplier'));
+        $this->assertSame(5, $units['pc3']['mp']);
+        // 敵単体と自分の防御が、どちらも3段階下がる（×0.5）
+        $this->assertSame(-3, $this->stageSum($units['enemy_1'], 'def'));
+        $this->assertSame(-3, $this->stageSum($units['pc3'], 'def'));
+        $this->assertSame(0, $this->stageSum($units['enemy_2'], 'def'));
+        $this->assertSame(0, $this->stageSum($units['pc1'], 'def'));
+        $this->assertSame(0.5, config('battle.stage.multipliers.def')[-3]);
 
         $targets = array_column(array_filter($result['events'], fn ($e) => $e['type'] === 'buff_applied'), 'target');
         $this->assertEqualsCanonicalizing(['enemy_1', 'pc3'], $targets);
@@ -186,11 +193,12 @@ class BattleEngineNewSpellTest extends TestCase
         $result = $this->engine()->applyPlayerAction($state, 'pc4', 'spell', 'pc4_earth_wall');
         $units = $result['state']['units'];
 
+        // 味方全体の防御が1段階上がる（×1.2）。敵には効かない
         foreach (['pc1', 'pc2', 'pc3', 'pc4'] as $id) {
-            $this->assertArrayHasKey('def_up_small', $units[$id]['buffs'], $id);
+            $this->assertSame(1, $this->stageSum($units[$id], 'def'), $id);
         }
-        $this->assertArrayNotHasKey('def_up_small', $units['enemy_1']['buffs']);
-        $this->assertSame(1.2, config('battle.buffs.def_up_small.multiplier'));
+        $this->assertSame(0, $this->stageSum($units['enemy_1'], 'def'));
+        $this->assertSame(1.2, config('battle.stage.multipliers.def')[1]);
     }
 
     /**

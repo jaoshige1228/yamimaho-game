@@ -136,15 +136,12 @@ class DungeonEventFloorOverridesTest extends TestCase
         $this->assertSame($dialogue(2), $dialogue(3));
         $this->assertNotEmpty($dialogue(3));
 
-        // 3 層の敵データ（イフリーヌ）ができるまで、謎の気配は抽選に出さない（重み 0）。ほかは 2 層と同じ重み
+        // 3 層の重みは、謎の気配も含めて 2 層と同じ
         foreach (DungeonEventMaster::query()->where('floor', 3)->get() as $event) {
             $weightOnFloorTwo = (int) DungeonEventMaster::query()->where('floor', 2)->where('code', $event->code)->value('weight');
-            $this->assertSame(
-                $event->code === 'mysterious_presence' ? 0 : $weightOnFloorTwo,
-                (int) $event->weight,
-                "3層 {$event->code} の重み",
-            );
+            $this->assertSame($weightOnFloorTwo, (int) $event->weight, "3層 {$event->code} の重み");
         }
+        $this->assertSame(8, (int) DungeonEventMaster::query()->where('floor', 3)->where('code', 'mysterious_presence')->value('weight'));
     }
 
     public function test_floor_three_sets_its_own_value_for_every_check_damage_and_gold(): void

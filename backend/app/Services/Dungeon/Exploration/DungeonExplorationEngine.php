@@ -119,6 +119,11 @@ class DungeonExplorationEngine
                 continue;
             }
 
+            if ($node->node_type === 'check_floor_cleared') {
+                $nodeKey = $this->executeCheckFloorCleared($user, $node);
+                continue;
+            }
+
             if ($node->node_type === 'stat_check_each_ally') {
                 $this->capturePartySnapshot($user, $context);
                 $lines = array_merge($lines, $this->buildStatCheckEachAllyLines($user, $node, $context, $floor));
@@ -174,9 +179,26 @@ class DungeonExplorationEngine
                     ];
                 }
 
+                // ノードの next_default が戦闘のセット（config の dungeon.event_battles。裂け目の4人の魔法使いなど）を指すとき
+                $eventBattle = DungeonFloorConfig::eventBattle((string) $node->next_default);
+                if ($eventBattle !== null) {
+                    return [
+                        'segment' => [
+                            'kind' => 'battle',
+                            'event_battle' => true,
+                            'enemy_codes' => $eventBattle['enemy_codes'],
+                            'rift' => $eventBattle['rift'],
+                            'boss' => true,
+                        ],
+                        'next_node' => null,
+                        'complete' => true,
+                    ];
+                }
+
                 return [
                     'segment' => [
                         'kind' => 'battle',
+                        // 単体の敵コード（その層の enemy_masters の行）
                         'enemy_code' => (string) ($node->next_default ?: 'inu_moe'),
                         'boss' => true,
                     ],
@@ -757,6 +779,22 @@ class DungeonExplorationEngine
             && $party->every(fn (UserCharacter $character) => (int) $character->level >= $requiredLevel);
 
         return $allReached
+            ? (string) ($node->next_on_success ?: $node->next_default)
+            : (string) ($node->next_on_fail ?: $node->next_default);
+    }
+
+    /**
+     * stat_multiplier の層を踏破済み（その層のボスを倒したことがある）なら next_on_success、まだなら next_on_fail。
+     * 「謎の気配」の空間の裂け目に入れる条件（3 層のボスを倒したあと）に使う。
+     */
+    private function executeCheckFloorCleared(User $user, DungeonEventNode $node): string
+    {
+        $requiredFloor = (int) ($node->stat_multiplier ?? 0);
+        if ($requiredFloor <= 0) {
+            throw new \InvalidArgumentException('check_floor_cleared ノードに stat_multiplier（踏破が必要な層）が必要です。');
+        }
+
+        return $this->progress->getClearedFloor($user) >= $requiredFloor
             ? (string) ($node->next_on_success ?: $node->next_default)
             : (string) ($node->next_on_fail ?: $node->next_default);
     }

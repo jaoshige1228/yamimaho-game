@@ -13,7 +13,7 @@ use App\Services\Player\UserCharacterService;
 class TestBattleService
 {
     /** @var list<string> */
-    private const BOSS_ONLY_CODES = ['inu_moe', 'npc_kasu', 'npc_gusu'];
+    private const BOSS_ONLY_CODES = ['inu_moe', 'npc_kasu', 'npc_gusu', 'rift_mercy', 'rift_legend', 'rift_music', 'rift_guide'];
 
     public function __construct(
         private readonly UserCharacterService $characters = new UserCharacterService,
@@ -67,6 +67,11 @@ class TestBattleService
                     'id' => 'floor3_boss',
                     'label' => '3層ボス戦',
                     'description' => 'ゼロ＆ナビ×2',
+                ],
+                [
+                    'id' => 'rift_boss',
+                    'label' => '空間の裂け目',
+                    'description' => '慈愛・伝説・奏楽・光導の魔法使い',
                 ],
             ],
             'weapons' => WeaponMaster::query()
@@ -162,6 +167,7 @@ class TestBattleService
             'floor2_boss' => $this->buildFloorBoss(2, bossEncounter: true),
             'floor3_boss' => $this->buildFloorBoss(3, bossEncounter: true),
             'floor2_mid_boss' => $this->buildFloor2MidBoss(),
+            'rift_boss' => $this->buildRiftBoss(),
             default => throw new \InvalidArgumentException('不明なボス戦です。'),
         };
     }
@@ -183,6 +189,46 @@ class TestBattleService
                 'can_flee' => false,
             ],
             'encounter' => $bossEncounter ? ['boss_encounter' => true] : [],
+        ];
+    }
+
+    /**
+     * 空間の裂け目の戦闘（実際の探索と同じ敵の構成。config の dungeon.event_battles.rift）。
+     *
+     * @return array{enemies: list<array<string, mixed>>, meta: array<string, mixed>, encounter: array<string, mixed>}
+     */
+    private function buildRiftBoss(): array
+    {
+        $battle = DungeonFloorConfig::eventBattle('rift');
+        if ($battle === null) {
+            throw new \InvalidArgumentException('空間の裂け目の戦闘が設定されていません。');
+        }
+
+        $enemies = [];
+        foreach ($battle['enemy_codes'] as $i => $code) {
+            $master = EnemyMaster::query()->where('code', $code)->orderBy('floor')->first();
+            if ($master === null) {
+                throw new \InvalidArgumentException("敵 {$code} が見つかりません。");
+            }
+            $enemies[] = [
+                'slot' => 'enemy_'.($i + 1),
+                'master_code' => $master->code,
+                'floor' => (int) $master->floor,
+                'name' => $master->name,
+                'sprite' => $master->sprite,
+            ];
+        }
+
+        return [
+            'enemies' => $enemies,
+            'meta' => [
+                'source' => 'test',
+                'floor' => 3,
+                'boss' => true,
+                'rift' => true,
+                'can_flee' => false,
+            ],
+            'encounter' => ['boss_encounter' => true],
         ];
     }
 

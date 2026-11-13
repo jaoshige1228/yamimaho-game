@@ -221,6 +221,7 @@ class BattleFactory
             'crit_rate' => (int) config('battle.ally_defaults.crit_rate', 5),
             'damage_shield' => false,
             'buffs' => [],
+            'stages' => [],
             'statuses' => [],
             'spells' => $spells,
         ];
@@ -354,6 +355,7 @@ class BattleFactory
             'crit_rate' => (int) config('battle.ally_defaults.crit_rate', 5),
             'damage_shield' => false,
             'buffs' => [],
+            'stages' => [],
             'statuses' => [],
             'spells' => $spells,
         ];
@@ -401,6 +403,7 @@ class BattleFactory
                 : (int) ($allyDefaults['crit_rate'] ?? 5),
             'damage_shield' => false,
             'buffs' => [],
+            'stages' => [],
             'statuses' => [],
             'spells' => $spells,
         ];
@@ -427,6 +430,16 @@ class BattleFactory
     public function findSpell(string $spellId): array
     {
         return $this->masters->findSpell($spellId);
+    }
+
+    /**
+     * その敵の行動ルール（enemy_skill_rules.csv）。持たない敵は空。
+     *
+     * @return list<array{rule: string, skill_code: string, value: string}>
+     */
+    public function enemySkillRules(string $enemyCode): array
+    {
+        return $this->masters->enemySkillRulesFor($enemyCode);
     }
 
     public function newBattleId(): string

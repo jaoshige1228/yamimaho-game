@@ -47,6 +47,41 @@ class ExplorationBattleLauncher
     }
 
     /**
+     * 探索イベントの戦闘（config の dungeon.event_battles。裂け目の 4 人の魔法使いなど）。ボス戦扱い。
+     * 敵は層を問わず、コードで enemy_masters から引く（どの層から入っても同じ戦闘になる）。
+     *
+     * @param  list<string>  $enemyCodes  左から enemy_1, enemy_2…
+     * @param  array<string, mixed>  $metaExtra  戦闘の meta に足すもの（rift など）
+     * @return array<string, mixed>
+     */
+    public function startEventBattle(User $user, int $floor, int $step, array $enemyCodes, array $metaExtra = []): array
+    {
+        $enemies = [];
+        foreach (array_values($enemyCodes) as $i => $code) {
+            $master = EnemyMaster::query()->where('code', $code)->orderBy('floor')->firstOrFail();
+            $enemies[] = [
+                'slot' => 'enemy_'.($i + 1),
+                'master_code' => $master->code,
+                'floor' => (int) $master->floor,
+                'name' => $master->name,
+                'sprite' => $master->sprite,
+            ];
+        }
+
+        $meta = array_merge([
+            'source' => 'dungeon',
+            'floor' => $floor,
+            'step' => $step,
+            'boss' => true,
+            'can_flee' => false,
+        ], $metaExtra);
+
+        return $this->launchBattle($user, $enemies, $meta, [
+            'boss_encounter' => true,
+        ]);
+    }
+
+    /**
      * @param  list<string>  $enemyCodes
      * @return array<string, mixed>
      */

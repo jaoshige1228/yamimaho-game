@@ -51,11 +51,11 @@ mysterious_presence,intro,narration,一同は異常な寒気を感じた。見�
 mysterious_presence,rift2,narration,裂けた空間の向こうでは、まさに異次元と言わんばかりに、不気味な斑模様がうごめいてる。,,,,,,,,,,,,react1
 mysterious_presence,react1,dialogue,,random_ally_store,な、なにこれ……,おい、なんだこれは,うわ、なんだこれ！,なに……これ……,,,,,,,react2
 mysterious_presence,react2,dialogue,,random_ally_except_reactor,も、物凄い魔力を感じるわ。向こうに何がいるのかしら……,とてつもない魔力を感じるな。一体何がいるんだ……？,すごい魔力を感じるぞ。あっちに何がいるんだ！？,ものすごい魔力を感じる……。一体……何がいるの……？,,,,,,,choose
-mysterious_presence,choose,binary_choice,空間の裂け目に、入りますか？,,はい,いいえ,,,,,,,level_check,decline1,
-mysterious_presence,level_check,check_party_level,,,,,,,,20,,,enter1,level_short,
-mysterious_presence,level_short,narration,しかし、どうしても足がすくんで動けなかった。\nこの先へ進むには、強さが足りないと確信するだろう,,,,,,,,,,,,end
+mysterious_presence,choose,binary_choice,空間の裂け目に、入りますか？,,はい,いいえ,,,,,,,clear_check,decline1,
+mysterious_presence,clear_check,check_floor_cleared,,,,,,,,3,,,enter1,clear_short,
+mysterious_presence,clear_short,narration,しかし、どうしても足がすくんで動けなかった。\nこの先へ進むには、強さが足りないと確信する。\n全ての層を踏破したのであれば、あるいは……。,,,,,,,,,,,,end
 mysterious_presence,enter1,narration,一行は互いに顔を見合わせる。\n覚悟を決め、裂け目の向こうへと足を踏み入れた。,,,,,,,,,,,,enter_battle
-mysterious_presence,enter_battle,start_battle,,,,,,,,,,,,,inu_moe
+mysterious_presence,enter_battle,start_battle,,,,,,,,,,,,,rift
 mysterious_presence,decline1,narration,一行は互いに顔を見合わせる。\nこの先へ進むのは、あまりに自殺行為だ。,,,,,,,,,,,,end
 mysterious_presence,end,end,,,,,,,,,,,,,
 gold_pickup,react,dialogue,,target,あら？あれは……,ん？あれは……,ん？あれは……,あれは……,,,,,,,found
@@ -272,7 +272,7 @@ sketchy_plant,line7,dialogue,,fixed:pc2,,おっと、先を急ごう,,,,,,,,,lin
 sketchy_plant,line8,dialogue,,fixed:pc4,,,,え、なんで……？こわ……,,,,,,,end
 sketchy_plant,end,end,,,,,,,,,,,,,
 cat_teaser,line1,dialogue,,fixed:pc4,,,,あ……猫じゃらし,,,,,,,line2
-cat_teaser,line2,dialogue,,fixed:pc2,,エノコログサ（狗尾草、学名：Setaria viridis）だな。イネ科エノコログサ属の植物で、一年生草本であり、ブラシのように長い穂の形が独特な雑草だ,,,,,,,,,line3
+cat_teaser,line2,dialogue,,fixed:pc2,,"エノコログサ（狗尾草、学名：Setaria viridis）だな。イネ科エノコログサ属の植物で、一年生草本であり、ブラシのように長い穂の形が独特な雑草だ",,,,,,,,,line3
 cat_teaser,line3,dialogue,,fixed:pc4,,,,あ、うん……,,,,,,,end
 cat_teaser,end,end,,,,,,,,,,,,,
 class_grumbling,line1,dialogue,,fixed:pc1,ここ最近、平民への愚痴を漏らすゾネ生が増えているような気がするわ,,,,,,,,,,line2

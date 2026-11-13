@@ -13,9 +13,22 @@ class DungeonEventCatalog
         private readonly DungeonEventFloorOverrides $overrides = new DungeonEventFloorOverrides,
     ) {}
 
-    public function pickRandomEventCode(int $floor): string
+    /**
+     * @param  bool  $allFloorsCleared  全ての層を踏破済み（`game.dungeon.all_cleared_event_weights` の重みを使う）
+     */
+    public function pickRandomEventCode(int $floor, bool $allFloorsCleared = false): string
     {
-        return $this->pickFromPool($this->mechanicalEventPool($floor), $floor, 'mechanical');
+        return $this->pickFromPool($this->mechanicalEventPool($floor, $allFloorsCleared), $floor, 'mechanical');
+    }
+
+    /**
+     * その層の探索イベントの重み（イベントコード => 重み）。抽選に使うのと同じもの。
+     *
+     * @return array<string, int>
+     */
+    public function mechanicalEventWeights(int $floor, bool $allFloorsCleared = false): array
+    {
+        return array_column($this->mechanicalEventPool($floor, $allFloorsCleared), 'weight', 'code');
     }
 
     public function pickRandomDialogueEventCode(int $floor): string
@@ -149,14 +162,16 @@ class DungeonEventCatalog
     /**
      * @return list<array{code: string, weight: int}>
      */
-    private function mechanicalEventPool(int $floor): array
+    private function mechanicalEventPool(int $floor, bool $allFloorsCleared = false): array
     {
         $pool = [];
+        $clearedWeights = $allFloorsCleared ? (array) config('game.dungeon.all_cleared_event_weights', []) : [];
 
         foreach (DungeonEventMaster::query()->where('floor', $floor)->get() as $event) {
+            $code = (string) $event->code;
             $pool[] = [
-                'code' => (string) $event->code,
-                'weight' => (int) $event->weight,
+                'code' => $code,
+                'weight' => array_key_exists($code, $clearedWeights) ? (int) $clearedWeights[$code] : (int) $event->weight,
             ];
         }
 

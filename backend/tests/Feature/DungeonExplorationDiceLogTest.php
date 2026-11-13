@@ -252,7 +252,7 @@ class DungeonExplorationDiceLogTest extends TestCase
                     $firstVisibleTypes($eventCode, $node->next_on_success ?: $node->next_default, $depth + 1),
                     $firstVisibleTypes($eventCode, $node->next_on_fail ?: $node->next_default, $depth + 1),
                 ),
-                'check_party_level' => array_merge(
+                'check_party_level', 'check_floor_cleared' => array_merge(
                     $firstVisibleTypes($eventCode, $node->next_on_success, $depth + 1),
                     $firstVisibleTypes($eventCode, $node->next_on_fail, $depth + 1),
                 ),

@@ -52,6 +52,28 @@ class DungeonEventCatalogTest extends TestCase
         $this->assertNotContains('maj_umai_leaf', $unique);
     }
 
+    public function test_mysterious_presence_weight_doubles_after_every_floor_is_cleared(): void
+    {
+        $catalog = new DungeonEventCatalog;
+
+        foreach ([1, 2, 3] as $floor) {
+            $before = $catalog->mechanicalEventWeights($floor);
+            $after = $catalog->mechanicalEventWeights($floor, true);
+
+            $this->assertSame(8, $before['mysterious_presence'], "{$floor}層 踏破前");
+            $this->assertSame(16, $after['mysterious_presence'], "{$floor}層 全層踏破後");
+            // ほかのイベントの重みは変わらない
+            $this->assertSame(
+                array_diff_key($before, ['mysterious_presence' => 1]),
+                array_diff_key($after, ['mysterious_presence' => 1]),
+            );
+        }
+
+        // 1・2・3 層とも重みの合計は 94 → 102（探索イベントの 8/94 → 16/102）
+        $this->assertSame([94, 94, 94], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f)), [1, 2, 3]));
+        $this->assertSame([102, 102, 102], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f, true)), [1, 2, 3]));
+    }
+
     public function test_pick_random_dialogue_event_code_uses_dialogue_events_only(): void
     {
         $catalog = new DungeonEventCatalog;

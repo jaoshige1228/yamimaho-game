@@ -196,7 +196,12 @@ class BattleOrchestrator
 
             if ($isDungeon && ($meta['boss'] ?? false)) {
                 $floor = (int) ($meta['floor'] ?? 1);
-                $events[] = $this->dungeonProgress->onBossVictory($user, $floor);
+                $cleared = $this->dungeonProgress->onBossVictory($user, $floor);
+                // 空間の裂け目の戦闘は、層のボスではないので、「N層を踏破した」とは出さない
+                if ($meta['rift'] ?? false) {
+                    $cleared['text'] = '空間の裂け目の主たちを退けた！';
+                }
+                $events[] = $cleared;
             }
 
             return $events;

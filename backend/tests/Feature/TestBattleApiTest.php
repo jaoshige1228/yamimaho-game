@@ -25,12 +25,33 @@ class TestBattleApiTest extends TestCase
         $this->assertContains('bat', $codes);
         $this->assertNotContains('inu_moe', $codes);
         $this->assertNotContains('npc_kasu', $codes);
+        // 裂け目の 4 人の魔法使いは、通常敵の一覧に出ない（ボス戦のプリセットから選ぶ）
+        foreach (['rift_mercy', 'rift_legend', 'rift_music', 'rift_guide'] as $code) {
+            $this->assertNotContains($code, $codes);
+        }
 
         $presetIds = collect($response->json('boss_presets'))->pluck('id')->all();
         $this->assertEquals(
-            ['floor1_boss', 'floor2_boss', 'floor2_mid_boss', 'floor3_boss'],
+            ['floor1_boss', 'floor2_boss', 'floor2_mid_boss', 'floor3_boss', 'rift_boss'],
             $presetIds,
         );
+    }
+
+    public function test_start_rift_boss_spawns_the_four_mages_as_a_boss_battle(): void
+    {
+        $response = $this->postJson('/api/test_battles/start', ['preset' => 'rift_boss'])->assertOk();
+
+        $response->assertJsonPath('boss_encounter', true);
+        $enemies = collect($response->json('state.units'))->where('side', 'enemy')->values();
+        $this->assertSame(
+            ['rift_mercy', 'rift_legend', 'rift_music', 'rift_guide'],
+            $enemies->pluck('master_code')->all(),
+        );
+        $this->assertTrue($response->json('state.meta.boss'));
+        $this->assertTrue($response->json('state.meta.rift'));
+        $this->assertSame('test', $response->json('state.meta.source'));
+        // 4 人とも先手（開幕の敵フェーズで行動する）なので、その行動のイベントが返る
+        $this->assertContains('turn_start', array_column($response->json('events'), 'type'));
     }
 
     public function test_start_regular_battle_with_selected_count(): void

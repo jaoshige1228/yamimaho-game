@@ -98,7 +98,7 @@ class SpellMasterDataTest extends TestCase
         $this->assertSame(30, config('battle.buffs.evasion_set_small.value'));
 
         $burstTree = $provider->findSpell('pc2_burst_tree');
-        $this->assertSame([18, 'enemy_all', 'def_down_small'], [$burstTree['mp_cost'], $burstTree['target_type'], $burstTree['buff']]);
+        $this->assertSame([18, 'enemy_all', 'def_down_1'], [$burstTree['mp_cost'], $burstTree['target_type'], $burstTree['buff']]);
 
         $breath = $provider->findSpell('pc2_world_tree_breath');
         $this->assertSame([32, 'revive_chance', 100], [$breath['mp_cost'], $breath['effect'], $breath['power']]);
@@ -110,12 +110,12 @@ class SpellMasterDataTest extends TestCase
         );
 
         $ragaon = $provider->findSpell('pc3_ragaon_beat');
-        $this->assertSame([20, 'enemy_single', 'def_down_huge'], [$ragaon['mp_cost'], $ragaon['target_type'], $ragaon['buff']]);
+        $this->assertSame([35, 'enemy_single', 'def_down_3'], [$ragaon['mp_cost'], $ragaon['target_type'], $ragaon['buff']]);
 
         $rockFall = $provider->findSpell('pc4_rock_fall');
         $this->assertSame([10, 'earth', 3.2], [$rockFall['mp_cost'], $rockFall['element'], $rockFall['coefficient']]);
 
         $earthWall = $provider->findSpell('pc4_earth_wall');
-        $this->assertSame([20, 'ally_all', 'def_up_small'], [$earthWall['mp_cost'], $earthWall['target_type'], $earthWall['buff']]);
+        $this->assertSame([20, 'ally_all', 'def_up_1'], [$earthWall['mp_cost'], $earthWall['target_type'], $earthWall['buff']]);
     }
 }

@@ -9,6 +9,9 @@ class BattleEngine
     /** HPを回復する魔法の effect（heal_mag = 魔力×係数、heal = 固定値、heal_full = 全回復） */
     private const HEAL_EFFECTS = ['heal_mag', 'heal', 'heal_full'];
 
+    /** 使い魔の攻撃バフの出どころ（stages の source）。使い魔の分だけを入れ替える・判定するのに使う */
+    public const FAMILIAR_SOURCE = 'familiar';
+
     /** 戦闘不能の味方を蘇生する魔法の effect（revive_chance = 確率、revive_full = 確実にHP全回復） */
     private const REVIVE_EFFECTS = ['revive_chance', 'revive_full'];
 
@@ -89,8 +92,7 @@ class BattleEngine
                 break;
             }
 
-            $actorUnit = $state['units'][$actor];
-            $skill = $this->enemySkillPicker->pick((string) ($actorUnit['master_code'] ?? ''));
+            $skill = $this->chooseEnemySkill($state, $actor);
 
             $events = [['type' => 'turn_start', 'actor' => $actor]];
             $events = array_merge($events, $this->resolveEnemySkill($state, $actor, $skill));
@@ -251,16 +253,12 @@ class BattleEngine
 
                 case 'buff':
                     $buffKey = $this->familiarSupport->attackBuffKey($level);
-                    // 強化版と通常版は重ねない
-                    unset($target['buffs']['atk_up_familiar'], $target['buffs']['atk_up_familiar_large']);
-                    $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
-                    $events[] = [
-                        'type' => 'buff_applied',
-                        'actor' => 'familiar',
-                        'target' => $targetId,
-                        'buff' => $buffKey,
-                        'icon' => config("battle.buffs.{$buffKey}.icon"),
-                    ];
+                    // 使い魔の攻撃バフ同士は重ねない（前の分を消してから付け直す）。ほかの効果とは段階を合算する
+                    $target['stages'] = array_values(array_filter(
+                        $target['stages'] ?? [],
+                        fn (array $entry): bool => ($entry['source'] ?? '') !== self::FAMILIAR_SOURCE,
+                    ));
+                    $events[] = $this->applyBuffToUnit($target, $targetId, 'familiar', $buffKey, self::FAMILIAR_SOURCE);
                     break;
 
                 case 'revive':
@@ -278,6 +276,137 @@ class BattleEngine
         }
 
         return $events;
+    }
+
+    /**
+     * 敵が次に使う技を決める。
+     * 行動ルール（enemy_skill_rules.csv）を持たない敵は、今までどおり重みの抽選だけ。
+     * ルールを持つ敵は、そのユニット自身の行動の回数（ターン）で、上のルールから順に当てはめる。
+     * どれにも当てはまらなければ、重みで抽選する（重み 0 の技は除く。heal_below があれば、回復は有効なときだけ）。
+     *
+     * @param  array<string, mixed>  $state
+     * @return array{skill_code: string, label: string, action_type: string, target_type: string, coefficient: float}
+     */
+    private function chooseEnemySkill(array &$state, string $actorId): array
+    {
+        $enemyCode = (string) ($state['units'][$actorId]['master_code'] ?? '');
+        $rules = $this->factory->enemySkillRules($enemyCode);
+        if ($rules === []) {
+            return $this->enemySkillPicker->pick($enemyCode);
+        }
+
+        $unit = &$state['units'][$actorId];
+        $turn = (int) ($unit['turns_taken'] ?? 0) + 1;
+        $unit['turns_taken'] = $turn;
+
+        // 詠唱の途中なら、その続き（ほかの行動はしない）
+        if (isset($unit['charge'])) {
+            return ['skill_code' => (string) $unit['charge']['skill'], 'label' => '詠唱', 'action_type' => 'charge_step', 'target_type' => '', 'coefficient' => 0.0];
+        }
+
+        $skills = $this->enemySkillPicker->skillsFor($enemyCode);
+        $byCode = [];
+        foreach ($skills as $row) {
+            $byCode[(string) $row['skill_code']] = $row;
+        }
+
+        $healBelow = null;
+        foreach ($rules as $rule) {
+            if ($rule['rule'] === 'heal_below') {
+                $healBelow = (int) $rule['value'];
+                continue;
+            }
+            $row = $byCode[$rule['skill_code']] ?? null;
+            if ($row === null) {
+                continue;
+            }
+            $matched = match ($rule['rule']) {
+                'turns' => in_array($turn, array_map('intval', explode('|', $rule['value'])), true),
+                'every' => $this->matchesEveryRule($turn, $rule['value']),
+                'ally_fallen_once' => ! ($unit['once_used'][$rule['skill_code']] ?? false)
+                    && $this->fallenEnemyIds($state['units']) !== [],
+                default => false,
+            };
+            if (! $matched) {
+                continue;
+            }
+            if ($rule['rule'] === 'ally_fallen_once') {
+                $unit['once_used'][$rule['skill_code']] = true;
+            }
+
+            return $this->enemySkillPicker->toSkill($row);
+        }
+
+        // 重みで抽選。回復は、有効なもの（HP が閾値未満の味方がいる）だけを候補に残し、無効なら攻撃などから引き直す
+        $weighted = array_values(array_filter($skills, fn (array $row): bool => (int) $row['weight'] > 0));
+        $usable = array_values(array_filter(
+            $weighted,
+            fn (array $row): bool => ! $this->isUselessEnemySupport($state['units'], $row, $healBelow),
+        ));
+
+        return $this->enemySkillPicker->pickFrom($usable !== [] ? $usable : $weighted);
+    }
+
+    /** 「5/3」= 5 ターン目から 3 ターンごと（5, 8, 11…）。 */
+    private function matchesEveryRule(int $turn, string $value): bool
+    {
+        [$from, $step] = array_map('intval', explode('/', $value) + [1 => 1]);
+
+        return $step > 0 && $turn >= $from && ($turn - $from) % $step === 0;
+    }
+
+    /**
+     * 詠唱が数ターンかかる技を唱え始める（最初のメッセージを出すだけ。効果は 2 回あとの行動で出る）。
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function startEnemyCharge(array &$state, string $actorId, string $skillCode): array
+    {
+        $spell = $this->factory->findSpell($skillCode);
+        $name = (string) $state['units'][$actorId]['name'];
+        $state['units'][$actorId]['charge'] = ['skill' => $skillCode, 'phase' => 1];
+        $text = $this->chargeMessage($skillCode, 'start', $name);
+        $state['log'][] = $text;
+
+        return [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null)];
+    }
+
+    /**
+     * 詠唱の続き。1 回目は詠唱し始めるメッセージだけ、2 回目で唱え終えて、生きている相手全員に効果が出る。
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function continueEnemyCharge(array &$state, string $actorId): array
+    {
+        $charge = $state['units'][$actorId]['charge'];
+        $skillCode = (string) $charge['skill'];
+        $name = (string) $state['units'][$actorId]['name'];
+
+        if ((int) $charge['phase'] < 2) {
+            $state['units'][$actorId]['charge']['phase'] = 2;
+            $text = $this->chargeMessage($skillCode, 'chant', $name);
+            $state['log'][] = $text;
+
+            return [$this->announceEvent($actorId, $text)];
+        }
+
+        unset($state['units'][$actorId]['charge']);
+        $spell = $this->factory->findSpell($skillCode);
+        $text = $this->chargeMessage($skillCode, 'fire', $name);
+        $state['log'][] = $text;
+        $events = [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null)];
+        foreach ($this->resolveEnemySpellTargets($spell, $state['units'], $actorId) as $tid) {
+            $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $skillCode));
+        }
+
+        return $events;
+    }
+
+    private function chargeMessage(string $skillCode, string $phase, string $name): string
+    {
+        return str_replace('{name}', $name, (string) config("battle.charged_skills.{$skillCode}.{$phase}", ''));
     }
 
     /**
@@ -299,6 +428,14 @@ class BattleEngine
 
         if ($actionType === 'flee') {
             return $this->resolveEnemyFlee($state, $actorId);
+        }
+
+        // 詠唱が数ターンかかる技（悪魔級殲滅魔法）。唱え始める／詠唱を続ける
+        if ($actionType === 'charged_spell') {
+            return $this->startEnemyCharge($state, $actorId, (string) $skill['skill_code']);
+        }
+        if ($actionType === 'charge_step') {
+            return $this->continueEnemyCharge($state, $actorId);
         }
 
         // 魔法は「〜は〜を唱えた！」だけを告知する（技名の告知と重なるため出さない）
@@ -347,7 +484,7 @@ class BattleEngine
             foreach ($targets as $tid) {
                 $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
             }
-            $events = array_merge($events, $this->applySpellSelfEffects($state, $actorId, $spell));
+            $events = array_merge($events, $this->applySpellSelfEffects($state, $actorId, $spell, $spellId));
 
             return $events;
         }
@@ -423,7 +560,7 @@ class BattleEngine
      * @param  array<string, array<string, mixed>>  $units
      * @param  array<string, mixed>  $skill
      */
-    private function isUselessEnemySupport(array $units, array $skill): bool
+    private function isUselessEnemySupport(array $units, array $skill, ?int $healBelowPercent = null): bool
     {
         if (($skill['action_type'] ?? '') !== 'spell') {
             return false;
@@ -432,7 +569,7 @@ class BattleEngine
         $spell = $this->factory->findSpell((string) $skill['skill_code']);
 
         return match ((string) ($spell['effect'] ?? '')) {
-            'heal_mag', 'heal_full' => $this->woundedEnemyIds($units) === [],
+            'heal_mag', 'heal_full' => $this->woundedEnemyIds($units, $healBelowPercent) === [],
             'revive_chance', 'revive_full' => $this->fallenEnemyIds($units) === [],
             default => false,
         };
@@ -470,13 +607,15 @@ class BattleEngine
      * HP が減っている生存中の敵ユニット。
      *
      * @param  array<string, array<string, mixed>>  $units
+     * @param  int|null  $belowPercent  指定すると、HP がその % 未満の敵だけ
      * @return list<string>
      */
-    private function woundedEnemyIds(array $units): array
+    private function woundedEnemyIds(array $units, ?int $belowPercent = null): array
     {
         return array_keys(array_filter(
             $units,
-            fn ($u) => ($u['side'] ?? '') === 'enemy' && ($u['alive'] ?? false) && $u['hp'] < $u['max_hp'],
+            fn ($u) => ($u['side'] ?? '') === 'enemy' && ($u['alive'] ?? false) && $u['hp'] < $u['max_hp']
+                && ($belowPercent === null || $u['hp'] * 100 < $u['max_hp'] * $belowPercent),
         ));
     }
 
@@ -598,7 +737,7 @@ class BattleEngine
         foreach ($targets as $tid) {
             $events = array_merge($events, $this->applySpellEffect($state, $actorId, $tid, $spell, $spellId));
         }
-        $events = array_merge($events, $this->applySpellSelfEffects($state, $actorId, $spell));
+        $events = array_merge($events, $this->applySpellSelfEffects($state, $actorId, $spell, $spellId));
 
         return $events;
     }
@@ -756,15 +895,7 @@ class BattleEngine
             case 'buff_def':
             case 'debuff_def':
             case 'debuff_def_both':
-                $buffKey = $spell['buff'];
-                $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
-                $events[] = [
-                    'type' => 'buff_applied',
-                    'actor' => $actorId,
-                    'target' => $targetId,
-                    'buff' => $buffKey,
-                    'icon' => config("battle.buffs.{$buffKey}.icon"),
-                ];
+                $events[] = $this->applyBuffToUnit($target, $targetId, $actorId, (string) $spell['buff'], $spellId);
                 $state['log'][] = "{$target['name']}に{$label}";
                 break;
 
@@ -823,15 +954,7 @@ class BattleEngine
 
             case 'buff':
             case 'debuff':
-                $buffKey = $spell['buff'];
-                $target['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
-                $events[] = [
-                    'type' => 'buff_applied',
-                    'actor' => $actorId,
-                    'target' => $targetId,
-                    'buff' => $buffKey,
-                    'icon' => config("battle.buffs.{$buffKey}.icon"),
-                ];
+                $events[] = $this->applyBuffToUnit($target, $targetId, $actorId, (string) $spell['buff'], $spellId);
                 $state['log'][] = "{$target['name']}に{$label}";
                 break;
 
@@ -854,7 +977,7 @@ class BattleEngine
      * @param  array<string, mixed>  $spell
      * @return list<array<string, mixed>>
      */
-    private function applySpellSelfEffects(array &$state, string $actorId, array $spell): array
+    private function applySpellSelfEffects(array &$state, string $actorId, array $spell, string $spellId): array
     {
         $events = [];
         $caster = &$state['units'][$actorId];
@@ -878,15 +1001,7 @@ class BattleEngine
                 break;
 
             case 'debuff_def_both':
-                $buffKey = $spell['buff'];
-                $caster['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
-                $events[] = [
-                    'type' => 'buff_applied',
-                    'actor' => $actorId,
-                    'target' => $actorId,
-                    'buff' => $buffKey,
-                    'icon' => config("battle.buffs.{$buffKey}.icon"),
-                ];
+                $events[] = $this->applyBuffToUnit($caster, $actorId, $actorId, (string) $spell['buff'], $spellId);
                 $state['log'][] = "{$caster['name']}にも{$spell['label']}";
                 break;
         }
@@ -976,6 +1091,8 @@ class BattleEngine
 
         if ($target['hp'] === 0) {
             $target['alive'] = false;
+            // 詠唱の途中で倒れたら、詠唱は中断される（蘇生しても、続きからは唱えない）
+            unset($target['charge']);
             if (($target['side'] ?? '') === 'enemy') {
                 if (! isset($state['meta'])) {
                     $state['meta'] = [];
@@ -1011,7 +1128,7 @@ class BattleEngine
         $defenderForCalc = $defender;
         if ($critical) {
             $defKey = $this->defenseStatKey($defender, $defenseKind);
-            $defenderForCalc = [...$defender, $defKey => 0, 'buffs' => []];
+            $defenderForCalc = [...$defender, $defKey => 0, 'buffs' => [], 'stages' => []];
         }
 
         $damage = $this->calcDamage($attacker, $defenderForCalc, $attackStat, $coefficient, $defenseKind);
@@ -1097,24 +1214,82 @@ class BattleEngine
             $base = (float) ($unit['def'] ?? 0);
         }
 
-        foreach ($unit['buffs'] as $key => $turns) {
-            if ($turns <= 0) {
-                continue;
-            }
-            $buff = config("battle.buffs.{$key}");
-            if (($buff['type'] ?? '') === 'evasion_set') {
-                continue;
-            }
-            // stat は 1 つの文字列、または複数（使い魔の攻撃バフは筋力と魔力の両方）
-            $buffStats = (array) ($buff['stat'] ?? '');
-            $applies = in_array($stat, $buffStats, true)
-                || (in_array('def', $buffStats, true) && in_array($stat, ['def', 'pdef', 'mdef'], true));
-            if ($applies) {
-                $base *= (float) $buff['multiplier'];
+        // 防御（def・pdef・mdef）と攻撃（str・mag）は、段階の倍率を掛ける。ほかのステータスは変わらない
+        foreach ((array) config('battle.stage.applies_to', []) as $stageStat => $stats) {
+            if (in_array($stat, (array) $stats, true)) {
+                $base *= $this->stageMultiplier((string) $stageStat, $this->currentStage($unit, (string) $stageStat));
             }
         }
 
         return $base;
+    }
+
+    /**
+     * 防御（def）・攻撃（atk）の現在の段階。付いている効果の段階の合計を、-3〜+3 に丸めた値。
+     *
+     * @param  array<string, mixed>  $unit
+     */
+    private function currentStage(array $unit, string $stat): int
+    {
+        $max = (int) config('battle.stage.max', 3);
+        $sum = 0;
+        foreach ($unit['stages'] ?? [] as $entry) {
+            if (($entry['stat'] ?? '') === $stat && (int) ($entry['turns'] ?? 0) > 0) {
+                $sum += (int) ($entry['amount'] ?? 0);
+            }
+        }
+
+        return max(-$max, min($max, $sum));
+    }
+
+    private function stageMultiplier(string $stat, int $stage): float
+    {
+        if ($stage === 0) {
+            return 1.0;
+        }
+        $table = (array) config("battle.stage.multipliers.{$stat}", []);
+
+        return (float) ($table[$stage] ?? 1.0);
+    }
+
+    /**
+     * バフ／デバフを1体に付ける。buff_applied イベントを返す。
+     *
+     * - 防御・攻撃の段階（type=stage）… 付与1回ごとに独立した持続ターンの効果を足す。付ける量は、段階の合計が
+     *   -3〜+3 に収まる分だけ（超えた分は無駄になる）。0 なら効果は足さず、演出だけ出す。
+     * - 回避固定（type=evasion_set）… `buffs` に残りターンを持つ（従来どおり）
+     *
+     * @param  array<string, mixed>  $unit
+     * @return array<string, mixed>
+     */
+    private function applyBuffToUnit(array &$unit, string $unitId, string $actorId, string $buffKey, string $source): array
+    {
+        $buff = (array) config("battle.buffs.{$buffKey}");
+        $event = ['type' => 'buff_applied', 'actor' => $actorId, 'target' => $unitId, 'buff' => $buffKey];
+
+        if (($buff['type'] ?? '') !== 'stage') {
+            $unit['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
+            $event['icon'] = config("battle.buffs.{$buffKey}.icon");
+
+            return $event;
+        }
+
+        $stat = (string) $buff['stat'];
+        $delta = (int) $buff['delta'];
+        $max = (int) config('battle.stage.max', 3);
+        $current = $this->currentStage($unit, $stat);
+        $applied = max(-$max, min($max, $current + $delta)) - $current;
+
+        if ($applied !== 0) {
+            $unit['stages'][] = [
+                'stat' => $stat,
+                'amount' => $applied,
+                'turns' => (int) config('battle.stage.turns', 3),
+                'source' => $source,
+            ];
+        }
+
+        return $event + ['stat' => $stat, 'delta' => $delta, 'applied' => $applied];
     }
 
     /**
@@ -1458,6 +1633,18 @@ class BattleEngine
                 $unit['buffs'][$key] = $turns - 1;
             }
         }
+
+        // 防御・攻撃の段階は、付与1回ごとに独立した持続ターンで切れていく
+        $stages = [];
+        foreach ($unit['stages'] ?? [] as $entry) {
+            $entry['turns'] = (int) ($entry['turns'] ?? 0) - 1;
+            if ($entry['turns'] > 0) {
+                $stages[] = $entry;
+            }
+        }
+        if (array_key_exists('stages', $unit) || $stages !== []) {
+            $unit['stages'] = $stages;
+        }
     }
 
     /**
@@ -1469,9 +1656,12 @@ class BattleEngine
         $actor = $state['current_actor'] ?? null;
         $unit = $actor ? ($state['units'][$actor] ?? null) : null;
 
+        // アイコンを持つ効果（回避）だけ。防御・攻撃の段階は unit の stages で出す
         $buffIcons = [];
         foreach (config('battle.buffs', []) as $key => $buff) {
-            $buffIcons[$key] = $buff['icon'] ?? $key;
+            if (isset($buff['icon'])) {
+                $buffIcons[$key] = $buff['icon'];
+            }
         }
 
         return [
@@ -1496,9 +1686,10 @@ class BattleEngine
      */
     private function publicUnit(array $unit): array
     {
+        // buffs は回避固定の効果だけ（古い戦闘に残った未定義のキーは出さない）
         $buffs = [];
         foreach ($unit['buffs'] as $key => $turns) {
-            if ($turns > 0) {
+            if ($turns > 0 && (config("battle.buffs.{$key}.type") ?? '') === 'evasion_set') {
                 $buffs[$key] = $turns;
             }
         }
@@ -1517,6 +1708,8 @@ class BattleEngine
             'alive' => $unit['alive'],
             'fled' => (bool) ($unit['fled'] ?? false),
             'buffs' => $buffs,
+            // 防御・攻撃の現在の段階（-3〜+3）。バッジの矢印の数になる
+            'stages' => ['def' => $this->currentStage($unit, 'def'), 'atk' => $this->currentStage($unit, 'atk')],
             'damage_shield' => (bool) ($unit['damage_shield'] ?? false),
             'life_ward' => (bool) ($unit['life_ward'] ?? false),
             'user_character_id' => $unit['user_character_id'] ?? null,

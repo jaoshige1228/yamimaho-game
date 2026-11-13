@@ -12,6 +12,8 @@ use Tests\TestCase;
  */
 class BattleEngineFloor3EnemiesTest extends TestCase
 {
+    use StageHelpers;
+
     public function test_regular_enemy_skills_are_defined(): void
     {
         $masters = new MasterDataProvider;
@@ -73,11 +75,12 @@ class BattleEngineFloor3EnemiesTest extends TestCase
         $this->assertLessThan($masters->findSpell('cult_heal')['coefficient'], (float) $repair['coefficient']);
 
         $protect = $masters->findSpell('navi_protect');
-        $this->assertSame(['ally_single', 'buff_def', 'def_up_small'], [$protect['target_type'], $protect['effect'], $protect['buff']]);
+        $this->assertSame(['ally_all', 'buff_def', 'def_up_1'], [$protect['target_type'], $protect['effect'], $protect['buff']]);
+        $this->assertStringContainsString('味方全員の防御力を1段階上げる', $protect['description']);
 
         $jamming = $masters->findSpell('navi_jamming');
-        $this->assertSame(['enemy_single', 'debuff_def', 'def_down_small'], [$jamming['target_type'], $jamming['effect'], $jamming['buff']]);
-        $this->assertGreaterThan(config('battle.buffs.def_down.multiplier'), config('battle.buffs.def_down_small.multiplier'), '単体の防御ダウン（通常）より弱い');
+        $this->assertSame(['enemy_all', 'debuff_def', 'def_down_1'], [$jamming['target_type'], $jamming['effect'], $jamming['buff']]);
+        $this->assertStringContainsString('敵全体の防御力を1段階下げる', $jamming['description']);
     }
 
     public function test_stat_profiles_follow_the_design(): void
@@ -263,19 +266,25 @@ class BattleEngineFloor3EnemiesTest extends TestCase
         $this->assertSame(150, $this->eventsOfType($result['events'], 'heal')[0]['value'], '回復量は魔力×1.0');
     }
 
-    public function test_navi_protect_buffs_one_enemy_unit_and_jamming_debuffs_one_player(): void
+    public function test_navi_protect_buffs_every_enemy_unit_and_jamming_debuffs_every_player(): void
     {
         $protect = $this->engine('navi_protect')->runEnemyTurnsUntilPlayer($this->bossState(actor: 'enemy_1'));
         $buffed = $this->eventsOfType($protect['events'], 'buff_applied');
-        $this->assertCount(1, $buffed);
-        $this->assertSame('def_up_small', $buffed[0]['buff']);
-        $this->assertSame('enemy', $protect['state']['units'][$buffed[0]['target']]['side']);
+        $this->assertEqualsCanonicalizing(['enemy_1', 'enemy_2', 'enemy_3'], array_column($buffed, 'target'));
+        $this->assertSame(['def_up_1', 'def_up_1', 'def_up_1'], array_column($buffed, 'buff'));
+        foreach (['enemy_1', 'enemy_2', 'enemy_3'] as $id) {
+            $this->assertSame(1, $this->stageSum($protect['state']['units'][$id], 'def'), $id);
+        }
+        $this->assertSame(0, $this->stageSum($protect['state']['units']['pc1'], 'def'));
 
         $jamming = $this->engine('navi_jamming')->runEnemyTurnsUntilPlayer($this->bossState(actor: 'enemy_1'));
         $debuffed = $this->eventsOfType($jamming['events'], 'buff_applied');
-        $this->assertCount(1, $debuffed);
-        $this->assertSame('def_down_small', $debuffed[0]['buff']);
-        $this->assertSame('ally', $jamming['state']['units'][$debuffed[0]['target']]['side']);
+        $this->assertEqualsCanonicalizing(['pc1', 'pc2', 'pc3', 'pc4'], array_column($debuffed, 'target'));
+        $this->assertSame(['def_down_1', 'def_down_1', 'def_down_1', 'def_down_1'], array_column($debuffed, 'buff'));
+        foreach (['pc1', 'pc2', 'pc3', 'pc4'] as $id) {
+            $this->assertSame(-1, $this->stageSum($jamming['state']['units'][$id], 'def'), $id);
+        }
+        $this->assertSame(0, $this->stageSum($jamming['state']['units']['enemy_1'], 'def'));
     }
 
     /**

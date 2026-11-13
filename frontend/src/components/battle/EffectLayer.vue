@@ -39,7 +39,7 @@ function portraitSrc(portrait) {
       v-for="d in floatingDamages"
       :key="d.id"
       class="float-damage"
-      :class="{ 'is-ally': d.ally }"
+      :class="{ 'is-ally': d.ally, 'is-miss': d.miss }"
       :style="{ left: d.x + '%', top: d.y + '%' }"
     >
       {{ d.value }}
@@ -109,14 +109,20 @@ function portraitSrc(portrait) {
   transform: translateX(-50%);
   z-index: 16;
   padding: 0.5rem 1.25rem;
-  border-radius: 999px;
+  border-radius: 1.4rem;
   background: rgba(0, 0, 0, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   font-size: 1.1rem;
   font-weight: 800;
   letter-spacing: 0.04em;
-  white-space: nowrap;
+  /* 短い告知は 1 行のまま。長い告知（悪魔級殲滅魔法の詠唱など）は、画面の幅に収まるよう折り返す */
+  width: max-content;
+  max-width: calc(100% - 1.5rem);
+  box-sizing: border-box;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
   animation: bannerPop 1.1s ease forwards;
 }
@@ -194,6 +200,22 @@ function portraitSrc(portrait) {
     0 -2px 0 #1a0408, 0 2px 0 #1a0408, -2px 0 0 #1a0408, 2px 0 0 #1a0408,
     0 3px 10px rgba(0, 0, 0, 0.9),
     0 0 18px rgba(255, 60, 80, 0.85);
+}
+/* miss（攻撃が外れた）: ダメージの数字と同じ動きで、白い字で出す。赤い光は付けず、暗い縁取りで明るい背景でも読めるようにする */
+.float-damage.is-miss {
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-shadow:
+    -1px -1px 0 #12121c, 1px -1px 0 #12121c, -1px 1px 0 #12121c, 1px 1px 0 #12121c,
+    0 2px 8px #000, 0 0 10px rgba(255, 255, 255, 0.45);
+}
+.float-damage.is-ally.is-miss {
+  color: #fff;
+  text-shadow:
+    -2px -2px 0 #12121c, 2px -2px 0 #12121c, -2px 2px 0 #12121c, 2px 2px 0 #12121c,
+    0 -2px 0 #12121c, 0 2px 0 #12121c, -2px 0 0 #12121c, 2px 0 0 #12121c,
+    0 3px 10px rgba(0, 0, 0, 0.9),
+    0 0 14px rgba(255, 255, 255, 0.45);
 }
 .float-support {
   position: absolute;

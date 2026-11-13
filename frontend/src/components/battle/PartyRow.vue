@@ -116,6 +116,7 @@ function onSlotClick(unit) {
         </picture>
         <BuffIcons
           :buffs="unit.buffs"
+          :stages="unit.stages"
           :buff-icons="buffIcons"
           :damage-shield="unit.damage_shield"
           :life-ward="unit.life_ward"

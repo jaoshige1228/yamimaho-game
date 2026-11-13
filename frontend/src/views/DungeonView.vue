@@ -103,9 +103,6 @@ const canHeal = computed(
 
 const canRetreat = computed(() => canHeal.value);
 
-/** 誰かが傷ついている（HP・MP が減っている、または戦闘不能）。「回復」ボタンに目印を出す */
-const needsHeal = computed(() => party.value.some((u) => u.hp < u.max_hp || u.mp < u.max_mp));
-
 function onHealUpdated(data) {
   if (Array.isArray(data?.party)) {
     party.value = data.party;
@@ -413,12 +410,10 @@ onMounted(async () => {
           v-if="canHeal"
           type="button"
           class="scene-overlay-heal"
-          :class="{ 'needs-heal': needsHeal }"
-          :aria-label="needsHeal ? '回復（傷ついた味方がいます）' : '回復'"
+          aria-label="回復"
           @click="healModalOpen = true"
         >
           <span class="scene-overlay-heal__plus" aria-hidden="true">＋</span>回復
-          <span v-if="needsHeal" class="scene-overlay-heal__dot" aria-hidden="true" />
         </button>
 
         <button
@@ -493,16 +488,5 @@ onMounted(async () => {
   color: #8dffb4;
   font-size: 1.05rem;
   line-height: 1;
-}
-/* 傷ついた味方がいるときの目印 */
-.scene-overlay-heal__dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 11px;
-  height: 11px;
-  border: 2px solid #12091f;
-  border-radius: 50%;
-  background: #ff5d7a;
 }
 </style>

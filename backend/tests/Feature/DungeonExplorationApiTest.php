@@ -7,6 +7,7 @@ use App\Models\DungeonExplorationSession;
 use App\Models\ItemMaster;
 use App\Models\User;
 use App\Models\UserCharacter;
+use App\Models\UserDungeonProgress;
 use App\Models\UserItem;
 use App\Services\Growth\LevelGrowthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -443,7 +444,7 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertDatabaseHas('dungeon_event_nodes', [
             'event_code' => 'mysterious_presence',
             'node_key' => 'choose',
-            'next_on_success' => 'level_check',
+            'next_on_success' => 'clear_check',
             'next_on_fail' => 'decline1',
         ]);
         $choice->assertJsonPath('segment.prompt', '空間の裂け目に、入りますか？');
@@ -470,9 +471,10 @@ class DungeonExplorationApiTest extends TestCase
         $this->assertStringContainsString(self::EPILOGUE_TEXT, $transcript);
     }
 
-    public function test_mysterious_presence_yes_starts_boss_battle_when_whole_party_is_level_20_or_more(): void
+    public function test_mysterious_presence_yes_starts_boss_battle_once_floor_3_is_cleared(): void
     {
-        UserCharacter::query()->update(['level' => 20]);
+        // レベルは関係ない（全員 Lv1 のまま）。3 層のボスを倒していれば入れる
+        UserDungeonProgress::query()->update(['cleared_floor' => 3]);
         $hpBefore = UserCharacter::query()->orderBy('id')->pluck('hp')->all();
 
         [$sessionId, $response] = $this->chooseYesInMysteriousPresence();
@@ -488,14 +490,16 @@ class DungeonExplorationApiTest extends TestCase
         $response->assertJsonPath('boss_encounter', true);
         $this->assertStringNotContainsString('足がすくんで', $transcript);
         $this->assertSame($hpBefore, UserCharacter::query()->orderBy('id')->pluck('hp')->all());
+
+        // 裂け目の先は、慈愛・伝説・奏楽・光導の 4 人の魔法使い（左から）
+        $this->assertRiftBattle($response, expectedFloor: 1);
     }
 
-    public function test_mysterious_presence_yes_ends_without_battle_when_anyone_is_below_level_20(): void
+    public function test_mysterious_presence_yes_ends_without_battle_before_floor_3_is_cleared(): void
     {
-        UserCharacter::query()->update(['level' => 20]);
-        $weakest = UserCharacter::query()->orderBy('id')->firstOrFail();
-        $weakest->level = 19;
-        $weakest->save();
+        // 2 層までを踏破していても、レベルが十分でも、3 層のボスを倒すまでは入れない
+        UserCharacter::query()->update(['level' => 30]);
+        UserDungeonProgress::query()->update(['cleared_floor' => 2]);
         $hpBefore = UserCharacter::query()->orderBy('id')->pluck('hp')->all();
 
         [$sessionId, $response] = $this->chooseYesInMysteriousPresence();
@@ -512,9 +516,64 @@ class DungeonExplorationApiTest extends TestCase
 
         $response->assertJsonPath('segment.kind', 'complete');
         $this->assertStringContainsString('しかし、どうしても足がすくんで動けなかった。', $transcript);
-        $this->assertStringContainsString('この先へ進むには、強さが足りないと確信するだろう', $transcript);
+        $this->assertStringContainsString('全ての層を踏破したのであれば、あるいは', $transcript);
         $this->assertStringContainsString(self::EPILOGUE_TEXT, $transcript);
         $this->assertSame($hpBefore, UserCharacter::query()->orderBy('id')->pluck('hp')->all());
+    }
+
+    public function test_mysterious_presence_on_floor_2_fights_the_same_four_mages(): void
+    {
+        UserDungeonProgress::query()->update(['floor' => 2, 'unlocked_floor' => 2, 'cleared_floor' => 3]);
+
+        $this->assertRiftBattle($this->enterRiftBattle(), expectedFloor: 2);
+    }
+
+    public function test_mysterious_presence_on_floor_3_fights_the_same_four_mages(): void
+    {
+        UserDungeonProgress::query()->update(['floor' => 3, 'unlocked_floor' => 3, 'cleared_floor' => 3]);
+
+        $this->assertRiftBattle($this->enterRiftBattle(), expectedFloor: 3);
+    }
+
+    /**
+     * 「謎の気配」で「はい」を選び、戦闘が始まるまで進める。
+     */
+    private function enterRiftBattle(): \Illuminate\Testing\TestResponse
+    {
+        [$sessionId, $response] = $this->chooseYesInMysteriousPresence();
+        for ($i = 0; $i < 6 && $response->json('event') !== 'battle'; $i++) {
+            $response = $this->postJson('/api/dungeon/exploration/continue', ['session_id' => $sessionId])
+                ->assertOk();
+        }
+
+        return $response;
+    }
+
+    /**
+     * 裂け目の戦闘: ボス戦扱いで、慈愛・伝説・奏楽・光導の 4 人（左から）。どの層から入っても同じ。
+     *
+     * レスポンスの floor は「いまの進行中の層」で、開幕の敵フェーズでパーティーが全滅すると 1 に戻ることがある。
+     * そのため、入った層は戦闘の meta で確かめる。
+     */
+    private function assertRiftBattle(\Illuminate\Testing\TestResponse $response, int $expectedFloor): void
+    {
+        $response->assertJsonPath('event', 'battle');
+        $response->assertJsonPath('boss_encounter', true);
+
+        $state = \App\Models\BattleState::query()->findOrFail($response->json('battle_id'))->state;
+        $enemies = collect($state['units'])->where('side', 'enemy');
+        $this->assertSame(
+            ['rift_mercy', 'rift_legend', 'rift_music', 'rift_guide'],
+            $enemies->pluck('master_code')->values()->all(),
+        );
+        $this->assertSame(
+            ['慈愛の魔法使い', '伝説の魔法使い', '奏楽の魔法使い', '光導の魔法使い'],
+            $enemies->pluck('name')->values()->all(),
+        );
+        $this->assertTrue($state['meta']['boss']);
+        $this->assertTrue($state['meta']['rift']);
+        $this->assertFalse($state['meta']['can_flee']);
+        $this->assertSame($expectedFloor, (int) $state['meta']['floor']);
     }
 
     /**

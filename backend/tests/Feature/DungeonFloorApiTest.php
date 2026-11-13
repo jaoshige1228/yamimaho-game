@@ -405,6 +405,25 @@ class DungeonFloorApiTest extends TestCase
             ->whereHas('characterMaster', fn ($q) => $q->where('code', 'pc1'))->firstOrFail()->max_mp_bonus);
     }
 
+    public function test_dungeon_status_says_when_every_floor_has_been_cleared(): void
+    {
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 1, 'unlocked_floor' => 3, 'cleared_floor' => 2, 'step' => 0, 'in_dungeon' => false],
+        );
+
+        $this->getJson('/api/dungeon')->assertOk()
+            ->assertJsonPath('cleared_floor', 2)
+            ->assertJsonPath('all_floors_cleared', false);
+
+        $this->winFloor3Boss($user);
+
+        $this->getJson('/api/dungeon')->assertOk()
+            ->assertJsonPath('cleared_floor', 3)
+            ->assertJsonPath('all_floors_cleared', true);
+    }
+
     /**
      * 3 層のボス戦に勝つ。ボスの撃破処理は敵の種類によらないので、攻撃してこないナビを HP1 にして、こぶしで倒す
      * （ゼロだと、レベル1のパーティが開幕に全滅して操作できなくなることがある）。

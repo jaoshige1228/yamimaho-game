@@ -16,6 +16,8 @@ use Tests\TestCase;
  */
 class FamiliarSupportTest extends TestCase
 {
+    use StageHelpers;
+
     // ---- 発動の抽選 ----
 
     public function test_nothing_happens_without_a_familiar_in_the_battle(): void
@@ -168,8 +170,9 @@ class FamiliarSupportTest extends TestCase
             $this->assertSame($upgraded, $support->coefficientFor($action, 8), "{$action} Lv8");
             $this->assertSame($upgraded, $support->coefficientFor($action, 9), "{$action} Lv9");
         }
-        $this->assertSame('atk_up_familiar', $support->attackBuffKey(7));
-        $this->assertSame('atk_up_familiar_large', $support->attackBuffKey(8));
+        // 攻撃バフは段階制: Lv6〜7 は攻撃1段階（×1.2）、Lv8 以降は2段階（×1.4）
+        $this->assertSame('atk_up_1', $support->attackBuffKey(7));
+        $this->assertSame('atk_up_2', $support->attackBuffKey(8));
 
         // 実際のダメージ: (25 - 5) × 2.0 = 40。傷ついた味方がいれば「攻撃バフが必ず発動」にならず、最初の選択肢（敵単体）を選べる
         $state = $this->state(level: 8);
@@ -249,8 +252,11 @@ class FamiliarSupportTest extends TestCase
 
         $this->assertSame('味方全員に強化魔法を唱えた！', collect($result['events'])->firstWhere('type', 'familiar_action')['text']);
         $buffed = collect($result['events'])->where('type', 'buff_applied')->pluck('buff', 'target')->all();
-        $this->assertSame(['pc1' => 'atk_up_familiar', 'pc2' => 'atk_up_familiar', 'pc3' => 'atk_up_familiar', 'pc4' => 'atk_up_familiar'], $buffed);
-        $this->assertSame(3, $result['state']['units']['pc1']['buffs']['atk_up_familiar']);
+        $this->assertSame(['pc1' => 'atk_up_1', 'pc2' => 'atk_up_1', 'pc3' => 'atk_up_1', 'pc4' => 'atk_up_1'], $buffed);
+        $this->assertSame(1, $this->stageSum($result['state']['units']['pc1'], 'atk'));
+        $this->assertSame('familiar', $result['state']['units']['pc1']['stages'][0]['source']);
+        // 全員の行動が一周したあとなので、持続ターンは行動した人の分だけ減っている（1回の付与ごとに独立して数える）
+        $this->assertSame(3, $result['state']['units']['pc2']['stages'][0]['turns']);
     }
 
     public function test_attack_buff_is_not_forced_when_someone_is_wounded(): void
@@ -266,7 +272,7 @@ class FamiliarSupportTest extends TestCase
     public function test_attack_buff_is_not_forced_while_an_ally_already_has_it(): void
     {
         $state = $this->state(level: 6);
-        $state['units']['pc3']['buffs']['atk_up_familiar'] = 2;
+        $state['units']['pc3']['stages'] = [$this->stageEntry('atk', 1, 2, 'familiar')];
 
         $result = $this->roundEnd($state, [1, 0, 0, 0]);
 
@@ -279,13 +285,14 @@ class FamiliarSupportTest extends TestCase
         $method->setAccessible(true);
         $engine = $this->engine([]);
 
-        $unit = fn (string $buff) => ['str' => 10, 'mag' => 20, 'def' => 5, 'buffs' => [$buff => 3]];
+        $unit = fn (int $stage) => ['str' => 10, 'mag' => 20, 'def' => 5, 'buffs' => [], 'stages' => [$this->stageEntry('atk', $stage, 3, 'familiar')]];
 
-        $this->assertEqualsWithDelta(12.0, $method->invoke($engine, $unit('atk_up_familiar'), 'str'), 0.0001);
-        $this->assertEqualsWithDelta(24.0, $method->invoke($engine, $unit('atk_up_familiar'), 'mag'), 0.0001);
-        $this->assertEqualsWithDelta(5.0, $method->invoke($engine, $unit('atk_up_familiar'), 'def'), 0.0001, '防御には乗らない');
-        $this->assertEqualsWithDelta(13.0, $method->invoke($engine, $unit('atk_up_familiar_large'), 'str'), 0.0001);
-        $this->assertEqualsWithDelta(26.0, $method->invoke($engine, $unit('atk_up_familiar_large'), 'mag'), 0.0001);
+        // 1段階（Lv6〜7）= ×1.2、2段階（Lv8 以降）= ×1.4
+        $this->assertEqualsWithDelta(12.0, $method->invoke($engine, $unit(1), 'str'), 0.0001);
+        $this->assertEqualsWithDelta(24.0, $method->invoke($engine, $unit(1), 'mag'), 0.0001);
+        $this->assertEqualsWithDelta(5.0, $method->invoke($engine, $unit(1), 'def'), 0.0001, '防御には乗らない');
+        $this->assertEqualsWithDelta(14.0, $method->invoke($engine, $unit(2), 'str'), 0.0001);
+        $this->assertEqualsWithDelta(28.0, $method->invoke($engine, $unit(2), 'mag'), 0.0001);
     }
 
     public function test_the_familiar_can_finish_off_the_last_enemy(): void

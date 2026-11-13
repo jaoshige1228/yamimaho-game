@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
 import UnitBars from '../battle/UnitBars.vue';
-import { enemySpriteAssetKey } from '../../utils/enemySprite';
-import { characterSpriteUrls, publicAssetUrl } from '../../utils/publicAssetUrl.js';
+import { enemySpriteUrl } from '../../utils/enemySprite';
+import { characterSpriteUrls } from '../../utils/publicAssetUrl.js';
 
 const props = defineProps({
   unit: { type: Object, required: true },
@@ -41,12 +41,7 @@ const spriteUrl = computed(() => {
     return characterSpriteUrls(props.unit.sprite).webp;
   }
 
-  const key = enemySpriteAssetKey(props.unit);
-  // NPC（グース／カース）の画像は characters/ に WebP で置いてある
-  if (key.startsWith('npc_')) {
-    return characterSpriteUrls(key).webp;
-  }
-  return publicAssetUrl(`/assets/enemies/${key}.png`);
+  return enemySpriteUrl(props.unit);
 });
 
 const showEquipment = computed(

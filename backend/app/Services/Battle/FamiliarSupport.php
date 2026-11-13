@@ -187,8 +187,9 @@ class FamiliarSupport
     private function anyHasBuff(array $units, array $allyIds): bool
     {
         foreach ($allyIds as $id) {
-            foreach (['atk_up_familiar', 'atk_up_familiar_large'] as $buffKey) {
-                if ((int) ($units[$id]['buffs'][$buffKey] ?? 0) > 0) {
+            // 使い魔の攻撃バフ（stages の source が familiar）が、まだ残っているか
+            foreach ($units[$id]['stages'] ?? [] as $entry) {
+                if (($entry['source'] ?? '') === BattleEngine::FAMILIAR_SOURCE && (int) ($entry['turns'] ?? 0) > 0) {
                     return true;
                 }
             }

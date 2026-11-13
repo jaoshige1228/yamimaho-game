@@ -67,25 +67,60 @@ return [
     /** 蘇生魔法（effect=revive_chance）で復活したときの HP（最大 HP に対する割合 %）。戦闘中・探索中で共通 */
     'revive_hp_percent' => 50,
 
+    /**
+     * 防御・攻撃のバフ／デバフは「段階」で管理する（-3〜+3）。
+     * ユニットの `stages` に、付与1回につき1要素（stat・amount・turns・source）を持ち、持続ターンは要素ごとに独立。
+     * 現在の段階 = その stat の amount の合計を -max〜+max に丸めたもの。倍率は下の multipliers で決まる。
+     * 攻撃（atk）は筋力と魔力の両方、防御（def）は def・pdef・mdef のすべてに掛かる。
+     */
+    'stage' => [
+        'max' => 3,
+        'turns' => 3,
+        'multipliers' => [
+            'def' => [1 => 1.2, 2 => 1.4, 3 => 1.7, -1 => 0.8, -2 => 0.65, -3 => 0.5],
+            'atk' => [1 => 1.2, 2 => 1.4, 3 => 1.6, -1 => 0.8, -2 => 0.65, -3 => 0.5],
+        ],
+        /** 段階の stat が掛かるユニットのステータス */
+        'applies_to' => [
+            'def' => ['def', 'pdef', 'mdef'],
+            'atk' => ['str', 'mag'],
+        ],
+    ],
+
+    /**
+     * 魔法の buff_key（spell_masters.csv）から引く効果。
+     * type=stage … 防御・攻撃の段階（stat は def / atk、delta は上がる段階（+）／下がる段階（-））
+     * type=evasion_set … 回避率を固定する（ユニットの `buffs` に残りターンで持つ）
+     */
     'buffs' => [
-        'def_up' => ['stat' => 'def', 'multiplier' => 1.4, 'turns' => 3, 'icon' => 'def_up'],
-        'def_up_large' => ['stat' => 'def', 'multiplier' => 1.5, 'turns' => 3, 'icon' => 'def_up_large'],
-        'def_down' => ['stat' => 'def', 'multiplier' => 0.7, 'turns' => 3, 'icon' => 'def_down'],
-        'def_down_large' => ['stat' => 'def', 'multiplier' => 0.6, 'turns' => 3, 'icon' => 'def_down_large'],
-        'atk_up' => ['stat' => 'str', 'multiplier' => 1.2, 'turns' => 3, 'icon' => 'atk_up'],
-        'atk_up_large' => ['stat' => 'str', 'multiplier' => 1.5, 'turns' => 3, 'icon' => 'atk_up_large'],
-        'atk_down' => ['stat' => 'str', 'multiplier' => 0.8, 'turns' => 3, 'icon' => 'atk_down'],
-        'atk_down_large' => ['stat' => 'str', 'multiplier' => 0.6, 'turns' => 3, 'icon' => 'atk_down_large'],
+        'def_up_1' => ['type' => 'stage', 'stat' => 'def', 'delta' => 1],
+        'def_up_2' => ['type' => 'stage', 'stat' => 'def', 'delta' => 2],
+        'def_up_3' => ['type' => 'stage', 'stat' => 'def', 'delta' => 3],
+        'def_down_1' => ['type' => 'stage', 'stat' => 'def', 'delta' => -1],
+        'def_down_2' => ['type' => 'stage', 'stat' => 'def', 'delta' => -2],
+        'def_down_3' => ['type' => 'stage', 'stat' => 'def', 'delta' => -3],
+        'atk_up_1' => ['type' => 'stage', 'stat' => 'atk', 'delta' => 1],
+        'atk_up_2' => ['type' => 'stage', 'stat' => 'atk', 'delta' => 2],
+        'atk_up_3' => ['type' => 'stage', 'stat' => 'atk', 'delta' => 3],
+        'atk_down_1' => ['type' => 'stage', 'stat' => 'atk', 'delta' => -1],
+        'atk_down_2' => ['type' => 'stage', 'stat' => 'atk', 'delta' => -2],
+        'atk_down_3' => ['type' => 'stage', 'stat' => 'atk', 'delta' => -3],
         'evasion_set' => ['type' => 'evasion_set', 'value' => 60, 'turns' => 3, 'icon' => 'evasion'],
-        // 全体魔法・新魔法用（アイコンは既存のものを流用）
-        'def_up_small' => ['stat' => 'def', 'multiplier' => 1.2, 'turns' => 3, 'icon' => 'def_up'],
-        'def_down_small' => ['stat' => 'def', 'multiplier' => 0.8, 'turns' => 3, 'icon' => 'def_down'],
-        // 使い魔の支援（攻撃バフ）。筋力と魔力の両方に乗る。Lv8 以降は large（config/familiar.php）
-        'atk_up_familiar' => ['stat' => ['str', 'mag'], 'multiplier' => 1.2, 'turns' => 3, 'icon' => 'atk_up'],
-        'atk_up_familiar_large' => ['stat' => ['str', 'mag'], 'multiplier' => 1.3, 'turns' => 3, 'icon' => 'atk_up'],
-        // 大爆樹用（×0.65）
-        'def_down_big' => ['stat' => 'def', 'multiplier' => 0.65, 'turns' => 3, 'icon' => 'def_down_large'],
-        'def_down_huge' => ['stat' => 'def', 'multiplier' => 0.5, 'turns' => 3, 'icon' => 'def_down_large'],
         'evasion_set_small' => ['type' => 'evasion_set', 'value' => 30, 'turns' => 3, 'icon' => 'evasion'],
+        // 裂け目の光導の魔法使い（悪魔の幻影群）
+        'evasion_set_20' => ['type' => 'evasion_set', 'value' => 20, 'turns' => 3, 'icon' => 'evasion'],
+    ],
+
+    /**
+     * 詠唱が数ターンかかる敵の技（enemy_skills.csv の action_type = charged_spell）。キーは技のコード。
+     * 唱え始めたターンに start、次の行動で chant、そのまた次の行動で fire（効果が出る）。{name} は唱える敵の名前。
+     * 詠唱の途中でその敵が倒れれば、効果は出ない（倒れた敵は行動しない）。
+     */
+    'charged_skills' => [
+        'rift_evil_infinity' => [
+            'start' => '{name}はおぞましい魔法を唱えようとしている……。',
+            'chant' => '{name}はおぞましい魔法を詠唱し始めた！',
+            'fire' => '{name}は悪魔級殲滅魔法（イーヴィルインフィニティ）を唱え終えた！',
+        ],
     ],
 ];

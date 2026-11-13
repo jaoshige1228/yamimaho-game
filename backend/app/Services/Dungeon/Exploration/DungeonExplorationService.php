@@ -45,7 +45,7 @@ class DungeonExplorationService
 
         $code = $eventCode ?? ($dialogueOnlyPool
             ? $this->catalog->pickRandomDialogueEventCode($floor)
-            : $this->catalog->pickRandomEventCode($floor));
+            : $this->catalog->pickRandomEventCode($floor, $this->progress->hasClearedAllFloors($user)));
         $event = $this->catalog->resolveEvent($floor, $code);
         $context = $this->engine->buildInitialContext($user, $code);
         $context['skip_epilogue'] = $event->skipEpilogue;
@@ -219,6 +219,24 @@ class DungeonExplorationService
             }
 
             $this->clearSessions($user);
+
+            // 戦闘のセット（裂け目の 4 人の魔法使いなど）
+            if ((bool) ($segment['event_battle'] ?? false)) {
+                /** @var list<string> $codes */
+                $codes = $segment['enemy_codes'] ?? [];
+
+                return array_merge(
+                    $this->battleLauncher->startEventBattle(
+                        $user,
+                        $floor,
+                        $step,
+                        $codes,
+                        (bool) ($segment['rift'] ?? false) ? ['rift' => true] : [],
+                    ),
+                    ['party' => $this->partyPayload($user)],
+                );
+            }
+
             $enemyCode = (string) ($segment['enemy_code'] ?? 'inu_moe');
 
             return array_merge(
