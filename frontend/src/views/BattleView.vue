@@ -142,6 +142,9 @@ const resultTitle = computed(() => {
   return '敗北…';
 });
 
+/** 結果画面に出すゴールド。敗北では、戦闘中に敵を倒していても入らないので出さない（勝ったときだけ） */
+const resultGold = computed(() => (state.value?.status === 'victory' ? goldGained.value : 0));
+
 const showLearnedStep = computed(
   () => learnedSpellMessages.value.length > 0 && resultStep.value === 'learned',
 );
@@ -500,9 +503,15 @@ const FAMILIAR_BANNER_MS = 1200;
 /** 敵アイコンが前に出る動きの長さ（ms） */
 const ENEMY_LUNGE_MS = 280;
 
-/** 「〇〇は△△を唱えた！」の告知イベントか */
+/**
+ * 魔法の告知イベントか（フラッシュ・効果音・間を出す対象）。
+ * 「〇〇は△△を唱えた！」だけでなく、特技（演奏・調合など。「〇〇の△△！」）も同じ演出にするため、
+ * 文章の「唱え」ではなく、魔法の告知に付く spell_effect / spell_element で見分ける。
+ * （詠唱の途中の「詠唱し始めた！」は、どちらも付かないので、演出は出ない）
+ */
 function isSpellAnnounce(ev) {
-  return ev?.type === 'announce' && Boolean(ev.text?.includes('唱え'));
+  if (ev?.type !== 'announce') return false;
+  return Boolean(ev.spell_effect || ev.spell_element || ev.text?.includes('唱え'));
 }
 
 async function playEvents(events) {
@@ -591,6 +600,13 @@ async function playEvents(events) {
       await showSupportEffect(ev.target, isDebuff ? 'debuff' : 'buff');
       await delay(120);
     }
+    if (ev.type === 'mp_recovered') {
+      // 魔力集中: MP が回復した（直前の damage が、引き換えに減った HP）
+      showFloatingSupport(ev.target, `MP +${ev.value}`, 'mp');
+      playSe('heal');
+      await showSupportEffect(ev.target, 'buff');
+      await delay(120);
+    }
     if (ev.type === 'shield_applied') {
       setBadgeFlag(ev.target, 'damage_shield', true);
       showFloatingSupport(ev.target, '盾', 'shield');
@@ -631,7 +647,15 @@ async function playEvents(events) {
       showActionBanner(`${unitName(ev.target)}が蘇生した！`);
       await delay(280);
     }
-    if (ev.type === 'revive_failed' || ev.type === 'spell_failed') {
+    if (ev.type === 'spell_failed') {
+      // 即死魔法（クリーナーのデリートなど）が、その相手に効かなかった。
+      // 対象が複数でも、何が起きたか分かるように、狙われた相手の位置に白い「miss」を、1 人ずつ順番に出す（回避と同じ見せ方）
+      showFloatingDamage(ev.target, 0, true);
+      playSe('miss');
+      await delay(280);
+      await delay(120);
+    }
+    if (ev.type === 'revive_failed') {
       showActionBanner('効果がなかった…');
       await delay(280);
     }
@@ -831,6 +855,11 @@ function onKick() {
 
 function onSpell(spell) {
   showCommandModal.value = false;
+  // 自分に使う魔法（魔力集中）は、相手を選ばず、すぐ唱える
+  if (spell.target_type === 'self') {
+    doAction({ action: 'spell', spell_id: spell.id });
+    return;
+  }
   pendingAction.value = { action: 'spell', spell_id: spell.id, spell };
   targetMode.value = spell.target_type;
 }
@@ -1010,8 +1039,8 @@ watch(
       <ul v-if="showLearnedStep" class="reward-list">
         <li v-for="(line, i) in learnedSpellMessages" :key="i">{{ line }}</li>
       </ul>
-      <ul v-else-if="victoryRewards.length || goldGained > 0" class="reward-list">
-        <li v-if="goldGained > 0">ゴールドを {{ goldGained }} 獲得した</li>
+      <ul v-else-if="victoryRewards.length || resultGold > 0" class="reward-list">
+        <li v-if="resultGold > 0">ゴールドを {{ resultGold }} 獲得した</li>
         <li v-for="(line, i) in victoryRewards" :key="i">{{ line }}</li>
       </ul>
       <button v-if="showNextButton" type="button" class="btn-primary" @click="onResultNext">

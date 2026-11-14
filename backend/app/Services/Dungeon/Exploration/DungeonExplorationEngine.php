@@ -26,6 +26,8 @@ class DungeonExplorationEngine
     private const NPC_SPEAKERS = [
         'gusu' => ['name' => 'グース', 'sprite' => 'npc_gusu'],
         'kasu' => ['name' => 'カース', 'sprite' => 'npc_kasu'],
+        // ステラ（同じ魔法学校の生徒。2 層・3 層の「ステラ登場」）。立ち絵は characters/stella.webp（PC と同じ 600×1200）
+        'stella' => ['name' => 'ステラ', 'sprite' => 'stella'],
     ];
 
     public function __construct(

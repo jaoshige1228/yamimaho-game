@@ -16,6 +16,7 @@ class DungeonEventMaster extends Model
         'event_type',
         'start_node_key',
         'skip_epilogue',
+        'once_per_run',
     ];
 
     /** @return array<string, string> */
@@ -23,6 +24,7 @@ class DungeonEventMaster extends Model
     {
         return [
             'skip_epilogue' => 'boolean',
+            'once_per_run' => 'boolean',
         ];
     }
 

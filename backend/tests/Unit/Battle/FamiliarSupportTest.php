@@ -51,6 +51,7 @@ class FamiliarSupportTest extends TestCase
             'Lv6' => [6, 30],
             'Lv7' => [7, 40],
             'Lv9' => [9, 40],
+            'Lv10' => [10, 50],
         ];
     }
 
@@ -144,6 +145,8 @@ class FamiliarSupportTest extends TestCase
         ], $names(6));
         // 蘇生は選択肢には入らず、戦闘不能の味方がいるときだけ必ず行う
         $this->assertSame($names(6), $names(9));
+        // Lv10 で増えるのは発動確率（50%）だけ。行動の種類は Lv9 と同じ
+        $this->assertSame($names(9), $names(10));
     }
 
     // ---- 効果 ----
@@ -233,6 +236,22 @@ class FamiliarSupportTest extends TestCase
         $this->assertSame(['familiar', 'pc2', 30], [$revive['actor'], $revive['target'], $revive['hp']], '最大HP100の30%');
         $this->assertTrue($result['state']['units']['pc2']['alive']);
         $this->assertSame(30, $result['state']['units']['pc2']['hp']);
+    }
+
+    public function test_level_ten_also_revives_first_and_keeps_the_upgraded_strength(): void
+    {
+        $state = $this->state(level: 10);
+        $state['units']['pc2']['hp'] = 0;
+        $state['units']['pc2']['alive'] = false;
+        $state['units']['pc1']['hp'] = 10;
+
+        $result = $this->roundEnd($state, [1, 0, 0, 0]);
+
+        $this->assertSame('木を蘇生した！', collect($result['events'])->firstWhere('type', 'familiar_action')['text']);
+        $this->assertTrue($result['state']['units']['pc2']['alive']);
+
+        // Lv8 以降の強化版の係数が、Lv10 でも使われる
+        $this->assertSame(2.0, (new FamiliarSupport)->coefficientFor('enemy_single', 10));
     }
 
     public function test_revive_is_unavailable_below_level_nine(): void

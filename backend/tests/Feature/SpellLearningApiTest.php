@@ -124,6 +124,80 @@ class SpellLearningApiTest extends TestCase
         $this->assertSame(8 + 12, UserCharacterLearnedSpell::query()->count());
     }
 
+    public function test_defeating_the_floor3_boss_teaches_each_character_their_new_spells_once(): void
+    {
+        // 1 層・2 層のボスを倒したあとの状態から始める（20 個覚えている）
+        $this->winIfrineBattle();
+        $this->winFloor2BossBattle();
+        $before = UserCharacterLearnedSpell::query()->count();
+        $this->assertSame(8 + 12, $before);
+
+        $first = $this->winFloor3BossBattle();
+        $learned = collect($first['events'])->firstWhere('type', 'spells_learned');
+
+        $this->assertNotNull($learned);
+        $this->assertSame(['pc1', 'pc2', 'pc3', 'pc4'], array_column($learned['characters'], 'slot_id'));
+        $this->assertSame(
+            [['奇跡の虹', '奇跡の雫'], ['闘志の旋律'], ['魔力集中'], ['応急手当']],
+            array_map(fn (array $c) => array_column($c['spells'], 'label'), $learned['characters']),
+        );
+        $this->assertSame([[], [], [], []], array_map(fn (array $c) => $c['forgotten'], $learned['characters']), '忘れる魔法はない');
+        $this->assertSame($before + 5, UserCharacterLearnedSpell::query()->count());
+
+        // 次の戦闘から、並び順どおりに使える（以前の魔法はそのまま）
+        $next = $this->postJson('/api/battles/demo-boss')->assertOk()->json('battle_id');
+        $this->assertSame(
+            ['pc1_heal_water', 'pc1_holy_water', 'pc1_spirit_water', 'pc1_spirit_rainbow', 'pc1_water_blade', 'pc1_water_fierce_blade', 'pc1_water_veil', 'pc1_water_veil_all', 'pc1_miracle_rainbow', 'pc1_miracle_drop'],
+            $this->allySpells($next, 'pc1'),
+        );
+        $this->assertSame(
+            ['pc2_vine_whip', 'pc2_vine_spear', 'pc2_vine_bind', 'pc2_great_burst_tree', 'pc2_world_tree_breath', 'pc2_world_tree_drop', 'pc2_quick_brew', 'pc2_fighting_melody'],
+            $this->allySpells($next, 'pc2'),
+        );
+        $this->assertSame(
+            ['pc3_fire_shot', 'pc3_fire_burst', 'pc3_great_explosion', 'pc3_fire_wave', 'pc3_dragon_breath', 'pc3_black_hole', 'pc3_ragaon_beat', 'pc3_mana_focus'],
+            $this->allySpells($next, 'pc3'),
+        );
+        $this->assertSame(
+            ['pc4_stone_shot', 'pc4_rock_fall', 'pc4_meteor_shower', 'pc4_earth_armor', 'pc4_steel_wall', 'pc4_shield_magic', 'pc4_life_ward', 'pc4_first_aid'],
+            $this->allySpells($next, 'pc4'),
+        );
+
+        // 2 回目以降に倒しても、覚え直しにはならない
+        $second = $this->winFloor3BossBattle();
+        $this->assertNull(collect($second['events'])->firstWhere('type', 'spells_learned'));
+        $this->assertSame($before + 5, UserCharacterLearnedSpell::query()->count());
+    }
+
+    public function test_the_floor3_boss_alone_teaches_the_new_spells_even_without_the_earlier_bosses(): void
+    {
+        // 覚える条件は「ゼロを倒すこと」だけ。1・2 層のボスを倒していなくても（管理画面などで先に進んだ場合）覚える
+        $first = $this->winFloor3BossBattle();
+        $learned = collect($first['events'])->firstWhere('type', 'spells_learned');
+
+        $this->assertNotNull($learned);
+        $this->assertSame(
+            [['奇跡の虹', '奇跡の雫'], ['闘志の旋律'], ['魔力集中'], ['応急手当']],
+            array_map(fn (array $c) => array_column($c['spells'], 'label'), $learned['characters']),
+        );
+        $this->assertSame(5, UserCharacterLearnedSpell::query()->count());
+    }
+
+    public function test_the_rift_mages_and_other_enemies_do_not_teach_the_floor3_spells(): void
+    {
+        $learning = app(\App\Services\Player\SpellLearningService::class);
+        $user = User::query()->where('email', config('game.demo_user_email'))->first() ?? $this->demoUserWithParty();
+
+        foreach (['bat', 'rift_mercy', 'rift_legend', 'navi', 'cleaner'] as $code) {
+            $state = ['units' => ['enemy_1' => ['side' => 'enemy', 'master_code' => $code, 'alive' => false]]];
+            $this->assertSame([], $learning->learnAfterVictory($state, $user), $code);
+        }
+        // 逃げたゼロは、倒したことにならない
+        $fled = ['units' => ['enemy_1' => ['side' => 'enemy', 'master_code' => 'zero', 'alive' => false, 'fled' => true]]];
+        $this->assertSame([], $learning->learnAfterVictory($fled, $user));
+        $this->assertSame(0, UserCharacterLearnedSpell::query()->count());
+    }
+
     public function test_reset_brings_back_the_forgotten_spells(): void
     {
         $this->winIfrineBattle();
@@ -408,6 +482,30 @@ class SpellLearningApiTest extends TestCase
         $start = $this->postJson('/api/test_battles/start', ['preset' => 'floor2_boss'])->assertOk();
 
         return $this->winAgainst($start->json('battle_id'));
+    }
+
+    /**
+     * 3 層のボス戦（ゼロとナビ 2 体）を始めて倒す。
+     *
+     * @return array{state: array<string, mixed>, events: list<array<string, mixed>>}
+     */
+    private function winFloor3BossBattle(): array
+    {
+        // ゼロは強いので、先に育てて全回復しておく
+        $this->postJson('/api/admins/grant-exp', ['exp' => 400000])->assertOk();
+        $user = User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
+        app(\App\Services\Player\UserCharacterService::class)->restorePartyToFull($user);
+
+        $start = $this->postJson('/api/test_battles/start', ['preset' => 'floor3_boss'])->assertOk();
+
+        return $this->winAgainst($start->json('battle_id'));
+    }
+
+    private function demoUserWithParty(): User
+    {
+        $this->postJson('/api/battles/demo')->assertOk();
+
+        return User::query()->where('email', config('game.demo_user_email'))->firstOrFail();
     }
 
     /**

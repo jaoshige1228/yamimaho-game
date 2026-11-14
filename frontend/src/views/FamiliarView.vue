@@ -18,7 +18,7 @@ const leveledUp = ref(false);
 const status = ref(null);
 
 const level = computed(() => status.value?.level ?? 0);
-const maxLevel = computed(() => status.value?.max_level ?? 9);
+const maxLevel = computed(() => status.value?.max_level ?? 10);
 const feedCost = computed(() => status.value?.feed_cost ?? 100);
 const maxReached = computed(() => status.value?.max_reached === true);
 const canFeed = computed(() => !!status.value && !maxReached.value && player.gold >= feedCost.value);
@@ -117,7 +117,7 @@ onMounted(load);
           >
             魔石を{{ bulkCount }}個与える（{{ bulkCost }}G）
           </button>
-          <p v-if="maxReached" class="feed-hint">使い魔はこれ以上強くならない。</p>
+          <p v-if="maxReached" class="feed-hint">使い魔は最強になった。</p>
           <p v-else-if="player.gold < feedCost" class="feed-hint">ゴールドが足りない。</p>
         </section>
 

@@ -45,8 +45,16 @@ class DungeonExplorationService
 
         $code = $eventCode ?? ($dialogueOnlyPool
             ? $this->catalog->pickRandomDialogueEventCode($floor)
-            : $this->catalog->pickRandomEventCode($floor, $this->progress->hasClearedAllFloors($user)));
+            : $this->catalog->pickRandomEventCode(
+                $floor,
+                $this->progress->hasClearedAllFloors($user),
+                $this->progress->onceEventCodes($user),
+            ));
         $event = $this->catalog->resolveEvent($floor, $code);
+        // 「1 回の挑戦で最大 1 回」のイベントは、出た時点で記録する（途中で撤退しても、同じ挑戦ではもう出ない）
+        if ($event->oncePerRun) {
+            $this->progress->markOnceEvent($user, $code);
+        }
         $context = $this->engine->buildInitialContext($user, $code);
         $context['skip_epilogue'] = $event->skipEpilogue;
 
@@ -224,6 +232,11 @@ class DungeonExplorationService
             if ((bool) ($segment['event_battle'] ?? false)) {
                 /** @var list<string> $codes */
                 $codes = $segment['enemy_codes'] ?? [];
+                $isRift = (bool) ($segment['rift'] ?? false);
+                if ($isRift) {
+                    // 裂け目でボス戦が始まった。以降、層選択画面から、直接このボス戦に挑める（DungeonRiftService）
+                    $this->progress->markRiftReached($user);
+                }
 
                 return array_merge(
                     $this->battleLauncher->startEventBattle(
@@ -231,8 +244,7 @@ class DungeonExplorationService
                         $floor,
                         $step,
                         $codes,
-                        // 空間の裂け目の戦闘は、専用の BGM（last_boss.mp3）。meta.bgm の値は frontend の BGM_TRACKS のキー
-                        (bool) ($segment['rift'] ?? false) ? ['rift' => true, 'bgm' => 'last_boss'] : [],
+                        $isRift ? ExplorationBattleLauncher::RIFT_META : [],
                     ),
                     ['party' => $this->partyPayload($user)],
                 );

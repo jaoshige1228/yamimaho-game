@@ -69,9 +69,9 @@ class DungeonEventCatalogTest extends TestCase
             );
         }
 
-        // 1・2・3 層とも重みの合計は 94 → 102（探索イベントの 8/94 → 16/102）
-        $this->assertSame([94, 94, 94], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f)), [1, 2, 3]));
-        $this->assertSame([102, 102, 102], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f, true)), [1, 2, 3]));
+        // 重みの合計は、1 層が 94 → 102（探索イベントの 8/94 → 16/102）。2・3 層は「ステラ登場」（重み 5）が加わって 99 → 107
+        $this->assertSame([94, 99, 99], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f)), [1, 2, 3]));
+        $this->assertSame([102, 107, 107], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f, true)), [1, 2, 3]));
     }
 
     public function test_pick_random_dialogue_event_code_uses_dialogue_events_only(): void

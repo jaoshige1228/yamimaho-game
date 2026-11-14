@@ -185,13 +185,14 @@ class DungeonEventFloorOverridesTest extends TestCase
     public function test_floor_three_multipliers_are_lower_than_floor_two_because_stats_are_higher(): void
     {
         // 3 層は想定レベルが高い（2 層 Lv12/15/18 → 3 層 Lv20/25/30）ぶん、同じ判定でも倍率は小さい
+        // （2026-11-14 に 3 層の倍率を 0.8 倍にしたので、宝箱（筋力）のように 1 を下回る倍率もある）
         $catalog = new DungeonEventCatalog;
         foreach ([['treasure_chest', 'str_roll'], ['trapped_chest', 'know_roll'], ['flash_flood', 'spirit_checks'], ['ghost_possession', 'spirit_roll']] as [$event, $node]) {
             $two = $catalog->findNode($event, $node, 2);
             $three = $catalog->findNode($event, $node, 3);
             $this->assertTrue($three->statMultiplierOverridden, "{$event}.{$node}");
             $this->assertLessThan((float) $two->stat_multiplier, (float) $three->stat_multiplier, "{$event}.{$node}");
-            $this->assertGreaterThan(1.0, (float) $three->stat_multiplier, "{$event}.{$node}");
+            $this->assertGreaterThan(0.0, (float) $three->stat_multiplier, "{$event}.{$node}");
         }
     }
 
@@ -205,7 +206,7 @@ class DungeonEventFloorOverridesTest extends TestCase
         $this->assertCount(4, $options);
         foreach ($options as $option) {
             $this->assertSame(
-                min(95, (int) ceil(round($option['str'] * 1.215, 6))),
+                min(95, (int) ceil(round($option['str'] * 0.972, 6))),
                 $option['success_rate'],
                 "str {$option['str']}",
             );
@@ -221,7 +222,7 @@ class DungeonEventFloorOverridesTest extends TestCase
         $this->assertSame(1, preg_match('/成功率：(\d+)%/u', $text, $m), $text);
 
         $speeds = $this->party()->map(fn (UserCharacter $c) => (int) $c->spd);
-        $this->assertContains((int) $m[1], $speeds->map(fn (int $spd) => min(95, (int) ceil(round($spd * 1.035, 6))))->all());
+        $this->assertContains((int) $m[1], $speeds->map(fn (int $spd) => min(95, (int) ceil(round($spd * 0.828, 6))))->all());
     }
 
     public function test_floor_two_treasure_chest_rates_use_2_3_multiplier_rounded_up(): void

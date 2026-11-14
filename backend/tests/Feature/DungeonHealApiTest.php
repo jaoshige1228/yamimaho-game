@@ -261,6 +261,80 @@ class DungeonHealApiTest extends TestCase
         }
     }
 
+    public function test_floor3_boss_spells_that_work_outside_battle_show_up_in_the_heal_screen(): void
+    {
+        [, $chars] = $this->enterDungeonWithSpells([
+            'pc1' => ['pc1_miracle_rainbow', 'pc1_miracle_drop'],
+            'pc2' => ['pc2_fighting_melody', 'pc2_quick_brew'],
+            'pc3' => ['pc3_mana_focus'],
+            'pc4' => ['pc4_first_aid'],
+        ]);
+
+        $options = collect($this->getJson('/api/dungeon/heal/options')->assertOk()->json('spells'))->keyBy('id');
+
+        // 奇跡の虹: 味方全員を全回復（量は出さない）
+        $this->assertSame(['ally_all', 'heal_full', 64, null], [
+            $options['pc1_miracle_rainbow']['target_type'], $options['pc1_miracle_rainbow']['effect'],
+            $options['pc1_miracle_rainbow']['mp_cost'], $options['pc1_miracle_rainbow']['amount'],
+        ]);
+        // 奇跡の雫: 確実に HP 50% で蘇生
+        $this->assertSame(['ally_single', 'revive_chance', 40, 50], [
+            $options['pc1_miracle_drop']['target_type'], $options['pc1_miracle_drop']['effect'],
+            $options['pc1_miracle_drop']['mp_cost'], $options['pc1_miracle_drop']['revive_percent'],
+        ]);
+        // 応急手当: 迅速調合と同じ回復量・同じ消費 MP（魔力が同じなら）
+        $magOf = fn (string $code): float => (float) app(\App\Services\Player\EquipmentService::class)->effectiveCombatStats($chars[$code])['mag'];
+        $this->assertSame(14, $options['pc4_first_aid']['mp_cost']);
+        $this->assertSame($options['pc2_quick_brew']['mp_cost'], $options['pc4_first_aid']['mp_cost']);
+        $this->assertSame((int) floor($magOf('pc4') * 2.5), $options['pc4_first_aid']['amount']);
+        $this->assertSame((int) floor($magOf('pc2') * 2.5), $options['pc2_quick_brew']['amount']);
+
+        // 戦闘用: 闘志の旋律（攻撃バフ）と魔力集中（HP と引き換えに MP）は、探索中の回復画面には出ない
+        $this->assertArrayNotHasKey('pc2_fighting_melody', $options->all());
+        $this->assertArrayNotHasKey('pc3_mana_focus', $options->all());
+    }
+
+    public function test_miracle_rainbow_fully_heals_every_wounded_member_in_the_dungeon(): void
+    {
+        [, $chars] = $this->enterDungeonWithSpells(['pc1' => ['pc1_miracle_rainbow']]);
+        $chars['pc1']->update(['mp' => 100]);
+        $chars['pc2']->update(['hp' => 10]);
+        $chars['pc3']->update(['hp' => 1]);
+        $chars['pc4']->update(['hp' => 0]); // 戦闘不能は回復しない（蘇生ではない）
+
+        $response = $this->postJson('/api/dungeon/heal', [
+            'mode' => 'spell',
+            'caster_slot_id' => 'pc1',
+            'spell_id' => 'pc1_miracle_rainbow',
+        ])->assertOk()->assertJsonPath('message', '奇跡の虹を唱えた。');
+
+        $party = collect($response->json('party'))->keyBy('id');
+        foreach (['pc1', 'pc2', 'pc3'] as $id) {
+            $this->assertSame($party[$id]['max_hp'], $party[$id]['hp'], "{$id} は全回復");
+        }
+        $this->assertSame(0, $party['pc4']['hp']);
+        $this->assertSame(100 - 64, (int) $chars['pc1']->fresh()->mp);
+    }
+
+    public function test_miracle_drop_revives_a_fallen_member_with_half_hp_in_the_dungeon(): void
+    {
+        [, $chars] = $this->enterDungeonWithSpells(['pc1' => ['pc1_miracle_drop']]);
+        $chars['pc1']->update(['mp' => 60]);
+        $chars['pc2']->update(['hp' => 0]);
+
+        $response = $this->postJson('/api/dungeon/heal', [
+            'mode' => 'spell',
+            'caster_slot_id' => 'pc1',
+            'spell_id' => 'pc1_miracle_drop',
+            'target_slot_id' => 'pc2',
+        ])->assertOk();
+
+        $party = collect($response->json('party'))->keyBy('id');
+        $this->assertSame((int) floor($party['pc2']['max_hp'] * 50 / 100), $party['pc2']['hp'], 'HP 50%');
+        $this->assertTrue($party['pc2']['alive']);
+        $this->assertSame(60 - 40, (int) $chars['pc1']->fresh()->mp);
+    }
+
     public function test_spirit_water_fully_heals_and_world_tree_drop_revives_with_full_hp(): void
     {
         [, $chars] = $this->enterDungeonWithSpells([

@@ -64,6 +64,28 @@ class BattleEngineBossSkillsTest extends TestCase
         $this->assertSame(['ally_single', 'heal_mag', 2.5], [$heal['target_type'], $heal['effect'], $heal['coefficient']]);
     }
 
+    public function test_cultist_casts_a_spell_only_half_of_the_time(): void
+    {
+        // 2 層ボスの邪教徒は、魔法が多すぎるので減らした（2026-11-14。以前は 攻撃 25 : 魔法 75）。攻撃 60 : 魔法 60（3 種が 20 ずつ）= 魔法は 50%
+        $skills = (new MasterDataProvider)->enemySkillsFor('mahou');
+        $weights = array_column($skills, 'weight', 'skill_code');
+        $this->assertSame(['attack' => 60, 'cult_def_up' => 20, 'cult_def_down' => 20, 'cult_heal' => 20], array_map('intval', $weights));
+
+        $spellRows = array_sum(array_map('intval', array_diff_key($weights, ['attack' => 1])));
+        $this->assertSame(0.5, $spellRows / array_sum(array_map('intval', $weights)));
+
+        // 出目を全部試して、魔法になる割合も 50%
+        $total = array_sum(array_map('intval', $weights));
+        $spells = 0;
+        for ($roll = 0; $roll < $total; $roll++) {
+            $picked = (new \App\Services\Battle\EnemySkillPicker(roll: static fn (): int => $roll))->pickFrom($skills);
+            if ($picked['action_type'] === 'spell') {
+                $spells++;
+            }
+        }
+        $this->assertSame($total / 2, $spells);
+    }
+
     public function test_every_enemy_spell_row_points_at_an_existing_spell(): void
     {
         $masters = new MasterDataProvider;

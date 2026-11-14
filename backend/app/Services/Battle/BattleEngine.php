@@ -707,6 +707,7 @@ class BattleEngine
         if ($actor['mp'] < $mpCost) {
             throw new InvalidArgumentException('MPが足りません。');
         }
+        $this->assertSelfCastable($spell, $actor);
 
         $targets = $this->resolveSpellTargets($spell, $targetId, $state['units'], $actor['side']);
         if (($spell['target_type'] ?? '') === 'ally_all' && in_array($spell['effect'] ?? '', self::HEAL_EFFECTS, true)) {
@@ -727,7 +728,10 @@ class BattleEngine
         }
 
         $actor['mp'] -= $mpCost;
-        $events[] = ['type' => 'mp_spent', 'actor' => $actorId, 'amount' => $mpCost];
+        // 消費 MP が 0 の魔法（魔力集中）は、MP を使った印は出さない
+        if ($mpCost > 0) {
+            $events[] = ['type' => 'mp_spent', 'actor' => $actorId, 'amount' => $mpCost];
+        }
         $events[] = $this->announceEvent(
             $actorId,
             $this->spellAnnounceText($actor['name'], $spell),
@@ -1005,9 +1009,65 @@ class BattleEngine
                 $events[] = $this->applyBuffToUnit($caster, $actorId, $actorId, (string) $spell['buff'], $spellId);
                 $state['log'][] = "{$caster['name']}にも{$spell['label']}";
                 break;
+
+            case 'mp_heal_hp_cost':
+                // 魔力集中: 自分の HP を hp_cost（固定）減らして、MP を power だけ回復する（最大MPまで）。
+                // HP が足りないとき（hp_cost 以下）や MP が満タンのときは唱えられない（assertSelfCastable）ので、倒れることはない。
+                // HP の減少は、魔法障壁・命の加護に関係なく通る（ブラックホールの反動と同じ）
+                $cost = (int) ($spell['hp_cost'] ?? 0);
+                $caster['hp'] = max(1, (int) $caster['hp'] - $cost);
+                $events[] = [
+                    'type' => 'damage',
+                    'actor' => $actorId,
+                    'target' => $actorId,
+                    'value' => $cost,
+                    'element' => null,
+                    'critical' => false,
+                ];
+                $gained = min((int) ($spell['power'] ?? 0), max(0, (int) $caster['max_mp'] - (int) $caster['mp']));
+                $caster['mp'] = (int) $caster['mp'] + $gained;
+                $events[] = ['type' => 'mp_recovered', 'actor' => $actorId, 'target' => $actorId, 'value' => $gained];
+                $state['log'][] = "{$caster['name']}は{$cost}のHPと引き換えに、MPが{$gained}回復した";
+                break;
         }
 
         return $events;
+    }
+
+    /**
+     * 自分に使う魔法（魔力集中）を、いま唱えられるか。唱えられないときの理由を、例外にして返す。
+     *
+     * - HP が hp_cost 以下 … HP が足りない（唱えると倒れてしまう）
+     * - MP が満タン … 回復する分がない
+     *
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, mixed>  $caster
+     */
+    private function assertSelfCastable(array $spell, array $caster): void
+    {
+        $reason = $this->selfCastBlockedReason($spell, $caster);
+        if ($reason !== null) {
+            throw new InvalidArgumentException($reason);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, mixed>  $caster
+     */
+    private function selfCastBlockedReason(array $spell, array $caster): ?string
+    {
+        if (($spell['effect'] ?? '') !== 'mp_heal_hp_cost') {
+            return null;
+        }
+        if ((int) $caster['hp'] <= (int) ($spell['hp_cost'] ?? 0)) {
+            return 'HPが足りません。';
+        }
+        if ((int) $caster['mp'] >= (int) $caster['max_mp']) {
+            return 'MPが満タンです。';
+        }
+
+        return null;
     }
 
     /**
@@ -1272,8 +1332,11 @@ class BattleEngine
     /**
      * バフ／デバフを1体に付ける。buff_applied イベントを返す。
      *
-     * - 防御・攻撃の段階（type=stage）… 付与1回ごとに独立した持続ターンの効果を足す。付ける量は、段階の合計が
-     *   -3〜+3 に収まる分だけ（超えた分は無駄になる）。0 なら効果は足さず、演出だけ出す。
+     * - 防御・攻撃の段階（type=stage）… 付与1回ごとに、**かけた量そのまま**（ラグオンビートなら -3）で、独立した持続ターンの
+     *   効果を足す。段階は、付いている効果の合計を -3〜+3 に丸めた値（currentStage。丸めるのは読むときだけ）。
+     *   上限を超えてかけたときは、上限いっぱいまでかかった状態になり、先にかかっていた効果が先に切れても、新しくかけた効果の
+     *   持続のあいだは、その分が効き続ける（差分だけを記録すると、先の効果が切れた瞬間に新しい効果が薄まってしまう）。
+     *   イベントの `applied` は、かけた瞬間に見た目の段階が変わった量（上限で頭打ちになった分は含まない）。
      * - 回避固定（type=evasion_set）… `buffs` に残りターンを持つ（従来どおり）
      *
      * @param  array<string, mixed>  $unit
@@ -1295,16 +1358,17 @@ class BattleEngine
         $delta = (int) $buff['delta'];
         $max = (int) config('battle.stage.max', 3);
         $current = $this->currentStage($unit, $stat);
+        // かけた瞬間に、見た目の段階が変わる量（上限・下限で頭打ちになる）。演出と、画面のバッジの更新に使う
         $applied = max(-$max, min($max, $current + $delta)) - $current;
 
-        if ($applied !== 0) {
-            $unit['stages'][] = [
-                'stat' => $stat,
-                'amount' => $applied,
-                'turns' => (int) config('battle.stage.turns', 3),
-                'source' => $source,
-            ];
-        }
+        // 効果は、上限で切らずに、かけた量そのまま足す（段階は読むときに ±max へ丸める）。
+        // すでに上限でも足す（先の効果が切れたあとも、新しい効果の持続のあいだは上限のままになる）
+        $unit['stages'][] = [
+            'stat' => $stat,
+            'amount' => $delta,
+            'turns' => (int) config('battle.stage.turns', 3),
+            'source' => $source,
+        ];
 
         return $event + ['stat' => $stat, 'delta' => $delta, 'applied' => $applied];
     }
@@ -1764,7 +1828,9 @@ class BattleEngine
         foreach ($unit['spells'] as $spellId) {
             $spell = $this->factory->findSpell($spellId);
             $affordable = $unit['mp'] >= $spell['mp_cost'];
-            $usable = $affordable && $this->spellHasValidTarget($spell, $units);
+            $usable = $affordable
+                && $this->spellHasValidTarget($spell, $units)
+                && $this->selfCastBlockedReason($spell, $unit) === null;
             $spells[] = [
                 'id' => $spellId,
                 'label' => $spell['label'],
@@ -1772,6 +1838,8 @@ class BattleEngine
                 'mp_cost' => $spell['mp_cost'],
                 'target_type' => $spell['target_type'],
                 'effect' => $spell['effect'],
+                // コマンド画面で、「攻撃」「回復」「補助」のラベルの下に並べるための大分け（attack / heal / support）
+                'category' => $spell['category'] ?? SpellCategory::forEffect((string) $spell['effect']),
                 'affordable' => $affordable,
                 'usable' => $usable,
             ];

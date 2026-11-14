@@ -179,7 +179,9 @@ class BattleOrchestrator
         $status = $state['status'] ?? '';
         $events = [];
 
-        if (in_array($status, ['victory', 'defeat', 'fled'], true)) {
+        // 倒した敵のゴールドは、勝ったときだけ入る。敗北では、戦闘中に敵を倒していても入らない
+        // （逃げたときは、逃げる処理（applyFlee）の中で、それまでに倒した敵のゴールドを受け取る）
+        if ($status === 'victory') {
             $events = array_merge($events, $this->persistBattleGold($state, $user));
         }
 

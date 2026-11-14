@@ -24,6 +24,7 @@ Route::middleware('demo.player')->group(function (): void {
     Route::post('/familiar/feed', [FamiliarController::class, 'feed']);
     Route::get('/dungeon', [DungeonController::class, 'show']);
     Route::post('/dungeon/enter', [DungeonController::class, 'enter']);
+    Route::post('/dungeon/rift', [DungeonController::class, 'enterRift']);
     Route::post('/dungeon/advance', [DungeonController::class, 'advance']);
     Route::post('/dungeon/retreat', [DungeonController::class, 'retreat']);
     Route::get('/dungeon/heal/options', [DungeonHealController::class, 'options']);

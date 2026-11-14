@@ -75,6 +75,8 @@ class DungeonProgressService
             'unlocked_floor' => (int) $record->unlocked_floor,
             'cleared_floor' => (int) $record->cleared_floor,
             'all_floors_cleared' => (int) $record->cleared_floor >= DungeonFloorConfig::maxFloor(),
+            // 空間の裂け目でボス戦が始まったことがある（層選択画面に「時空の裂け目へ」を出す）
+            'rift_reached' => (bool) $record->rift_reached,
             'max_floor' => DungeonFloorConfig::maxFloor(),
             'playable_floor' => DungeonFloorConfig::playableFloor(),
             'boss_step' => DungeonFloorConfig::bossStep((int) $record->floor),
@@ -105,6 +107,7 @@ class DungeonProgressService
         $record = $this->findOrCreate($user);
         $record->step = 0;
         $record->in_dungeon = false;
+        $record->once_event_codes = [];
         $record->save();
         $user->refresh();
 
@@ -120,7 +123,47 @@ class DungeonProgressService
         $record = $this->findOrCreate($user);
         $record->floor = $floor;
         $record->in_dungeon = true;
+        // 新しい挑戦の始まり。「1 回の挑戦で最大 1 回」のイベントは、また出るようになる
+        $record->once_event_codes = [];
         $record->save();
+    }
+
+    /**
+     * 今の挑戦（層に入ってから、撤退・全滅・ボス撃破で出るまで）で、すでに出た「1 回だけ」のイベントのコード。
+     *
+     * @return list<string>
+     */
+    public function onceEventCodes(User $user): array
+    {
+        return array_values(array_map('strval', (array) ($this->findOrCreate($user)->once_event_codes ?? [])));
+    }
+
+    /** 空間の裂け目で、ボス戦が始まったことがあるか（一度なったら、ホーム画面のリセットまで、ずっと true）。 */
+    public function hasReachedRift(User $user): bool
+    {
+        return (bool) $this->findOrCreate($user)->rift_reached;
+    }
+
+    /** 空間の裂け目でボス戦が始まったことを記録する。 */
+    public function markRiftReached(User $user): void
+    {
+        $record = $this->findOrCreate($user);
+        if (! $record->rift_reached) {
+            $record->rift_reached = true;
+            $record->save();
+        }
+    }
+
+    /** 「1 回だけ」のイベントが出たことを、今の挑戦に記録する（次の抽選からは出ない）。 */
+    public function markOnceEvent(User $user, string $eventCode): void
+    {
+        $record = $this->findOrCreate($user);
+        $codes = array_values(array_map('strval', (array) ($record->once_event_codes ?? [])));
+        if (! in_array($eventCode, $codes, true)) {
+            $codes[] = $eventCode;
+            $record->once_event_codes = $codes;
+            $record->save();
+        }
     }
 
     public function reset(User $user): void
@@ -129,6 +172,7 @@ class DungeonProgressService
         $record->step = 0;
         $record->floor = 1;
         $record->in_dungeon = false;
+        $record->once_event_codes = [];
         $record->save();
     }
 
@@ -143,6 +187,8 @@ class DungeonProgressService
         $record->skip_battle_encounters = false;
         $record->force_dialogue_events = false;
         $record->in_dungeon = false;
+        $record->once_event_codes = [];
+        $record->rift_reached = false;
         $record->save();
 
         DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
@@ -204,6 +250,7 @@ class DungeonProgressService
 
         $record->step = 0;
         $record->in_dungeon = false;
+        $record->once_event_codes = [];
         $record->save();
 
         if ($firstClear) {

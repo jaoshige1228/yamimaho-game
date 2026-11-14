@@ -17,6 +17,8 @@ class UserDungeonProgress extends Model
         'skip_battle_encounters',
         'force_dialogue_events',
         'in_dungeon',
+        'once_event_codes',
+        'rift_reached',
     ];
 
     /** @return array<string, string> */
@@ -26,6 +28,8 @@ class UserDungeonProgress extends Model
             'skip_battle_encounters' => 'boolean',
             'force_dialogue_events' => 'boolean',
             'in_dungeon' => 'boolean',
+            'once_event_codes' => 'array',
+            'rift_reached' => 'boolean',
         ];
     }
 

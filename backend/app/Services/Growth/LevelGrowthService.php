@@ -26,7 +26,7 @@ class LevelGrowthService
     /** このレベル以上に上がるときは、LATE_GROWTH の代わりにこの上昇値を使う（GROWTH_BY_REACHED_LEVEL に指定のあるレベルを除く） */
     private const VETERAN_GROWTH_FROM_LEVEL = 21;
 
-    private const VETERAN_GROWTH = ['hp' => 40, 'mp' => 6, 'mag' => 6, 'def' => 6, 'flat' => 3];
+    private const VETERAN_GROWTH = ['hp' => 40, 'mp' => 8, 'mag' => 6, 'def' => 6, 'flat' => 3];
 
     /** @var list<string> */
     private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];

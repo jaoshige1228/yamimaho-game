@@ -15,10 +15,11 @@ class DungeonEventCatalog
 
     /**
      * @param  bool  $allFloorsCleared  全ての層を踏破済み（`game.dungeon.all_cleared_event_weights` の重みを使う）
+     * @param  list<string>  $excludeOnceCodes  今の挑戦ですでに出たイベントのコード。そのうち once_per_run のものは、抽選から外す
      */
-    public function pickRandomEventCode(int $floor, bool $allFloorsCleared = false): string
+    public function pickRandomEventCode(int $floor, bool $allFloorsCleared = false, array $excludeOnceCodes = []): string
     {
-        return $this->pickFromPool($this->mechanicalEventPool($floor, $allFloorsCleared), $floor, 'mechanical');
+        return $this->pickFromPool($this->mechanicalEventPool($floor, $allFloorsCleared, $excludeOnceCodes), $floor, 'mechanical');
     }
 
     /**
@@ -73,6 +74,7 @@ class DungeonEventCatalog
                 startNodeKey: (string) $mechanical->start_node_key,
                 skipEpilogue: (bool) $mechanical->skip_epilogue,
                 isDialogueOnly: false,
+                oncePerRun: (bool) $mechanical->once_per_run,
             );
         }
 
@@ -160,15 +162,19 @@ class DungeonEventCatalog
     }
 
     /**
+     * @param  list<string>  $excludeOnceCodes  今の挑戦ですでに出たイベントのコード（once_per_run のものだけ、プールから外す）
      * @return list<array{code: string, weight: int}>
      */
-    private function mechanicalEventPool(int $floor, bool $allFloorsCleared = false): array
+    private function mechanicalEventPool(int $floor, bool $allFloorsCleared = false, array $excludeOnceCodes = []): array
     {
         $pool = [];
         $clearedWeights = $allFloorsCleared ? (array) config('game.dungeon.all_cleared_event_weights', []) : [];
 
         foreach (DungeonEventMaster::query()->where('floor', $floor)->get() as $event) {
             $code = (string) $event->code;
+            if ($event->once_per_run && in_array($code, $excludeOnceCodes, true)) {
+                continue;
+            }
             $pool[] = [
                 'code' => $code,
                 'weight' => array_key_exists($code, $clearedWeights) ? (int) $clearedWeights[$code] : (int) $event->weight,

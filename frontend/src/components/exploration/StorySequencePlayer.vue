@@ -89,6 +89,18 @@ function playResultSe(lineIndex) {
   }
 }
 
+/**
+ * 行に `sfx`（SE の名前。dungeon_event_nodes.csv の sfx 列）が付いていれば、その行を表示したときに鳴らす
+ * （「HP回復薬とMP回復薬を受け取った！」の成功音など）。暗転（screen_fade）は音ではないので除く。
+ * 知らない名前（効果音のないもの）は、playSe が何もしない。
+ */
+function playLineSe(lineIndex) {
+  const sfx = props.lines[lineIndex]?.sfx;
+  if (typeof sfx === 'string' && sfx !== '' && sfx !== 'screen_fade') {
+    playSe(sfx);
+  }
+}
+
 watch(
   () => props.lines,
   () => {
@@ -99,6 +111,7 @@ watch(
     // index が変わらない（0 のまま）ときは、下の index の監視が動かないので、ここで鳴らす
     if (wasFirstLine) {
       playResultSe(0);
+      playLineSe(0);
     }
   },
 );
@@ -113,6 +126,7 @@ function emitSyncPartyIfNeeded(lineIndex) {
 watch(index, (lineIndex) => {
   emitSyncPartyIfNeeded(lineIndex);
   playResultSe(lineIndex);
+  playLineSe(lineIndex);
   const line = props.lines[lineIndex];
   const fadeMs = Number(line?.screen_fade_ms);
   if (fadeMs > 0) {

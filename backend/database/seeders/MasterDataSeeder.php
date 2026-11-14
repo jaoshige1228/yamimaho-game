@@ -124,6 +124,8 @@ class MasterDataSeeder extends Seeder
                     'power' => ($row['power'] ?? '') !== '' ? (int) $row['power'] : null,
                     'buff_key' => ($row['buff_key'] ?? '') !== '' ? $row['buff_key'] : null,
                     'cast_style' => ($row['cast_style'] ?? '') !== '' ? $row['cast_style'] : null,
+                    'hp_cost' => ($row['hp_cost'] ?? '') !== '' ? (int) $row['hp_cost'] : null,
+                    'category' => ($row['category'] ?? '') !== '' ? $row['category'] : null,
                 ],
             );
         }
@@ -198,6 +200,7 @@ class MasterDataSeeder extends Seeder
                     'event_type' => $row['event_type'],
                     'start_node_key' => $row['start_node_key'],
                     'skip_epilogue' => (bool) ((int) ($row['skip_epilogue'] ?? 0)),
+                    'once_per_run' => (bool) ((int) ($row['once_per_run'] ?? 0)),
                 ],
             );
         }

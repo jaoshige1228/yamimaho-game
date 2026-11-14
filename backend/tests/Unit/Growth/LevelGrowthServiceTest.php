@@ -52,6 +52,78 @@ class LevelGrowthServiceTest extends TestCase
         }
     }
 
+    public function test_exp_from_level_25_was_raised_so_that_level_29_and_34_need_what_level_30_and_37_used_to(): void
+    {
+        $levels = new LevelTableProvider;
+
+        // Lv24 までは、以前と同じ
+        $this->assertSame(14700, $levels->cumulativeExpForLevel(23));
+        $this->assertSame(17500, $levels->cumulativeExpForLevel(24));
+
+        // 2026-11-14 の調整: 以前の Lv30 に必要だった 39,550 で Lv29 に、以前の Lv37 に必要だった 76,650 で Lv34 になる
+        $this->assertSame(39550, $levels->cumulativeExpForLevel(29), 'もとの Lv30 の必要 EXP');
+        $this->assertSame(76650, $levels->cumulativeExpForLevel(34), 'もとの Lv37 の必要 EXP');
+        // その間・その先も、なだらかにつながっている
+        $this->assertSame(20700, $levels->cumulativeExpForLevel(25));
+        $this->assertSame(45750, $levels->cumulativeExpForLevel(30));
+        $this->assertSame(85500, $levels->cumulativeExpForLevel(35));
+        $this->assertSame(248650, $levels->cumulativeExpForLevel(50));
+
+        // 以前の表（Lv25〜50 の必要 EXP）より、どのレベルも上がりにくい
+        $old = [25 => 20550, 26 => 23850, 27 => 27400, 28 => 31200, 29 => 35250, 30 => 39550, 31 => 44100, 32 => 48900, 33 => 53950, 34 => 59250,
+            35 => 64800, 36 => 70600, 37 => 76650, 40 => 96300, 45 => 134050, 50 => 178050];
+        foreach ($old as $level => $oldExp) {
+            $this->assertGreaterThan($oldExp, $levels->cumulativeExpForLevel($level), "Lv{$level}");
+        }
+
+        // Lv25 から Lv34 までの 1 レベルごとの増分は、毎回同じ量ずつ増える（途中で楽になるレベルも、急に重くなるレベルもない。丸め 50 の誤差だけ許す）
+        $gaps = [];
+        for ($level = 25; $level <= 34; $level++) {
+            $gaps[] = $levels->cumulativeExpForLevel($level) - $levels->cumulativeExpForLevel($level - 1);
+        }
+        for ($i = 1; $i < count($gaps); $i++) {
+            $this->assertEqualsWithDelta(602, $gaps[$i] - $gaps[$i - 1], 60, "Lv".(25 + $i).' の増分の増え方');
+        }
+    }
+
+    public function test_the_new_exp_makes_a_character_reach_level_29_and_34_where_it_used_to_be_30_and_37(): void
+    {
+        $this->seed(\Database\Seeders\MasterDataSeeder::class);
+        $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
+        $growth = new LevelGrowthService;
+        $stats = $growth->statsForLevel($master, 1);
+
+        $levelAfter = function (int $exp) use ($master, $stats, $growth): int {
+            $character = UserCharacter::query()->create([
+                'user_id' => User::factory()->create()->id,
+                'character_master_id' => $master->id,
+                'level' => 1,
+                'exp' => 0,
+                'hp' => $stats['hp'],
+                'mp' => $stats['mp'],
+                'str' => $stats['str'],
+                'mag' => $stats['mag'],
+                'def' => $stats['def'],
+                'spd' => $stats['spd'],
+                'know' => $stats['know'],
+                'spirit' => $stats['spirit'],
+            ]);
+            $character->setRelation('characterMaster', $master);
+            $growth->grantExp($character, $exp);
+
+            return (int) $character->level;
+        };
+
+        $this->assertSame(28, $levelAfter(39549));
+        $this->assertSame(29, $levelAfter(39550), 'もとは Lv30 になる経験値');
+        $this->assertSame(29, $levelAfter(45749));
+        $this->assertSame(30, $levelAfter(45750));
+        $this->assertSame(33, $levelAfter(76649));
+        $this->assertSame(34, $levelAfter(76650), 'もとは Lv37 になる経験値');
+        $this->assertSame(34, $levelAfter(85499));
+        $this->assertSame(35, $levelAfter(85500));
+    }
+
     public function test_every_stat_grows_by_a_fixed_amount_per_level(): void
     {
         $this->seed(\Database\Seeders\MasterDataSeeder::class);
@@ -153,8 +225,8 @@ class LevelGrowthServiceTest extends TestCase
             return array_map(fn (string $stat) => $after[$stat] - $before[$stat], array_combine(array_keys($before), array_keys($before)));
         };
 
-        // Lv21 以降に上がるとき: HP+40 MP+6 魔力+6 防御+6 その他+3
-        $veteran = ['hp' => 40, 'mp' => 6, 'mag' => 6, 'def' => 6, 'str' => 3, 'spd' => 3, 'know' => 3, 'spirit' => 3, 'vit' => 3];
+        // Lv21 以降に上がるとき: HP+40 MP+8 魔力+6 防御+6 その他+3（MP は 2026-11-14 に +6 から +8 へ）
+        $veteran = ['hp' => 40, 'mp' => 8, 'mag' => 6, 'def' => 6, 'str' => 3, 'spd' => 3, 'know' => 3, 'spirit' => 3, 'vit' => 3];
         $this->assertEquals($veteran, $gained(20, 21));
         $this->assertEquals($veteran, $gained(21, 22));
         $this->assertEquals($veteran, $gained(29, 30));
@@ -169,7 +241,7 @@ class LevelGrowthServiceTest extends TestCase
         $lv20 = $growth->statsForLevel($master, 20);
         $lv30 = $growth->statsForLevel($master, 30);
         $this->assertSame($lv20['hp'] + 400, $lv30['hp']);
-        $this->assertSame($lv20['mp'] + 60, $lv30['mp']);
+        $this->assertSame($lv20['mp'] + 80, $lv30['mp']);
         $this->assertSame($lv20['mag'] + 60, $lv30['mag']);
         $this->assertSame($lv20['def'] + 60, $lv30['def']);
         $this->assertSame($lv20['know'] + 30, $lv30['know']);

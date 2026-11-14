@@ -35,9 +35,9 @@ class EnemySkillAnnounceFlagTest extends TestCase
 
     public function test_enemy_spells_and_skills_have_the_skill_flag(): void
     {
-        // 邪教徒の魔法（闇の加護・闇の呪縛）
-        $this->assertTrue($this->firstAnnounce('mahou', roll: 25)['skill']);
-        $this->assertTrue($this->firstAnnounce('mahou', roll: 50)['skill']);
+        // 邪教徒の魔法（闇の加護・闇の呪縛）。重みは 攻撃 60・加護 20・呪縛 20・癒し 20（合計 120）なので、出目 60〜79 が加護、80〜99 が呪縛
+        $this->assertTrue($this->firstAnnounce('mahou', roll: 60)['skill']);
+        $this->assertTrue($this->firstAnnounce('mahou', roll: 80)['skill']);
         // エルドラゴンの物理の技（ドラゴンクロウ・ドラゴンブレス）。通常攻撃は同じくフラグなし
         $claw = $this->firstAnnounce('dragon', roll: 30);
         $this->assertSame('エルドラゴンのドラゴンクロウ！', $claw['text']);

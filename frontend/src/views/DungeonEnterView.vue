@@ -3,13 +3,20 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api';
 import AdviceCat from '../components/hub/AdviceCat.vue';
+import { useAppAudio } from '../composables/useAppAudio.js';
+import { useBattleStore } from '../stores/battle';
 import { usePlayerStore } from '../stores/player';
 import '../styles/hub-screen.css';
 
 const router = useRouter();
 const player = usePlayerStore();
+const battle = useBattleStore();
+const { unlock } = useAppAudio();
 const loading = ref(true);
 const enteringFloor = ref(null);
+const enteringRift = ref(false);
+/** 空間の裂け目でボス戦が始まったことがある（一度なったら、ずっと true）。true なら「時空の裂け目へ」を出す */
+const riftReached = ref(false);
 const error = ref('');
 const unlockedFloor = ref(1);
 const playableFloor = ref(1);
@@ -28,6 +35,7 @@ async function loadDungeonOptions() {
     unlockedFloor.value = data.unlocked_floor ?? 1;
     playableFloor.value = data.playable_floor ?? 1;
     allFloorsCleared.value = data.all_floors_cleared === true;
+    riftReached.value = data.rift_reached === true;
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -49,6 +57,30 @@ async function enterDungeon(floor) {
     error.value = e.message;
   } finally {
     enteringFloor.value = null;
+  }
+}
+
+/** 「時空の裂け目へ」: ダンジョンに潜らずに、裂け目のボス戦（4 人の魔法使い）を直接始める */
+async function enterRift() {
+  enteringRift.value = true;
+  error.value = '';
+  try {
+    unlock();
+    const data = await api('/dungeon/rift', { method: 'POST' });
+    battle.battleId = data.battle_id;
+    battle.state = data.state;
+    battle.pendingEvents = data.events ?? [];
+    await player.fetchNavigation();
+    router.push({
+      name: 'battle',
+      params: { id: data.battle_id },
+      // ボス戦（逃げられない）。探索中の戦闘と同じ扱い（勝っても負けても、待機画面に戻る）
+      query: { from: 'dungeon', boss: '1' },
+    });
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    enteringRift.value = false;
   }
 }
 
@@ -82,6 +114,18 @@ onMounted(() => loadDungeonOptions());
           @click="enterDungeon(floor)"
         >
           {{ enteringFloor === floor ? '入場中…' : `${floor}層に潜る` }}
+        </button>
+      </div>
+
+      <!-- 一度、裂け目でボス戦が始まったら、層に潜るボタンの少し下に出す -->
+      <div v-if="!loading && !error && riftReached" class="rift-actions">
+        <button
+          type="button"
+          class="rift-enter-btn"
+          :disabled="enteringFloor !== null || enteringRift"
+          @click="enterRift"
+        >
+          {{ enteringRift ? '向かっている…' : '時空の裂け目へ' }}
         </button>
       </div>
 
@@ -140,6 +184,30 @@ onMounted(() => loadDungeonOptions());
   flex-direction: column;
   gap: 0.65rem;
   width: min(280px, 100%);
+}
+.rift-actions {
+  display: flex;
+  flex-direction: column;
+  width: min(280px, 100%);
+  /* 層に潜るボタンの少し下（親の gap 1rem に足して、少し間をあける） */
+  margin-top: 0.9rem;
+}
+.rift-enter-btn {
+  min-height: 48px;
+  padding: 0.65rem 1.25rem;
+  border: 2px solid rgba(200, 160, 255, 0.85);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(60, 20, 110, 0.85), rgba(20, 8, 48, 0.9));
+  color: #f0e4ff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 18px rgba(170, 110, 255, 0.35);
+}
+.rift-enter-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 .floor-enter-btn {
   min-height: 48px;

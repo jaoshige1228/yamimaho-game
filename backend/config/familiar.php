@@ -7,7 +7,7 @@
  * 次のレベルの `stones` に達するとレベルが上がる（必要数は累計ではなく、前回のレベルアップからの数）。
  */
 return [
-    'max_level' => 9,
+    'max_level' => 10,
 
     /** 魔石を1つ与えるのに必要なゴールド */
     'feed_cost' => 100,
@@ -20,15 +20,16 @@ return [
      * 説明は解放済みのレベルだけ画面に出す（未解放は「？？？」）。
      */
     'levels' => [
-        1 => ['stones' => 2, 'description' => '敵単体にダメージを与える。'],
-        2 => ['stones' => 4, 'description' => '味方一人を小回復する。'],
-        3 => ['stones' => 8, 'description' => '使い魔が支援してくれる確率が上がる。'],
-        4 => ['stones' => 10, 'description' => '敵全体に小ダメージを与える。'],
-        5 => ['stones' => 16, 'description' => '味方全体を小回復する。'],
-        6 => ['stones' => 20, 'description' => '味方全体の攻撃力を上げる。'],
-        7 => ['stones' => 30, 'description' => '使い魔が支援してくれる確率が上がる。'],
-        8 => ['stones' => 50, 'description' => '全ての支援の効果が上がる。'],
-        9 => ['stones' => 80, 'description' => '戦闘不能の味方を蘇生する。'],
+        1 => ['stones' => 1, 'description' => '敵単体にダメージを与える。'],
+        2 => ['stones' => 5, 'description' => '味方一人を小回復する。'],
+        3 => ['stones' => 10, 'description' => '使い魔が支援してくれる確率が上がる。'],
+        4 => ['stones' => 20, 'description' => '敵全体に小ダメージを与える。'],
+        5 => ['stones' => 40, 'description' => '味方全体を小回復する。'],
+        6 => ['stones' => 60, 'description' => '味方全体の攻撃力を上げる。'],
+        7 => ['stones' => 80, 'description' => '使い魔が支援してくれる確率が上がる。'],
+        8 => ['stones' => 120, 'description' => '全ての支援の効果が上がる。'],
+        9 => ['stones' => 200, 'description' => '戦闘不能の味方を蘇生する。'],
+        10 => ['stones' => 300, 'description' => '使い魔が支援してくれる確率が上がる。'],
     ],
 
     /**
@@ -39,6 +40,7 @@ return [
         1 => 20,
         3 => 30,
         7 => 40,
+        10 => 50,
     ],
 
     /** このレベル以上になると、全ての支援の効果が強くなる（下の upgraded を使う） */

@@ -20,6 +20,8 @@ class SpellMaster extends Model
         'power',
         'buff_key',
         'cast_style',
+        'hp_cost',
+        'category',
     ];
 
     /** @return BelongsToMany<CharacterMaster, $this> */

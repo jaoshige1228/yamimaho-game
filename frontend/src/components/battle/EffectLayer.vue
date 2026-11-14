@@ -233,6 +233,10 @@ function portraitSrc(portrait) {
   color: #b8ffd8;
   text-shadow: 0 2px 8px #000, 0 0 14px #3ecf7a;
 }
+.float-support.kind-mp {
+  color: #cfe8ff;
+  text-shadow: 0 2px 8px #000, 0 0 14px #4aa8ff;
+}
 .float-support.kind-buff {
   color: #e8dcff;
   text-shadow: 0 2px 8px #000, 0 0 14px #9d7cff;

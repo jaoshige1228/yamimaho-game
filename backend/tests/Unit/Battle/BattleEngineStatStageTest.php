@@ -82,9 +82,9 @@ class BattleEngineStatStageTest extends TestCase
         $this->assertEqualsWithDelta(100.0, $this->effective($state['units']['pc1'], 'def'), 0.0001);
     }
 
-    public function test_the_total_is_capped_and_the_overflow_is_wasted(): void
+    public function test_the_visible_stage_is_capped_but_every_cast_keeps_its_full_amount(): void
     {
-        // +2 のあとにもう +2 をかけても、合計は +3 まで（あとの効果は +1 だけ付く）
+        // +2 のあとにもう +2 をかけると、見た目は +3 まで。でも、あとの効果は +2 のまま記録される
         $engine = $this->engine();
         $state = $this->state();
 
@@ -93,22 +93,25 @@ class BattleEngineStatStageTest extends TestCase
         $second = $this->cast($engine, $state, 'pc4', 'pc4_steel_wall');
         $state = $second['state'];
 
-        $this->assertSame(3, $this->stageSum($state['units']['pc1'], 'def'));
-        $this->assertSame([2, 1], array_column($state['units']['pc1']['stages'], 'amount'), '超えた分は付かない');
+        $this->assertEqualsWithDelta(170.0, $this->effective($state['units']['pc1'], 'def'), 0.0001, '見た目は +3 まで');
+        $this->assertSame([2, 2], array_column($state['units']['pc1']['stages'], 'amount'), 'かけた量はそのまま残る');
         $event = collect($second['events'])->where('type', 'buff_applied')->firstWhere('target', 'pc1');
-        $this->assertSame(['def', 2, 1], [$event['stat'], $event['delta'], $event['applied']]);
+        $this->assertSame(['def', 2, 1], [$event['stat'], $event['delta'], $event['applied']], '見た目が変わった量は +1');
 
-        // もう上限なので、さらにかけても効果は足されない（演出のイベントだけ出る）
+        // もう上限なので、さらにかけても見た目は変わらない（applied は 0）。でも効果は足されて、持続のあいだ上限を保つ
         $third = $this->cast($engine, $state, 'pc4', 'pc4_earth_armor', 'pc1');
         $state = $third['state'];
-        $this->assertSame([2, 1], array_column($state['units']['pc1']['stages'], 'amount'));
+        $this->assertSame([2, 2, 1], array_column($state['units']['pc1']['stages'], 'amount'));
         $event = collect($third['events'])->where('type', 'buff_applied')->firstWhere('target', 'pc1');
         $this->assertSame([1, 0], [$event['delta'], $event['applied']]);
 
-        // 先の +2 が切れると、残りの +1 だけになる（超えた分は戻ってこない）
+        // 先の +2 が切れても、あとからかけた +2 と +1 が残るので、+3 のまま（上限を超えた分は、あとの効果の持続のあいだ効く）
         $this->tick($engine, $state, 'pc1');
         $this->tick($engine, $state, 'pc1');
-        $this->assertSame(1, $this->stageSum($state['units']['pc1'], 'def'));
+        $this->assertEqualsWithDelta(170.0, $this->effective($state['units']['pc1'], 'def'), 0.0001);
+        // 最後は、全部切れて元に戻る
+        $this->tick($engine, $state, 'pc1');
+        $this->assertEqualsWithDelta(100.0, $this->effective($state['units']['pc1'], 'def'), 0.0001);
     }
 
     public function test_debuffs_are_capped_at_minus_three_too(): void
@@ -117,14 +120,80 @@ class BattleEngineStatStageTest extends TestCase
         $state = $this->state();
 
         $state = $this->cast($engine, $state, 'pc3', 'pc3_ragaon_beat', 'enemy_1')['state'];
-        $this->assertSame(-3, $this->stageSum($state['units']['enemy_1'], 'def'));
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['enemy_1'], 'def'), 0.0001);
 
         $state = $this->cast($engine, $state, 'pc2', 'pc2_great_burst_tree')['state'];
-        $this->assertSame(-3, $this->stageSum($state['units']['enemy_1'], 'def'), '-3 を超えては下がらない');
-        $this->assertSame([-3], array_column($state['units']['enemy_1']['stages'], 'amount'));
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['enemy_1'], 'def'), 0.0001, '-3 を超えては下がらない');
+        $this->assertSame([-3, -2], array_column($state['units']['enemy_1']['stages'], 'amount'), 'かけた量はそのまま残る');
         $this->assertSame(-2, $this->stageSum($state['units']['enemy_2'], 'def'), '敵全体には 2 段階下がる');
         $this->assertEqualsWithDelta(65.0, $this->effective($state['units']['enemy_2'], 'def'), 0.0001);
-        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['enemy_1'], 'def'), 0.0001);
+    }
+
+    /**
+     * 防御が下がっている状態で、ラグオンビート（自分の防御も 3 段階下がる）を使っても、自分の防御はちゃんと 3 段階下がった状態になる。
+     * 以前は、上限を超えた分を捨てて差分だけを記録していたため、先にかかっていた効果の最後の 1 ターンが同じ行動の終わりに切れると、
+     * 新しい効果が薄まって、防御が変わらない（さらには上がる）ことがあった。
+     *
+     * @return array<string, array{0: list<array{stat: string, amount: int, turns: int, source: string}>}>
+     */
+    public static function downStatesBeforeRagaon(): array
+    {
+        $down = static fn (int $amount, int $turns): array => ['stat' => 'def', 'amount' => $amount, 'turns' => $turns, 'source' => 'test'];
+
+        return [
+            '防御-1（残り3ターン）' => [[$down(-1, 3)]],
+            '防御-1（残り1ターン。この行動の終わりに切れる）' => [[$down(-1, 1)]],
+            '防御-2（残り1ターン）' => [[$down(-2, 1)]],
+            '防御-1 が 2 つ（残り 1 ターンと 3 ターン）' => [[$down(-1, 1), $down(-1, 3)]],
+            '防御-3（残り1ターン）' => [[$down(-3, 1)]],
+        ];
+    }
+
+    /**
+     * @param  list<array{stat: string, amount: int, turns: int, source: string}>  $existing
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('downStatesBeforeRagaon')]
+    public function test_ragaon_beat_always_leaves_the_caster_at_minus_three_defense(array $existing): void
+    {
+        $engine = $this->engine();
+        $state = $this->state();
+        $state['units']['pc3']['stages'] = $existing;
+
+        $result = $this->cast($engine, $state, 'pc3', 'pc3_ragaon_beat', 'enemy_1');
+        $state = $result['state'];
+
+        // 使った行動の終わり（持続ターンが 1 つ減ったあと）でも、自分も敵も -3 段階（防御 100 → 50）
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc3'], 'def'), 0.0001, '自分の防御');
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['enemy_1'], 'def'), 0.0001, '敵の防御');
+        // 画面に出る段階も -3
+        $this->assertSame(-3, $this->engine()->publicState($state)['units'][2]['stages']['def'] ?? null);
+
+        // 新しくかけた効果は 3 ターンのうち 1 つ使ったので、あと 2 回の行動のあいだ、-3 のまま。そのあと戻る
+        $this->tick($engine, $state, 'pc3');
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc3'], 'def'), 0.0001);
+        $this->tick($engine, $state, 'pc3');
+        $this->assertEqualsWithDelta(100.0, $this->effective($state['units']['pc3'], 'def'), 0.0001);
+    }
+
+    public function test_a_new_cast_keeps_the_cap_for_its_whole_duration_even_if_an_older_effect_expires_first(): void
+    {
+        // 敵味方どちらも同じ: 防御+1（残り 1 ターン）のところに +3 をかける → +3。先の +1 が切れても、+3 のまま
+        $engine = $this->engine();
+        $state = $this->state();
+        foreach (['pc1', 'enemy_1'] as $id) {
+            $state['units'][$id]['stages'] = [$this->stageEntry('def', 1, 1)];
+            $this->applyBuff($engine, $state, $id, 'def_up_3');
+            $this->assertEqualsWithDelta(170.0, $this->effective($state['units'][$id], 'def'), 0.0001, "{$id} は +3");
+
+            $this->tick($engine, $state, $id); // 先の +1 が切れる。+3 は残り 2 ターン
+            $this->assertEqualsWithDelta(170.0, $this->effective($state['units'][$id], 'def'), 0.0001, "{$id} は +3 のまま");
+        }
+
+        // デバフも同じ: 防御-1（残り 1 ターン）のところに -3
+        $state['units']['pc2']['stages'] = [$this->stageEntry('def', -1, 1)];
+        $this->applyBuff($engine, $state, 'pc2', 'def_down_3');
+        $this->tick($engine, $state, 'pc2');
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc2'], 'def'), 0.0001);
     }
 
     public function test_buffs_and_debuffs_add_up(): void

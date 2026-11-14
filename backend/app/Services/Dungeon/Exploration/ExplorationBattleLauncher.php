@@ -10,6 +10,12 @@ use App\Services\Battle\BattleOrchestrator;
 
 class ExplorationBattleLauncher
 {
+    /**
+     * 空間の裂け目のボス戦（4 人の魔法使い）の meta。探索イベントの裂け目も、層選択画面の「時空の裂け目へ」も、これを使う。
+     * rift = 勝ったときの文言が「空間の裂け目の主たちを退けた！」になる。bgm = 専用の BGM（last_boss.mp3。frontend の BGM_TRACKS のキー）。
+     */
+    public const RIFT_META = ['rift' => true, 'bgm' => 'last_boss'];
+
     public function __construct(
         private readonly BattleFactory $factory = new BattleFactory,
         private readonly BattleOrchestrator $orchestrator = new BattleOrchestrator,

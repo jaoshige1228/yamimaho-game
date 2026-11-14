@@ -33,8 +33,9 @@
 ### 音量の仕組み（調整するとき）
 
 - `frontend/src/composables/useBattleAudio.js` の `GainNode` で掛ける（BGM は `bgmGain`、SE は `seGain`）。
-- BGM = スライダー値 × `BGM_MASTER_GAIN`（0.10）。SE = スライダー値 × 音源ごとの補正ゲイン。
+- BGM = スライダー値 × `BGM_MASTER_GAIN`（0.10）× 曲ごとの追加補正（`BGM_TRACK_BOOST_DB`。裂け目のボス戦の `last_boss` だけ +3 dB。2026-11-14）。SE = スライダー値 × 音源ごとの補正ゲイン。
 - SE の音源は音量がまちまちなので、実測ラウドネス（`SE_SOURCE_LEVELS`）から `SE_TARGET_LUFS`（-20）に揃える補正を自動計算している。`cursor` は音源が小さく、割れない範囲までしか持ち上げられないため、他よりやや小さめになる。
+- **SE ごとの追加補正（`SE_BOOST_DB`。2026-11-14）**: 揃えた音量より大きくしたい SE に dB で足す。今は `enemy_magic`（裂け目の敵の魔法）= +6 dB、`debahu`（PC にデバフが付いたとき）= +10 dB。追加補正のある SE は、ピークの天井（-1 dB）の代わりに**ソフトリミッター**（`WaveShaperNode`。振幅 0.5 までは素通し、超えた分をなめらかに 1.0 へ。追加補正のない SE は通らない）で割れを防ぐ。補正後の音量はブラウザでオフライン再生して測った（`debahu` は 200Hz 未満の低音がほとんどで、スマホ・ノート PC のスピーカーでは、ラウドネスが同じでも他の SE より 10〜18 dB 小さく聞こえていた。+10 dB で、200Hz 以上の音量が `magic` / `success` / `damage` と同じくらいになる）。音量を変えるときは、この 2 つの表の数字を直す（6 dB で約 2 倍）。
 - SE の音源を差し替えたら、`ffmpeg -i <file> -af loudnorm=I=-23:TP=-1:print_format=json -f null -` で `input_i`（LUFS）と `input_tp`（ピーク）を測り直し、`SE_SOURCE_LEVELS` を更新する。
 
 ## 3. 素材・転送量

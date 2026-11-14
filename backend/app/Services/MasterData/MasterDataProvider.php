@@ -7,6 +7,7 @@ use App\Models\CharacterMaster;
 use App\Models\EnemyMaster;
 use App\Models\SpellMaster;
 use App\Models\WeaponMaster;
+use App\Services\Battle\SpellCategory;
 use Illuminate\Support\Facades\Schema;
 
 class MasterDataProvider
@@ -608,6 +609,14 @@ class MasterDataProvider
         if ($castStyle !== '') {
             $spell['cast_style'] = $castStyle;
         }
+
+        // 唱えると減る HP（固定値。魔力集中）。空 = 減らない
+        if (($row['hp_cost'] ?? '') !== '' && $row['hp_cost'] !== null) {
+            $spell['hp_cost'] = (int) $row['hp_cost'];
+        }
+
+        // コマンド画面での大分け（attack / heal / support）。空・不正なら、効果の種類から決める
+        $spell['category'] = SpellCategory::resolve($row['category'] ?? null, (string) $row['effect']);
 
         return $spell;
     }

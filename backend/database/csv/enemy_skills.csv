@@ -20,10 +20,10 @@ mimic,flee,逃げる,50,flee,,
 dragon,attack,攻撃,30,punch,ally_single,1.0
 dragon,dragon_claw,ドラゴンクロウ,35,physical_single,ally_single,1.5
 dragon,dragon_breath,ドラゴンブレス,35,physical_all,ally_all,0.9
-mahou,attack,攻撃,25,punch,ally_single,1.0
-mahou,cult_def_up,闇の加護,25,spell,,
-mahou,cult_def_down,闇の呪縛,25,spell,,
-mahou,cult_heal,闇の癒し,25,spell,,
+mahou,attack,攻撃,60,punch,ally_single,1.0
+mahou,cult_def_up,闇の加護,20,spell,,
+mahou,cult_def_down,闇の呪縛,20,spell,,
+mahou,cult_heal,闇の癒し,20,spell,,
 bunisher,attack,攻撃,50,punch,ally_single,1.0
 bunisher,banish_blow,追放の一撃,50,physical_single,ally_single,1.8
 cleaner,attack,攻撃,30,punch,ally_single,1.0

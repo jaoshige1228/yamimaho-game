@@ -7,8 +7,8 @@ import { characterSpriteUrls } from '../../utils/publicAssetUrl.js';
 /**
  * ダンジョン内の回復画面。
  * ① 回復する相手をカードで選ぶ（HP・MP のバーと、戦闘不能が一目で分かる）
- * ② アイテム / 魔法から使うものを選ぶ（選んだ相手に使ったときの結果が、その場で見える。使えないものは理由が出る）
- * ③ 使うと、カードの数字とバーが動き、結果の文が出る
+ * ② アイテム / 魔法から使うものを選ぶ（使えないものは灰色になって押せない。理由や見込みの文は出さない）
+ * ③ 使うと、カードの数字とバーが動き、カードの上に増えた数字が浮かぶ（結果の文は出さない）
  */
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -24,8 +24,6 @@ const targetSlotId = ref('');
 const busy = ref(false);
 const error = ref('');
 const spells = ref([]);
-/** 直前に使った結果 { lines: string[] } */
-const result = ref(null);
 /** カードの上に浮かぶ数字 { [slot]: [{ id, text, kind }] } */
 const floats = ref({});
 let floatSeq = 0;
@@ -60,49 +58,23 @@ function suggestTarget() {
   return props.party[0] ? slotOf(props.party[0]) : '';
 }
 
-/** ［使えるか］と［画面に出す一言（使えるときは回復の見込み、使えないときは理由）］ */
-function evalItem(item, target) {
-  if (!target) return { usable: false, text: '回復する相手を選んでください' };
-  const power = Number(item.power) || 0;
-  if (item.effect === 'revive') {
-    if (!isDead(target)) return { usable: false, text: '戦闘不能の味方にだけ使えます' };
-    const hp = Math.max(1, Math.floor((target.max_hp * power) / 100));
-    return { usable: true, text: `${target.name}　HP 0 → ${hp}` };
-  }
-  if (isDead(target)) return { usable: false, text: `${target.name}は戦闘不能です` };
-  if (item.effect === 'heal_hp') {
-    if (target.hp >= target.max_hp) return { usable: false, text: `${target.name}のHPは満タンです` };
-    return { usable: true, text: `${target.name}　HP ${target.hp} → ${Math.min(target.max_hp, target.hp + power)}` };
-  }
-  if (target.mp >= target.max_mp) return { usable: false, text: `${target.name}のMPは満タンです` };
-  return { usable: true, text: `${target.name}　MP ${target.mp} → ${Math.min(target.max_mp, target.mp + power)}` };
+/** 使えるか（使えないものは灰色にして押せなくする。理由の文は出さない） */
+function canUseItem(item, target) {
+  if (!target) return false;
+  if (item.effect === 'revive') return isDead(target);
+  if (isDead(target)) return false;
+  if (item.effect === 'heal_hp') return target.hp < target.max_hp;
+  return target.mp < target.max_mp;
 }
 
-function evalSpell(spell, target) {
+function canUseSpell(spell, target) {
   const caster = unitBySlot(spell.caster_slot_id);
-  if (!caster || isDead(caster)) return { usable: false, text: `${spell.caster_name}は戦闘不能です` };
-  if (caster.mp < spell.mp_cost) {
-    return { usable: false, text: `MPが足りません（あと ${spell.mp_cost - caster.mp}）` };
-  }
-
-  if (isAllTarget(spell)) {
-    const hurt = props.party.filter((u) => !isDead(u) && u.hp < u.max_hp);
-    if (hurt.length === 0) return { usable: false, text: '傷ついた味方がいません' };
-    const how = spell.effect === 'heal_full' ? 'HPを全回復' : `HPを ${spell.amount} ずつ回復`;
-    return { usable: true, text: `傷ついた味方 ${hurt.length} 人の${how}` };
-  }
-
-  if (!target) return { usable: false, text: '回復する相手を選んでください' };
-
-  if (isReviveSpell(spell)) {
-    if (!isDead(target)) return { usable: false, text: '戦闘不能の味方にだけ使えます' };
-    const hp = Math.max(1, Math.floor((target.max_hp * (spell.revive_percent ?? 50)) / 100));
-    return { usable: true, text: `${target.name}　HP 0 → ${hp}` };
-  }
-  if (isDead(target)) return { usable: false, text: `${target.name}は戦闘不能です（蘇生が必要）` };
-  if (target.hp >= target.max_hp) return { usable: false, text: `${target.name}のHPは満タンです` };
-  const after = spell.effect === 'heal_full' ? target.max_hp : Math.min(target.max_hp, target.hp + (spell.amount ?? 0));
-  return { usable: true, text: `${target.name}　HP ${target.hp} → ${after}` };
+  if (!caster || isDead(caster) || caster.mp < spell.mp_cost) return false;
+  // 味方全体の魔法は、傷ついた生存者が 1 人でもいれば使える
+  if (isAllTarget(spell)) return props.party.some((u) => !isDead(u) && u.hp < u.max_hp);
+  if (!target) return false;
+  if (isReviveSpell(spell)) return isDead(target);
+  return !isDead(target) && target.hp < target.max_hp;
 }
 
 const itemRows = computed(() =>
@@ -113,25 +85,22 @@ const itemRows = computed(() =>
     title: item.name,
     sub: item.description,
     side: [`×${item.quantity}`],
-    ...evalItem(item, selectedTarget.value),
+    usable: canUseItem(item, selectedTarget.value),
     run: () => useItem(item),
   })),
 );
 
 const spellRows = computed(() =>
-  spells.value.map((spell) => {
-    const caster = unitBySlot(spell.caster_slot_id);
-    return {
-      key: `${spell.caster_slot_id}-${spell.id}`,
-      kind: isReviveSpell(spell) ? 'revive' : 'hp',
-      tag: isReviveSpell(spell) ? '蘇生' : 'HP',
-      title: spell.label,
-      sub: spell.description,
-      side: [spell.caster_name, `MP ${spell.mp_cost}（のこり ${caster?.mp ?? 0}）`],
-      ...evalSpell(spell, selectedTarget.value),
-      run: () => useSpell(spell),
-    };
-  }),
+  spells.value.map((spell) => ({
+    key: `${spell.caster_slot_id}-${spell.id}`,
+    kind: isReviveSpell(spell) ? 'revive' : 'hp',
+    tag: isReviveSpell(spell) ? '蘇生' : 'HP',
+    title: spell.label,
+    sub: spell.description,
+    side: [spell.caster_name, `MP ${spell.mp_cost}`],
+    usable: canUseSpell(spell, selectedTarget.value),
+    run: () => useSpell(spell),
+  })),
 );
 
 const rows = computed(() => (tab.value === 'item' ? itemRows.value : spellRows.value));
@@ -151,7 +120,6 @@ watch(
     tab.value = 'item';
     targetSlotId.value = suggestTarget();
     error.value = '';
-    result.value = null;
     floats.value = {};
     loadSpells().catch((e) => {
       error.value = e.message;
@@ -159,11 +127,9 @@ watch(
   },
 );
 
-// 相手やタブを変えたら、前の結果の文は消す（別の相手の結果が残って紛らわしくならないように）
 function pickTarget(unit) {
   if (targetSlotId.value !== slotOf(unit)) {
     playSe('cursor');
-    result.value = null;
     error.value = '';
   }
   targetSlotId.value = slotOf(unit);
@@ -172,7 +138,6 @@ function pickTarget(unit) {
 function pickTab(next) {
   if (tab.value !== next) {
     playSe('cursor');
-    result.value = null;
     error.value = '';
   }
   tab.value = next;
@@ -187,30 +152,21 @@ function addFloat(slot, text, kind) {
   }, 1400);
 }
 
-/** 使う前と後のパーティを比べて、結果の文と、カードに浮かべる数字を作る */
-function showResult(message, before, after) {
-  const lines = [message];
+/** 使う前と後のパーティを比べて、カードの上に浮かべる数字（増えた HP・MP、復活）を出す */
+function showFloats(before, after) {
   for (const next of after) {
     const prev = before.find((u) => slotOf(u) === slotOf(next));
     if (!prev) continue;
     const slot = slotOf(next);
     if (isDead(prev) && !isDead(next)) {
-      lines.push(`${next.name}が復活した（HP ${next.hp}）`);
       addFloat(slot, '復活', 'revive');
       continue;
     }
     const hp = next.hp - prev.hp;
     const mp = next.mp - prev.mp;
-    if (hp > 0) {
-      lines.push(`${next.name}のHPが ${hp} 回復した`);
-      addFloat(slot, `+${hp}`, 'hp');
-    }
-    if (mp > 0) {
-      lines.push(`${next.name}のMPが ${mp} 回復した`);
-      addFloat(slot, `+${mp}`, 'mp');
-    }
+    if (hp > 0) addFloat(slot, `+${hp}`, 'hp');
+    if (mp > 0) addFloat(slot, `+${mp}`, 'mp');
   }
-  result.value = { lines };
 }
 
 async function send(body, seName) {
@@ -222,13 +178,12 @@ async function send(body, seName) {
     playSe('cursor');
     const data = await api('/dungeon/heal', { method: 'POST', body: JSON.stringify(body) });
     emit('updated', data);
-    showResult(data.message ?? '', before, data.party ?? []);
+    showFloats(before, data.party ?? []);
     playSe(seName);
     // 魔法を使うとMPが減って使えるものが変わるので、一覧を読み直す
     await loadSpells().catch(() => {});
   } catch (e) {
     error.value = e.message;
-    result.value = null;
   } finally {
     busy.value = false;
   }
@@ -264,7 +219,6 @@ function useSpell(spell) {
       <div class="heal-sheet" role="dialog" aria-modal="true" aria-label="回復">
         <header class="heal-head">
           <h3>回復</h3>
-          <p class="heal-hint">回復する相手を選んで、使うものを選びます</p>
           <button type="button" class="heal-close" aria-label="閉じる" @click="emit('close')">×</button>
         </header>
 
@@ -299,17 +253,14 @@ function useSpell(spell) {
 
         <div class="heal-tabs" role="tablist">
           <button type="button" role="tab" :aria-selected="tab === 'item'" :class="{ active: tab === 'item' }" @click="pickTab('item')">
-            アイテム<span class="heal-tabs__count">{{ itemRows.length }}</span>
+            アイテム
           </button>
           <button type="button" role="tab" :aria-selected="tab === 'spell'" :class="{ active: tab === 'spell' }" @click="pickTab('spell')">
-            魔法<span class="heal-tabs__count">{{ spellRows.length }}</span>
+            魔法
           </button>
         </div>
 
         <div class="heal-body">
-          <div v-if="result" class="heal-result" role="status">
-            <p v-for="(line, i) in result.lines" :key="i" :class="{ first: i === 0 }">{{ line }}</p>
-          </div>
           <p v-if="error" class="heal-error">{{ error }}</p>
 
           <ul v-if="rows.length > 0" class="heal-actions">
@@ -319,7 +270,6 @@ function useSpell(spell) {
                 <span class="heal-action__main">
                   <span class="heal-action__title">{{ row.title }}</span>
                   <span class="heal-action__sub">{{ row.sub }}</span>
-                  <span class="heal-action__state" :class="row.usable ? 'ok' : 'ng'">{{ row.text }}</span>
                 </span>
                 <span class="heal-action__side">
                   <span v-for="(s, i) in row.side" :key="i">{{ s }}</span>
@@ -349,7 +299,7 @@ function useSpell(spell) {
   flex-direction: column;
   box-sizing: border-box;
   width: min(430px, 100%);
-  /* 高さを固定する。結果の文が出たり消えたりしても、画面が上下にずれないように（一覧が多いときは一覧の中でスクロール） */
+  /* 高さを固定する。タブを切り替えて一覧の数が変わっても、画面が上下にずれないように（一覧が多いときは一覧の中でスクロール） */
   height: min(80dvh, 560px);
   padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
   border: 1px solid rgba(200, 176, 255, 0.35);
@@ -386,11 +336,6 @@ function useSpell(spell) {
   margin: 0;
   font-size: 1.05rem;
   letter-spacing: 0.1em;
-}
-.heal-hint {
-  margin: 0;
-  font-size: 0.66rem;
-  color: #a898c8;
 }
 .heal-close {
   position: absolute;
@@ -591,38 +536,12 @@ function useSpell(spell) {
   background: #4a2c85;
   color: #fff;
 }
-.heal-tabs__count {
-  min-width: 1.3em;
-  padding: 0 0.3em;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 0.66rem;
-  text-align: center;
-}
-
 /* ───── 一覧 ───── */
 .heal-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-.heal-result {
-  margin-bottom: 0.5rem;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid rgba(141, 255, 180, 0.4);
-  border-radius: 10px;
-  background: rgba(40, 110, 70, 0.28);
-  font-size: 0.74rem;
-  line-height: 1.5;
-  color: #d8ffe6;
-}
-.heal-result p {
-  margin: 0;
-}
-.heal-result p.first {
-  font-weight: 800;
-  color: #fff;
 }
 .heal-error {
   margin: 0 0 0.5rem;
@@ -703,17 +622,6 @@ function useSpell(spell) {
   font-size: 0.64rem;
   line-height: 1.35;
   color: #a898c8;
-}
-.heal-action__state {
-  margin-top: 0.1rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-.heal-action__state.ok {
-  color: #8dffb4;
-}
-.heal-action__state.ng {
-  color: #ffb08a;
 }
 .heal-action__side {
   flex-shrink: 0;

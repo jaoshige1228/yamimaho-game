@@ -298,3 +298,14 @@ floor2_mid_boss,to_battle,start_battle,,,,,,,,,,,outro1,,
 floor2_mid_boss,outro1,dialogue,ち、ちっくしょー！覚えてろ！,npc:gusu,,,,,,,,,,,outro2
 floor2_mid_boss,outro2,dialogue,覚えてろ！,npc:kasu,,,,,,,,,,,end
 floor2_mid_boss,end,end,,,,,,,,,,,,,
+stella_appears,intro,narration,道の向こうから4人の一行が歩いてくる。同じ魔法学校の生徒だ。,,,,,,,,,,,,stella1
+stella_appears,stella1,dialogue,あ……みなさん,npc:stella,,,,,,,,,,,pc1_call
+stella_appears,pc1_call,dialogue,,fixed:pc1,ステラ！,,,,,,,,,,stella2
+stella_appears,stella2,dialogue,みなさん、この先に進まれるんですね。この先は敵も強いので気をつけてください。あ、そうだ……,npc:stella,,,,,,,,,,,stella3
+stella_appears,stella3,dialogue,私たちは撤退するので、よろしければ……,npc:stella,,,,,,,,,,,received
+stella_appears,received,narration,HP回復薬とMP回復薬を受け取った！,,,,,,,,,success,,,grant_hp
+stella_appears,grant_hp,grant_item,,,,,,,potion_hp_s,1,,,,,grant_mp
+stella_appears,grant_mp,grant_item,,,,,,,potion_mp_s,1,,,,,pc1_thanks
+stella_appears,pc1_thanks,dialogue,,fixed:pc1,いいの？ありがとう,,,,,,,,,,stella4
+stella_appears,stella4,dialogue,いえいえ。じゃあ、頑張ってくださいね,npc:stella,,,,,,,,,,,end
+stella_appears,end,end,,,,,,,,,,,,,

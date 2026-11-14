@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Dungeon\DungeonAdvanceService;
 use App\Services\Dungeon\DungeonProgressService;
+use App\Services\Dungeon\DungeonRiftService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,7 @@ class DungeonController extends Controller
     public function __construct(
         private readonly DungeonProgressService $progress,
         private readonly DungeonAdvanceService $advance,
+        private readonly DungeonRiftService $rift,
     ) {}
 
     public function show(): JsonResponse
@@ -49,6 +51,23 @@ class DungeonController extends Controller
             ],
             $this->progress->statusPayload($user),
         ));
+    }
+
+    /** 層選択画面の「時空の裂け目へ」。裂け目のボス戦（4 人の魔法使い）を直接始める。 */
+    public function enterRift(): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json(['message' => '未ログイン'], 401);
+        }
+
+        try {
+            return response()->json($this->rift->startBattle($user));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
     }
 
     public function advance(): JsonResponse
