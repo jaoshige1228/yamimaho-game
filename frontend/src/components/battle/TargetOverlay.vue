@@ -3,6 +3,8 @@ defineProps({
   visible: { type: Boolean, default: false },
   skill: { type: Object, default: null },
   showExecute: { type: Boolean, default: false },
+  /** 今は唱えられない（skill.unusable_reason がある）ので、「唱える」を押せなくする */
+  executeDisabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['cancel', 'confirm-all']);
@@ -16,10 +18,18 @@ const emit = defineEmits(['cancel', 'confirm-all']);
           <h4 class="skill-name">{{ skill.label }}</h4>
           <p v-if="skill.description" class="skill-desc">{{ skill.description }}</p>
           <p v-if="skill.mp_cost != null" class="skill-mp">消費 MP: {{ skill.mp_cost }}</p>
+          <!-- 唱えられない魔法も選べる（どんな魔法か分かるように）。その代わり、ここに理由を出して、対象を選ぶ・唱えることをできなくする -->
+          <p v-if="skill.unusable_reason" class="skill-unusable">今は唱えられません：{{ skill.unusable_reason }}</p>
         </div>
         <div class="actions">
           <button type="button" class="btn" @click="emit('cancel')">やめる</button>
-          <button v-if="showExecute" type="button" class="btn primary" @click="emit('confirm-all')">
+          <button
+            v-if="showExecute"
+            type="button"
+            class="btn primary"
+            :disabled="executeDisabled"
+            @click="emit('confirm-all')"
+          >
             唱える
           </button>
         </div>
@@ -68,6 +78,12 @@ const emit = defineEmits(['cancel', 'confirm-all']);
   font-size: 0.75rem;
   color: var(--mp, #5cb8ff);
 }
+.skill-unusable {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ff9a9a;
+}
 .actions {
   display: flex;
   gap: 0.5rem;
@@ -94,5 +110,9 @@ const emit = defineEmits(['cancel', 'confirm-all']);
   background: var(--accent, #7c5cff);
   border-color: transparent;
   font-weight: 700;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

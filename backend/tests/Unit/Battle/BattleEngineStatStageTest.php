@@ -131,8 +131,10 @@ class BattleEngineStatStageTest extends TestCase
 
     /**
      * 防御が下がっている状態で、ラグオンビート（自分の防御も 3 段階下がる）を使っても、自分の防御はちゃんと 3 段階下がった状態になる。
-     * 以前は、上限を超えた分を捨てて差分だけを記録していたため、先にかかっていた効果の最後の 1 ターンが同じ行動の終わりに切れると、
+     * 以前は、上限を超えた分を捨てて差分だけを記録していたため、先にかかっていた効果の最後の 1 ターンが切れると、
      * 新しい効果が薄まって、防御が変わらない（さらには上がる）ことがあった。
+     * （持続がラウンドの終わりに全員いっしょに減るようになってからは、使った行動の終わりに古い効果が切れることはないが、
+     * 古い効果が先に切れても -3 のままであることは、このあとの tick で確かめる）
      *
      * @return array<string, array{0: list<array{stat: string, amount: int, turns: int, source: string}>}>
      */
@@ -162,17 +164,19 @@ class BattleEngineStatStageTest extends TestCase
         $result = $this->cast($engine, $state, 'pc3', 'pc3_ragaon_beat', 'enemy_1');
         $state = $result['state'];
 
-        // 使った行動の終わり（持続ターンが 1 つ減ったあと）でも、自分も敵も -3 段階（防御 100 → 50）
+        // 使った直後に、自分も敵も -3 段階（防御 100 → 50）
         $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc3'], 'def'), 0.0001, '自分の防御');
         $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['enemy_1'], 'def'), 0.0001, '敵の防御');
         // 画面に出る段階も -3
         $this->assertSame(-3, $this->engine()->publicState($state)['units'][2]['stages']['def'] ?? null);
 
-        // 新しくかけた効果は 3 ターンのうち 1 つ使ったので、あと 2 回の行動のあいだ、-3 のまま。そのあと戻る
+        // 新しくかけた効果は 3 ターン。ラウンドの終わりを 2 回迎えても（先にかかっていた効果が切れても）-3 のまま。3 回目で戻る
         $this->tick($engine, $state, 'pc3');
-        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc3'], 'def'), 0.0001);
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc3'], 'def'), 0.0001, '1 回目のラウンドの終わり');
         $this->tick($engine, $state, 'pc3');
-        $this->assertEqualsWithDelta(100.0, $this->effective($state['units']['pc3'], 'def'), 0.0001);
+        $this->assertEqualsWithDelta(50.0, $this->effective($state['units']['pc3'], 'def'), 0.0001, '2 回目のラウンドの終わり');
+        $this->tick($engine, $state, 'pc3');
+        $this->assertEqualsWithDelta(100.0, $this->effective($state['units']['pc3'], 'def'), 0.0001, '3 回目のラウンドの終わり');
     }
 
     public function test_a_new_cast_keeps_the_cap_for_its_whole_duration_even_if_an_older_effect_expires_first(): void
@@ -386,7 +390,7 @@ class BattleEngineStatStageTest extends TestCase
         return $method->invoke($this->engine(), $unit, $stat);
     }
 
-    /** そのユニットが自分の行動を終えたときの持続ターンの経過（エンジンは行動のあとに呼ぶ）。 */
+    /** ラウンドの終わりの、そのユニット 1 体ぶんの持続ターンの経過（エンジンは、全員の行動が一周したときに全員ぶん呼ぶ）。 */
     private function tick(BattleEngine $engine, array &$state, string $unitId): void
     {
         $method = new \ReflectionMethod(BattleEngine::class, 'tickBuffsForUnit');

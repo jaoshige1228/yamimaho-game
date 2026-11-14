@@ -258,9 +258,9 @@ class BattleEngineSecondBossSpellsTest extends TestCase
             $this->assertSame(2, $this->stageSum($units[$id], 'def'), $id);
             $this->assertSame(3, $units[$id]['stages'][0]['turns'], $id);
         }
-        // 唱えた本人は、行動の終わりに自分の効果の持続が1ターン減る（ほかの魔法と同じ）
+        // 唱えた本人も、ほかの味方と同じ長さ（持続はラウンドの終わりに全員いっしょに減る。唱えた本人だけ先に減ることはない）
         $this->assertSame(2, $this->stageSum($units['pc4'], 'def'));
-        $this->assertSame(2, $units['pc4']['stages'][0]['turns']);
+        $this->assertSame(3, $units['pc4']['stages'][0]['turns']);
         $this->assertSame(0, $this->stageSum($units['pc3'], 'def'), '倒れた味方にはかからない');
         $this->assertSame(0, $this->stageSum($units['enemy_1'], 'def'));
         $this->assertSame(1.4, config('battle.stage.multipliers.def')[2]);

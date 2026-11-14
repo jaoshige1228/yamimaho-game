@@ -65,12 +65,16 @@ return [
     ],
 
     /**
-     * 回復魔法（heal_mag）の回復量を、詠唱者のレベルが低いときだけ増やす。魔法のコード => [max_level, multiplier]。
-     * 癒しの水（pc1_heal_water）は、詠唱者が Lv10 以下のときだけ回復量（魔力 × 係数）が 1.3 倍。Lv11 以上は元の倍率。
-     * 全回復・蘇生には掛からない。使い魔の回復にも掛からない。上の heal_mag_level_penalty（Lv22 以上）とは重ならない。
+     * 回復魔法（heal_mag）の回復量を、詠唱者のレベルが低いときだけ増やす。魔法のコード => 補正のリスト（[max_level, multiplier] を 1 つ以上）。
+     * 詠唱者のレベルが max_level 以下の補正は、**すべて掛け合わせる**（重なる）。
+     * 癒しの水（pc1_heal_water）: Lv10 以下で 1.3 倍、**さらに Lv5 以下で 1.5 倍**（Lv5 以下は 1.3 × 1.5 = 1.95 倍）。Lv11 以上は元の倍率。
+     * 全回復・蘇生には掛からない。使い魔の回復にも掛からない。下の heal_mag_level_penalty（Lv22 以上）とは重ならない。
      */
     'heal_mag_spell_level_bonus' => [
-        'pc1_heal_water' => ['max_level' => 10, 'multiplier' => 1.3],
+        'pc1_heal_water' => [
+            ['max_level' => 10, 'multiplier' => 1.3],
+            ['max_level' => 5, 'multiplier' => 1.5],
+        ],
     ],
 
     /** 蘇生魔法（effect=revive_chance）で復活したときの HP（最大 HP に対する割合 %）。戦闘中・探索中で共通 */

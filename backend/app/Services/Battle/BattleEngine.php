@@ -73,7 +73,6 @@ class BattleEngine
 
         $events = [['type' => 'turn_start', 'actor' => $actorId]];
         $events = array_merge($events, $this->resolveAction($state, $actorId, $action, $spellId, $targetId));
-        $this->tickBuffsForUnit($state['units'][$actorId]);
 
         return $this->afterAction($state, $events, $actorId);
     }
@@ -96,7 +95,6 @@ class BattleEngine
 
             $events = [['type' => 'turn_start', 'actor' => $actor]];
             $events = array_merge($events, $this->resolveEnemySkill($state, $actor, $skill));
-            $this->tickBuffsForUnit($state['units'][$actor]);
 
             $result = $this->afterAction($state, $events, $actor);
             $state = $result['state'];
@@ -121,8 +119,10 @@ class BattleEngine
         $nextIndex = $this->nextTurnIndex($state, $actorId);
         $nextActor = $this->factory->findNextActor($state['units'], $state['turn_order'], $nextIndex);
 
-        // 全員（味方と敵）の行動が一周したら、使い魔の支援の抽選を行う
+        // 全員（味方と敵）の行動が一周したら、まず全員のバフ・デバフの残りターンを 1 減らし、
+        // そのあと使い魔の支援の抽選を行う（使い魔の支援は次のラウンドの頭の扱いなので、付けたばかりの効果は減らさない）
         if ($this->roundCompleted($state, $actorId, $nextActor)) {
+            $events = array_merge($events, $this->tickBuffsAtRoundEnd($state));
             $support = $this->runFamiliarSupport($state);
             if ($support !== []) {
                 $events = array_merge($events, $support);
@@ -230,6 +230,11 @@ class BattleEngine
 
             switch ($decision['kind']) {
                 case 'damage':
+                    // 戦闘不能（HP 0・逃げた）の敵には攻撃しない。判断（FamiliarSupport::decide）も生存者だけを選ぶが、
+                    // ここでも確かめる（攻撃の途中で、先に攻撃した敵が倒れても、まだ生きている敵だけに続ける）
+                    if (! ($target['alive'] ?? false) || (int) ($target['hp'] ?? 0) <= 0) {
+                        break;
+                    }
                     $coefficient = $this->familiarSupport->coefficientFor($decision['action'], $level);
                     $damage = $this->calcDamage(['mag' => $averageMag, 'buffs' => []], $target, 'mag', $coefficient, 'magical');
                     $targetLabel = (string) $target['name'];
@@ -768,6 +773,39 @@ class BattleEngine
                 throw new InvalidArgumentException('蘇生できない対象です。');
             }
         }
+    }
+
+    /**
+     * 今この魔法を唱えられない理由（唱えられるなら null）。MP が足りない／対象になる相手がいない／自分に使う魔法の条件を満たさない。
+     * 画面は、唱えられない魔法も選べるようにして（何の魔法か分かるように）、この理由を出す。サーバーは、唱えられない魔法の行動を、
+     * 今までどおり受け付けない（applyPlayerAction が InvalidArgumentException を返す）。
+     *
+     * @param  array<string, mixed>  $spell
+     * @param  array<string, mixed>  $unit
+     * @param  array<string, array<string, mixed>>  $units
+     */
+    private function spellUnusableReason(array $spell, array $unit, array $units): ?string
+    {
+        if ((int) $unit['mp'] < (int) $spell['mp_cost']) {
+            return 'MPが足りません';
+        }
+
+        $blocked = $this->selfCastBlockedReason($spell, $unit);
+        if ($blocked !== null) {
+            return rtrim($blocked, '。');
+        }
+
+        if (! $this->spellHasValidTarget($spell, $units)) {
+            $effect = (string) ($spell['effect'] ?? '');
+
+            return match (true) {
+                in_array($effect, self::HEAL_EFFECTS, true) => '回復できる味方がいません',
+                in_array($effect, self::REVIVE_EFFECTS, true) => '戦闘不能の味方がいません',
+                default => '対象がいません',
+            };
+        }
+
+        return null;
     }
 
     /**
@@ -1337,6 +1375,7 @@ class BattleEngine
      *   上限を超えてかけたときは、上限いっぱいまでかかった状態になり、先にかかっていた効果が先に切れても、新しくかけた効果の
      *   持続のあいだは、その分が効き続ける（差分だけを記録すると、先の効果が切れた瞬間に新しい効果が薄まってしまう）。
      *   イベントの `applied` は、かけた瞬間に見た目の段階が変わった量（上限で頭打ちになった分は含まない）。
+     *   イベントの `stages` / `buffs` は、かけた直後のそのユニットの状態（画面のバッジはこれをそのまま使う）。
      * - 回避固定（type=evasion_set）… `buffs` に残りターンを持つ（従来どおり）
      *
      * @param  array<string, mixed>  $unit
@@ -1351,7 +1390,7 @@ class BattleEngine
             $unit['buffs'][$buffKey] = config("battle.buffs.{$buffKey}.turns");
             $event['icon'] = config("battle.buffs.{$buffKey}.icon");
 
-            return $event;
+            return $event + $this->effectsOf($unit);
         }
 
         $stat = (string) $buff['stat'];
@@ -1370,7 +1409,8 @@ class BattleEngine
             'source' => $source,
         ];
 
-        return $event + ['stat' => $stat, 'delta' => $delta, 'applied' => $applied];
+        // stages / buffs は、付けた直後の、そのユニットのバッジの状態（画面はこれをそのまま使う）
+        return $event + ['stat' => $stat, 'delta' => $delta, 'applied' => $applied] + $this->effectsOf($unit);
     }
 
     /**
@@ -1708,13 +1748,44 @@ class BattleEngine
     }
 
     /**
+     * ラウンドの終わり（全員の行動が一周した直後）に、生きている全員のバフ・デバフの残りターンを 1 減らす。
+     * 防御・攻撃の段階は付与 1 回ごと、回避などの buffs は種類ごとに数える。0 になった効果は消え、消えたユニットごとに
+     * `buff_expired`（そのユニットの、いまの段階と回避の効果）を返す。画面はこれでバッジを更新する。
+     *
+     * 「3ターン」は、掛けたラウンドを 1 ターン目と数える（掛けたラウンドの終わり・次のラウンドの終わり・その次のラウンドの終わりで切れる）。
+     * 持続は誰が掛けられても同じ時刻に切れる（本人の行動の回数では数えない）。
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private function tickBuffsAtRoundEnd(array &$state): array
+    {
+        $events = [];
+        foreach (array_keys($state['units']) as $unitId) {
+            if (! ($state['units'][$unitId]['alive'] ?? false)) {
+                continue;
+            }
+            if ($this->tickBuffsForUnit($state['units'][$unitId])) {
+                $events[] = ['type' => 'buff_expired', 'target' => $unitId] + $this->effectsOf($state['units'][$unitId]);
+            }
+        }
+
+        return $events;
+    }
+
+    /**
+     * 1 体のバフ・デバフの残りターンを 1 減らす。消えた効果があれば true。
+     *
      * @param  array<string, mixed>  $unit
      */
-    private function tickBuffsForUnit(array &$unit): void
+    private function tickBuffsForUnit(array &$unit): bool
     {
-        foreach ($unit['buffs'] as $key => $turns) {
+        $expired = false;
+
+        foreach ($unit['buffs'] ?? [] as $key => $turns) {
             if ($turns <= 1) {
                 unset($unit['buffs'][$key]);
+                $expired = true;
             } else {
                 $unit['buffs'][$key] = $turns - 1;
             }
@@ -1726,11 +1797,38 @@ class BattleEngine
             $entry['turns'] = (int) ($entry['turns'] ?? 0) - 1;
             if ($entry['turns'] > 0) {
                 $stages[] = $entry;
+            } else {
+                $expired = true;
             }
         }
         if (array_key_exists('stages', $unit) || $stages !== []) {
             $unit['stages'] = $stages;
         }
+
+        return $expired;
+    }
+
+    /**
+     * ユニットに付いているバフ・デバフの、画面に出す形（防御・攻撃の現在の段階と、回避などの残りターン付きの効果）。
+     * `buff_applied` / `buff_expired` のイベントと、publicUnit で共通。画面は、これをそのままバッジにする。
+     *
+     * @param  array<string, mixed>  $unit
+     * @return array{stages: array{def: int, atk: int}, buffs: array<string, int>}
+     */
+    private function effectsOf(array $unit): array
+    {
+        // buffs は回避固定の効果だけ（古い戦闘に残った未定義のキーは出さない）
+        $buffs = [];
+        foreach ($unit['buffs'] ?? [] as $key => $turns) {
+            if ($turns > 0 && (config("battle.buffs.{$key}.type") ?? '') === 'evasion_set') {
+                $buffs[$key] = $turns;
+            }
+        }
+
+        return [
+            'stages' => ['def' => $this->currentStage($unit, 'def'), 'atk' => $this->currentStage($unit, 'atk')],
+            'buffs' => $buffs,
+        ];
     }
 
     /**
@@ -1772,13 +1870,7 @@ class BattleEngine
      */
     private function publicUnit(array $unit): array
     {
-        // buffs は回避固定の効果だけ（古い戦闘に残った未定義のキーは出さない）
-        $buffs = [];
-        foreach ($unit['buffs'] as $key => $turns) {
-            if ($turns > 0 && (config("battle.buffs.{$key}.type") ?? '') === 'evasion_set') {
-                $buffs[$key] = $turns;
-            }
-        }
+        $effects = $this->effectsOf($unit);
 
         return [
             'id' => $unit['id'],
@@ -1793,9 +1885,9 @@ class BattleEngine
             'max_mp' => $unit['max_mp'],
             'alive' => $unit['alive'],
             'fled' => (bool) ($unit['fled'] ?? false),
-            'buffs' => $buffs,
+            'buffs' => $effects['buffs'],
             // 防御・攻撃の現在の段階（-3〜+3）。バッジの矢印の数になる
-            'stages' => ['def' => $this->currentStage($unit, 'def'), 'atk' => $this->currentStage($unit, 'atk')],
+            'stages' => $effects['stages'],
             'damage_shield' => (bool) ($unit['damage_shield'] ?? false),
             'life_ward' => (bool) ($unit['life_ward'] ?? false),
             'user_character_id' => $unit['user_character_id'] ?? null,
@@ -1828,9 +1920,8 @@ class BattleEngine
         foreach ($unit['spells'] as $spellId) {
             $spell = $this->factory->findSpell($spellId);
             $affordable = $unit['mp'] >= $spell['mp_cost'];
-            $usable = $affordable
-                && $this->spellHasValidTarget($spell, $units)
-                && $this->selfCastBlockedReason($spell, $unit) === null;
+            $unusableReason = $this->spellUnusableReason($spell, $unit, $units);
+            $usable = $unusableReason === null;
             $spells[] = [
                 'id' => $spellId,
                 'label' => $spell['label'],
@@ -1842,6 +1933,9 @@ class BattleEngine
                 'category' => $spell['category'] ?? SpellCategory::forEffect((string) $spell['effect']),
                 'affordable' => $affordable,
                 'usable' => $usable,
+                // 今は唱えられない理由（唱えられるなら null）。戦闘中、魔法は唱えられないときも選べる（どんな魔法か確かめられるように）。
+                // 選んだあとの画面に、この理由を出して、唱える・対象を選ぶことだけをできなくする
+                'unusable_reason' => $unusableReason,
             ];
         }
 

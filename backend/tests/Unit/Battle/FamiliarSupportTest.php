@@ -5,6 +5,7 @@ namespace Tests\Unit\Battle;
 use App\Services\Battle\BattleEngine;
 use App\Services\Battle\BattleFactory;
 use App\Services\Battle\FamiliarSupport;
+use Closure;
 use Tests\TestCase;
 
 /**
@@ -184,6 +185,42 @@ class FamiliarSupportTest extends TestCase
         $state['units']['pc1']['hp'] = 90;
         $result = $this->roundEnd($state, [1, 0, 0, 0]);
         $this->assertSame(40, collect($result['events'])->where('type', 'damage')->firstWhere('actor', 'familiar')['value']);
+    }
+
+    public function test_single_attack_never_picks_a_defeated_enemy(): void
+    {
+        // 敵 3 体のうち、1 体は倒れている（alive = false）、1 体は HP 0 なのに alive のまま。残りの 1 体だけが対象になる
+        $state = $this->state(level: 1, enemies: 3);
+        $state['units']['enemy_1']['hp'] = 0;
+        $state['units']['enemy_1']['alive'] = false;
+        $state['units']['enemy_2']['hp'] = 0;
+
+        // 対象の選択の出目をどう変えても（0〜2）、生きている enemy_3 に当たる
+        foreach ([0, 1, 2, 3, 99] as $targetRoll) {
+            $decision = (new FamiliarSupport(fn (int $min, int $max): int => $max === 2 ? $targetRoll : $min))->decide($state['units'], 1);
+            $this->assertSame(['enemy_3'], $decision['targets'], "対象の出目 {$targetRoll}");
+        }
+    }
+
+    public function test_the_attack_skips_an_enemy_that_went_down_before_it_lands(): void
+    {
+        // 判断で選ばれたあとに倒れた敵（ここでは、判断を作り直して、倒れた敵を混ぜる）には、ダメージもダメージのイベントも出さない
+        $state = $this->state(level: 4, enemies: 2);
+        $state['units']['enemy_2']['hp'] = 0;
+        $state['units']['enemy_2']['alive'] = false;
+        $decision = ['action' => 'enemy_all', 'kind' => 'damage', 'targets' => ['enemy_1', 'enemy_2'], 'portrait' => 'tukaima_pc1'];
+
+        $apply = Closure::bind(function (array $state, array $decision): array {
+            $events = $this->applyFamiliarSupport($state, 4, $decision);
+
+            return ['state' => $state, 'events' => $events];
+        }, $this->engine([]), BattleEngine::class);
+        $result = $apply($state, $decision);
+
+        $targets = collect($result['events'])->where('type', 'damage')->pluck('target')->all();
+        $this->assertSame(['enemy_1'], $targets, '倒れた enemy_2 にはダメージが出ない');
+        $this->assertSame(0, $result['state']['units']['enemy_2']['hp']);
+        $this->assertFalse($result['state']['units']['enemy_2']['alive']);
     }
 
     public function test_all_enemy_damage_hits_every_living_enemy(): void

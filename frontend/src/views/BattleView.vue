@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BattleField from '../components/battle/BattleField.vue';
 import CommandModal from '../components/battle/CommandModal.vue';
+import EndingCredits from '../components/battle/EndingCredits.vue';
 import EffectLayer from '../components/battle/EffectLayer.vue';
 import TargetOverlay from '../components/battle/TargetOverlay.vue';
 import UnitStatsModal from '../components/battle/UnitStatsModal.vue';
@@ -58,7 +59,8 @@ const displayHp = ref({});
  * バッジ（防御↑↓・攻撃↑↓・回避・加護・無敵）の表示用の状態。
  * state は敵の行動などのイベントを再生する前に、先に最新になる。それをそのままバッジに出すと、敵の手番が始まった瞬間に
  * 全員のバフ・デバフが一斉に付いて見える（戦闘開始直後から敵にバッジが付く）。そのため、イベントの再生に合わせて
- * （魔法や特技を使ったと表示した時点で）バッジを付ける。再生が終わったら state に合わせる（持続が切れたものを消す）。
+ * （魔法や特技を使ったと表示した時点で）バッジを付ける。持続が切れたときも、サーバーが buff_expired を送ってくるので、その場で消す。
+ * 再生が終わったら、念のため state に合わせる。
  * @type {import('vue').Ref<Record<string, {buffs: Record<string, number>, stages: {def: number, atk: number}, damage_shield: boolean, life_ward: boolean}>>}
  */
 const displayBadges = ref({});
@@ -69,6 +71,8 @@ const fledIds = ref([]);
 /** @type {import('vue').Ref<'hidden' | 'entering' | 'ready'>} */
 const partyPhase = ref('hidden');
 const showResult = ref(false);
+/** エンドロールを流している間 */
+const showCredits = ref(false);
 const victoryRewards = ref([]);
 const goldGained = ref(0);
 const dungeonCleared = ref(false);
@@ -128,6 +132,12 @@ const isBossBattle = computed(
 /** 空間の裂け目のボス戦（4人の魔法使い）。敵の魔法の詠唱に専用の効果音を鳴らす */
 const isRiftBattle = computed(() => state.value?.meta?.rift === true);
 
+/**
+ * 空間の裂け目のボスを倒した。結果画面の「次へ」でエンドロールが流れる（何回目に倒しても、必ず流れる）。
+ * この戦闘は、戦闘が終わってもBGMを止めず、エンドロールが終わるまで同じBGMを流し続ける。
+ */
+const isRiftVictory = computed(() => isRiftBattle.value && state.value?.status === 'victory');
+
 const floor1BossSprite = computed(
   () => state.value?.meta?.boss === true && Number(state.value?.meta?.floor) === 1,
 );
@@ -153,6 +163,9 @@ const showNextButton = computed(
 );
 
 const resultPrimaryLabel = computed(() => {
+  if (isRiftVictory.value) {
+    return '次へ';
+  }
   if (dungeonCleared.value) {
     return '待機画面へ';
   }
@@ -174,7 +187,22 @@ function onResultNext() {
   resultStep.value = 'learned';
 }
 
+/** 結果画面を閉じて、エンドロールを流す（BGMは戦闘のまま。流れきったら onCreditsFinished で待機画面へ戻る） */
+function startCredits() {
+  showResult.value = false;
+  showCredits.value = true;
+}
+
+function onCreditsFinished() {
+  showCredits.value = false;
+  leaveBattle();
+}
+
 function onResultPrimary() {
+  if (isRiftVictory.value) {
+    startCredits();
+    return;
+  }
   if (isDungeonBattle.value) {
     leaveBattle();
     return;
@@ -242,10 +270,20 @@ const pendingSkillInfo = computed(() => {
       label: pending.spell.label,
       description: pending.spell.description ?? '',
       mp_cost: pending.spell.mp_cost,
+      unusable_reason: pending.spell.unusable_reason ?? null,
     };
   }
   return null;
 });
+
+/**
+ * 選んだ魔法が、今は唱えられない理由（MP が足りない・回復する相手がいない、など。唱えられるなら null）。
+ * 唱えられない魔法も選べる（どんな魔法か分かるように）。その代わり、対象を選ぶ画面で、何も選べず、唱えられない。
+ */
+const pendingUnusableReason = computed(() => pendingAction.value?.spell?.unusable_reason ?? null);
+
+/** 画面（立ち絵・敵）に渡す対象の種類。唱えられない魔法のときは、どの立ち絵・敵も選べない状態（'locked'）にする */
+const fieldTargetMode = computed(() => (targetMode.value && pendingUnusableReason.value ? 'locked' : targetMode.value));
 
 const spellEffect = computed(() => pendingAction.value?.spell?.effect ?? null);
 
@@ -419,10 +457,20 @@ function resetDisplayBadges() {
   badgesReady.value = true;
 }
 
-/** buff_applied を再生したときに、そのユニットのバッジを付ける（防御・攻撃は段階を足す） */
+/**
+ * buff_applied / buff_expired を再生したときに、そのユニットのバッジを、イベントが持つ「その時点の状態」にする。
+ * サーバーは、付けた直後・切れた直後の、防御・攻撃の段階（stages）と回避などの効果（buffs）をそのまま送ってくる。
+ * 画面で足し引きすると、切れた効果が画面に残っているぶんだけ本当の段階とずれる（防御+2 が切れたあとに -3 を受けて -1 と出る、など）ので、
+ * 足し算はしない。古い形式のイベント（stages が無い）のときだけ、従来どおり段階を足す。
+ */
 function applyBadgeForBuff(ev) {
   const badges = displayBadges.value[ev.target];
   if (!badges) return;
+  if (ev.stages) {
+    badges.stages = { def: Number(ev.stages.def ?? 0), atk: Number(ev.stages.atk ?? 0) };
+    badges.buffs = { ...(ev.buffs ?? {}) };
+    return;
+  }
   if (ev.stat) {
     const current = badges.stages[ev.stat] ?? 0;
     badges.stages[ev.stat] = Math.max(-3, Math.min(3, current + Number(ev.applied ?? ev.delta ?? 0)));
@@ -600,6 +648,10 @@ async function playEvents(events) {
       await showSupportEffect(ev.target, isDebuff ? 'debuff' : 'buff');
       await delay(120);
     }
+    if (ev.type === 'buff_expired') {
+      // ラウンドの終わりに、持続が切れた。そのユニットのバッジを、いまの状態（切れずに残っている分）にする。演出は無し（バッジが消えるだけ）
+      applyBadgeForBuff(ev);
+    }
     if (ev.type === 'mp_recovered') {
       // 魔力集中: MP が回復した（直前の damage が、引き換えに減った HP）
       showFloatingSupport(ev.target, `MP +${ev.value}`, 'mp');
@@ -697,7 +749,10 @@ async function playEvents(events) {
     }
     if (ev.type === 'battle_end') {
       showResult.value = true;
-      fadeOutBgm();
+      // 裂け目のボスに勝ったときだけ、BGMを止めない（そのままエンドロールまで流す）。負けたときは今までどおり
+      if (!isRiftVictory.value) {
+        fadeOutBgm();
+      }
     }
   }
   visualCurrentActor.value = null;
@@ -737,6 +792,7 @@ function onUserGesture() {
 async function initBattle() {
   busy.value = true;
   closeModals();
+  showCredits.value = false;
   dungeonCleared.value = false;
   goldGained.value = 0;
   fledIds.value = [];
@@ -855,8 +911,9 @@ function onKick() {
 
 function onSpell(spell) {
   showCommandModal.value = false;
-  // 自分に使う魔法（魔力集中）は、相手を選ばず、すぐ唱える
-  if (spell.target_type === 'self') {
+  // 自分に使う魔法（魔力集中）は、相手を選ばず、すぐ唱える。ただし、今は唱えられないときは、すぐには唱えず、
+  // 説明と理由を出す画面にする（ほかの唱えられない魔法と同じ。「やめる」だけができる）
+  if (spell.target_type === 'self' && !spell.unusable_reason) {
     doAction({ action: 'spell', spell_id: spell.id });
     return;
   }
@@ -870,7 +927,7 @@ function cancelTarget() {
 }
 
 async function onSelectTarget(targetId) {
-  if (!pendingAction.value) return;
+  if (!pendingAction.value || pendingUnusableReason.value) return;
   const payload = { action: pendingAction.value.action };
   if (pendingAction.value.spell_id) {
     payload.spell_id = pendingAction.value.spell_id;
@@ -882,7 +939,7 @@ async function onSelectTarget(targetId) {
 }
 
 async function confirmAll() {
-  if (!pendingAction.value) return;
+  if (!pendingAction.value || pendingUnusableReason.value) return;
   const payload = { action: pendingAction.value.action };
   if (pendingAction.value.spell_id) {
     payload.spell_id = pendingAction.value.spell_id;
@@ -922,19 +979,22 @@ async function retry() {
 
 function leaveBattle() {
   const wasDungeon = isDungeonBattle.value;
+  const wasRift = isRiftBattle.value;
   const status = state.value?.status;
   const cleared = dungeonCleared.value;
 
   showResult.value = false;
+  showCredits.value = false;
   victoryRewards.value = [];
   dungeonCleared.value = false;
   goldGained.value = 0;
   resetResultPages();
-  battle.battleId = null;
-  battle.state = null;
-  battle.pendingEvents = [];
 
   const destination = (() => {
+    // 裂け目のボスを倒したあと（エンドロールのあと）。探索から入った戦闘は待機画面へ、テスト戦闘はテスト戦闘の一覧へ
+    if (wasRift && status === 'victory') {
+      return wasDungeon ? '/hub' : '/test_battles';
+    }
     if (cleared || (status === 'defeat' && wasDungeon)) {
       return '/hub';
     }
@@ -944,8 +1004,14 @@ function leaveBattle() {
     return '/';
   })();
 
+  // 戦闘の state は、移動が終わってから空にする。先に空にすると、ルートが切り替わる前に BGM が戦闘のものから
+  // 別のもの（通常戦の BGM）に一瞬変わってしまう（エンドロールの最後に、BGM が途切れて鳴り直さないように）
   player.fetchNavigation().finally(() => {
-    router.push(destination);
+    router.push(destination).finally(() => {
+      battle.battleId = null;
+      battle.state = null;
+      battle.pendingEvents = [];
+    });
   });
 }
 
@@ -993,7 +1059,7 @@ watch(
         :buff-icons="buffIcons"
         :party-phase="partyPhase"
         :current-actor="displayCurrentActor"
-        :target-mode="targetMode"
+        :target-mode="fieldTargetMode"
         :spell-effect="spellEffect"
         :shake-target="shakeTarget"
         :support-effect-target="supportEffectTarget"
@@ -1012,6 +1078,7 @@ watch(
       :visible="!!targetMode"
       :skill="pendingSkillInfo"
       :show-execute="isAllTarget"
+      :execute-disabled="!!pendingUnusableReason"
       @cancel="cancelTarget"
       @confirm-all="confirmAll"
     />
@@ -1033,6 +1100,8 @@ watch(
     />
 
     <p v-if="battle.error" class="error">{{ battle.error }}</p>
+
+    <EndingCredits v-if="showCredits" @finished="onCreditsFinished" />
 
     <div v-if="showResult" class="result-modal">
       <h2>{{ resultTitle }}</h2>

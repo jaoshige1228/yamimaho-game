@@ -128,9 +128,9 @@ class DungeonHealApiTest extends TestCase
 
         $options = collect($this->getJson('/api/dungeon/heal/options')->assertOk()->json('spells'))->keyBy('id');
 
-        // 癒しの水: 実効魔力（武器込み）× 1.7。サフィリアが Lv10 以下（このパーティは Lv1）のあいだは、さらに 1.3 倍
+        // 癒しの水: 実効魔力（武器込み）× 1.7。サフィリアが Lv10 以下のあいだは 1.3 倍、Lv5 以下（このパーティは Lv1）はさらに 1.5 倍
         $mag = app(\App\Services\Player\EquipmentService::class)->effectiveCombatStats($chars['pc1'])['mag'];
-        $this->assertSame((int) floor($mag * (1.7 * 1.3)), $options['pc1_heal_water']['amount']);
+        $this->assertSame((int) floor($mag * (1.7 * (1.3 * 1.5))), $options['pc1_heal_water']['amount']);
         $this->assertNull($options['pc1_heal_water']['revive_percent']);
 
         // 精霊の水（全回復）は量を持たない
@@ -226,7 +226,7 @@ class DungeonHealApiTest extends TestCase
         }
     }
 
-    public function test_saphiria_heal_water_is_boosted_by_30_percent_up_to_level_10_in_the_dungeon(): void
+    public function test_saphiria_heal_water_is_boosted_at_low_levels_in_the_dungeon(): void
     {
         $this->postJson('/api/battles/demo')->assertOk();
         BattleState::query()->delete();
@@ -239,8 +239,9 @@ class DungeonHealApiTest extends TestCase
             ->firstOrFail();
         $byCode('pc3')->update(['level' => 30]);
 
-        // 癒しの水（倍率 1.7）は、サフィリアが Lv10 以下のときだけ 1.3 倍。Lv11 以上は元の倍率。ほかの回復魔法（神聖の水など）は変わらない
-        foreach ([[1, 1.3], [10, 1.3], [11, 1.0], [21, 1.0]] as [$level, $bonus]) {
+        // 癒しの水（倍率 1.7）は、サフィリアが Lv10 以下のときだけ 1.3 倍、Lv5 以下ではさらに 1.5 倍（= 1.95 倍）。Lv11 以上は元の倍率。
+        // ほかの回復魔法（神聖の水など）は変わらない
+        foreach ([[1, 1.3 * 1.5], [5, 1.3 * 1.5], [6, 1.3], [10, 1.3], [11, 1.0], [21, 1.0]] as [$level, $bonus]) {
             $byCode('pc1')->update(['level' => $level, 'mp' => 50]);
             $byCode('pc3')->update(['hp' => 10]);
             $mag = (float) app(\App\Services\Player\EquipmentService::class)->effectiveCombatStats($byCode('pc1'))['mag'];

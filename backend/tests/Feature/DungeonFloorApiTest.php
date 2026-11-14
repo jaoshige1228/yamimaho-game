@@ -391,6 +391,37 @@ class DungeonFloorApiTest extends TestCase
         $this->assertSame($after, $bonus());
     }
 
+    public function test_clearing_the_last_floor_does_not_say_a_deeper_floor_is_not_ready(): void
+    {
+        // 3 層が最後の層（max_floor = 3）。「さらに深い層はまだ準備が整っていない」は出さない
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 3, 'unlocked_floor' => 3, 'cleared_floor' => 2, 'step' => 0, 'in_dungeon' => true],
+        );
+
+        $event = app(\App\Services\Dungeon\DungeonProgressService::class)->onBossVictory($user, 3);
+
+        $this->assertSame('3層を踏破した！', $event['text']);
+        $this->assertNull($event['next_floor']);
+        $this->assertFalse($event['next_floor_playable']);
+    }
+
+    public function test_clearing_a_floor_that_has_a_deeper_but_not_playable_floor_still_says_it_is_not_ready(): void
+    {
+        // 次の層はあるのに、まだ遊べないとき（max_floor > playable_floor）だけ、準備中と伝える（今は 3 層が最後なので、設定を変えて確かめる）
+        config(['game.dungeon.max_floor' => 4, 'game.dungeon.playable_floor' => 3]);
+        $user = $this->demoUser();
+        UserDungeonProgress::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['floor' => 3, 'unlocked_floor' => 3, 'cleared_floor' => 2, 'step' => 0, 'in_dungeon' => true],
+        );
+
+        $event = app(\App\Services\Dungeon\DungeonProgressService::class)->onBossVictory($user, 3);
+
+        $this->assertSame('3層を踏破した！　だが、さらに深い層はまだ準備が整っていない……', $event['text']);
+    }
+
     public function test_clearing_floor_2_does_not_add_the_floor_3_max_mp_bonus(): void
     {
         $user = $this->demoUser();

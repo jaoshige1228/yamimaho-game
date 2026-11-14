@@ -263,6 +263,8 @@ class DungeonProgressService
         $nextFloor = $floor + 1;
         $nextPlayable = $nextFloor <= DungeonFloorConfig::playableFloor()
             && $nextFloor <= (int) $record->unlocked_floor;
+        // 最後の層（3 層）を踏破したときは、「さらに深い層」はそもそも無い。層はあるのに準備ができていないときだけ、準備中と伝える
+        $hasDeeperFloor = $nextFloor <= $maxFloor;
 
         return [
             'type' => 'dungeon_floor_cleared',
@@ -270,7 +272,7 @@ class DungeonProgressService
             'unlocked_floor' => (int) $record->unlocked_floor,
             'next_floor' => $nextFloor <= $maxFloor ? $nextFloor : null,
             'next_floor_playable' => $nextPlayable,
-            'text' => $nextPlayable
+            'text' => $nextPlayable || ! $hasDeeperFloor
                 ? "{$floor}層を踏破した！"
                 : "{$floor}層を踏破した！　だが、さらに深い層はまだ準備が整っていない……",
         ];

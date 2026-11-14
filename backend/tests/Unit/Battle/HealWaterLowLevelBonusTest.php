@@ -10,13 +10,17 @@ use Tests\TestCase;
 
 /**
  * サフィリアの癒しの水（pc1_heal_water）は、レベル 10 以下のときだけ、回復量（魔力 × 係数 1.7）が 1.3 倍。
+ * さらにレベル 5 以下のときだけ、もう 1.5 倍（Lv5 以下は 1.3 × 1.5 = 1.95 倍。2026-11-14）。
  * Lv11 以上は元の倍率。ほかの回復魔法・全回復・使い魔の回復には掛からない。
  */
 class HealWaterLowLevelBonusTest extends TestCase
 {
     public function test_the_bonus_is_configured_for_heal_water_up_to_level_10(): void
     {
-        $this->assertSame(['max_level' => 10, 'multiplier' => 1.3], config('battle.heal_mag_spell_level_bonus.pc1_heal_water'));
+        $this->assertSame(
+            [['max_level' => 10, 'multiplier' => 1.3], ['max_level' => 5, 'multiplier' => 1.5]],
+            config('battle.heal_mag_spell_level_bonus.pc1_heal_water'),
+        );
         $this->assertSame(1.7, (new MasterDataProvider)->findSpell('pc1_heal_water')['coefficient'], '係数そのものは変えていない');
     }
 
@@ -25,13 +29,22 @@ class HealWaterLowLevelBonusTest extends TestCase
         $water = (new MasterDataProvider)->findSpell('pc1_heal_water'); // 係数 1.7
         $holy = (new MasterDataProvider)->findSpell('pc1_holy_water'); // 係数 2.5
 
-        // 100 × 1.7 × 1.3 = 221
-        foreach ([1, 5, 9, 10] as $level) {
+        // Lv6〜10: 100 × 1.7 × 1.3 = 221
+        foreach ([6, 9, 10] as $level) {
             $this->assertSame(221, SpellHealing::healMagAmount(100.0, $water, 'pc1', $level, 'pc1_heal_water'), "Lv{$level}");
+        }
+        // Lv5 以下は、さらに 1.5 倍（1.3 × 1.5 = 1.95 倍）: 100 × 1.7 × 1.95 = 331.5 → 331
+        foreach ([1, 3, 5] as $level) {
+            $this->assertSame(331, SpellHealing::healMagAmount(100.0, $water, 'pc1', $level, 'pc1_heal_water'), "Lv{$level}");
         }
         // Lv11 以上は 100 × 1.7 = 170（Lv22 以上は、これまでどおり 0.75 倍で 127。補正は重ならない）
         foreach ([[11, 170], [20, 170], [21, 170], [22, 127], [40, 127]] as [$level, $expected]) {
             $this->assertSame($expected, SpellHealing::healMagAmount(100.0, $water, 'pc1', $level, 'pc1_heal_water'), "Lv{$level}");
+        }
+
+        // 補正の掛かり方: Lv5 以下は 1.95 倍、Lv6〜10 は 1.3 倍、Lv11 以上は 1.0 倍
+        foreach ([[5, 1.95], [6, 1.3], [10, 1.3], [11, 1.0]] as [$level, $expected]) {
+            $this->assertEqualsWithDelta($expected, SpellHealing::spellLevelBonus('pc1_heal_water', $level), 0.0000001, "Lv{$level}");
         }
 
         // 魔法のコードを渡さなければ、魔法ごとの補正は掛からない（使い魔の回復などの呼び方）
@@ -45,7 +58,7 @@ class HealWaterLowLevelBonusTest extends TestCase
 
     public function test_saphiria_heals_30_percent_more_with_heal_water_in_battle_up_to_level_10(): void
     {
-        foreach ([[1, 221], [10, 221], [11, 170], [21, 170], [22, 127]] as [$level, $expected]) {
+        foreach ([[1, 331], [5, 331], [6, 221], [10, 221], [11, 170], [21, 170], [22, 127]] as [$level, $expected]) {
             $state = $this->state('pc1', 'pc1_heal_water', $level);
             $state['units']['pc2']['hp'] = 100;
 

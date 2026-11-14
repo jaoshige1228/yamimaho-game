@@ -15,7 +15,7 @@ final class SpellHealing
      * レベルが min_level 以上なら、回復量に multiplier を掛ける（サフィリアは Lv22 以上で 0.75 倍）。
      *
      * 魔法ごとの低レベル補正（config/battle.php の heal_mag_spell_level_bonus）: 魔法のコード $spellCode が登録されていて、
-     * 詠唱者のレベルが max_level 以下なら、回復量に multiplier を掛ける（癒しの水は Lv10 以下で 1.3 倍）。
+     * 詠唱者のレベルが max_level 以下の補正を、すべて回復量に掛ける（癒しの水は Lv10 以下で 1.3 倍、さらに Lv5 以下で 1.5 倍）。
      *
      * 全回復（heal_full）・蘇生は回復量の式を通らないので、これらの補正は受けない。
      *
@@ -31,19 +31,24 @@ final class SpellHealing
         return (int) floor($mag * $multiplier);
     }
 
-    /** 魔法ごとの低レベル補正の倍率（補正なし・対象外のレベルは 1.0） */
+    /**
+     * 魔法ごとの低レベル補正の倍率。登録された補正のうち、詠唱者のレベルが max_level 以下のものを、すべて掛け合わせる
+     * （癒しの水は、Lv10 以下で 1.3 倍・Lv5 以下でさらに 1.5 倍）。補正なし・対象外のレベルは 1.0
+     */
     public static function spellLevelBonus(?string $spellCode, int $casterLevel): float
     {
         if ($spellCode === null) {
             return 1.0;
         }
 
-        $rule = config("battle.heal_mag_spell_level_bonus.{$spellCode}");
-        if (! is_array($rule) || $casterLevel > (int) ($rule['max_level'] ?? 0)) {
-            return 1.0;
+        $multiplier = 1.0;
+        foreach ((array) config("battle.heal_mag_spell_level_bonus.{$spellCode}", []) as $rule) {
+            if (is_array($rule) && $casterLevel <= (int) ($rule['max_level'] ?? 0)) {
+                $multiplier *= (float) ($rule['multiplier'] ?? 1.0);
+            }
         }
 
-        return (float) ($rule['multiplier'] ?? 1.0);
+        return $multiplier;
     }
 
     /** 詠唱者のレベル補正の倍率（補正なしは 1.0） */

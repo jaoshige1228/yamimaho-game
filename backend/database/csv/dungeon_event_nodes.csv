@@ -309,3 +309,13 @@ stella_appears,grant_mp,grant_item,,,,,,,potion_mp_s,1,,,,,pc1_thanks
 stella_appears,pc1_thanks,dialogue,,fixed:pc1,いいの？ありがとう,,,,,,,,,,stella4
 stella_appears,stella4,dialogue,いえいえ。じゃあ、頑張ってくださいね,npc:stella,,,,,,,,,,,end
 stella_appears,end,end,,,,,,,,,,,,,
+what_is_discrimination,line1,dialogue,,fixed:pc2,,腹が減ったな,,,,,,,,,line2
+what_is_discrimination,line2,dialogue,,fixed:pc3,,,携帯食のパンあるぞ,,,,,,,,line3
+what_is_discrimination,line3,dialogue,,fixed:pc2,,いただこう,,,,,,,,,line4
+what_is_discrimination,line4,dialogue,,fixed:pc2,,……固くて不味いパンだ。こういう場所でもなければ食えたもんじゃ……,,,,,,,,,line5
+what_is_discrimination,line5,dialogue,,fixed:pc1,ちょっと,,,,,,,,,,line6
+what_is_discrimination,line6,dialogue,,fixed:pc4,,,,…………,,,,,,,line7
+what_is_discrimination,line7,dialogue,,fixed:pc2,,ハッ！！,,,,,,,,,line8
+what_is_discrimination,line8,dialogue,,fixed:pc2,,…………,,,,,,,,,line9
+what_is_discrimination,line9,dialogue,,fixed:pc2,,（そうだ……俺もこちら側だということを忘れるな……）,,,,,,,,,end
+what_is_discrimination,end,end,,,,,,,,,,,,,

@@ -111,7 +111,8 @@ class FamiliarSupport
      */
     public function decide(array $units, int $level): ?array
     {
-        $enemies = $this->ids($units, 'enemy', fn (array $u) => (bool) ($u['alive'] ?? false));
+        // 攻撃の対象にするのは、生きている敵だけ（戦闘不能・逃げた敵は、alive が false。HP が 0 の敵も入れない）
+        $enemies = $this->ids($units, 'enemy', fn (array $u) => (bool) ($u['alive'] ?? false) && (int) ($u['hp'] ?? 0) > 0);
         $aliveAllies = $this->ids($units, 'ally', fn (array $u) => (bool) ($u['alive'] ?? false));
         $fallenAllies = $this->ids($units, 'ally', fn (array $u) => ! ($u['alive'] ?? false));
         // 傷ついている = 生存していて HP が最大未満（戦闘不能は含めない）

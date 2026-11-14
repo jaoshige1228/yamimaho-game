@@ -27,6 +27,20 @@ provide(APP_AUDIO_KEY, createAppAudio());
 </template>
 
 <style>
+/* 文字の書体は、アプリ全体でゴシック体（サンセリフ）にする。書体を指定していない文字は、ブラウザの標準の書体（明朝体）で出てしまうので、
+   いちばん外側（html）で指定して、中の全部に引き継ぐ。ボタン・入力欄はブラウザの標準の書体で出るので、引き継ぐ指定も入れる */
+:root {
+  --font-sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', system-ui, sans-serif;
+}
+html,
+body,
+#app,
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-sans);
+}
 html,
 body,
 #app {
