@@ -20,12 +20,22 @@ const riftReached = ref(false);
 const error = ref('');
 const unlockedFloor = ref(1);
 const playableFloor = ref(1);
+const maxFloor = ref(1);
 const allFloorsCleared = ref(false);
 
-const enterableFloors = computed(() => {
-  const max = Math.min(unlockedFloor.value, playableFloor.value);
-  return Array.from({ length: max }, (_, index) => index + 1);
-});
+/** 潜れる最深の層（前の層のボスを倒して解放された層と、遊べる層の、浅いほう） */
+const enterableMax = computed(() => Math.min(unlockedFloor.value, playableFloor.value));
+
+/**
+ * 層のボタンは、最初から全部の層を出す。まだ潜れない層（前の層のボスを倒していない）は、グレーアウトして押せない。
+ * 前の層のボスを倒すごとに、次の層のグレーアウトが外れる。
+ */
+const floorButtons = computed(() =>
+  Array.from({ length: Math.max(maxFloor.value, 1) }, (_, index) => {
+    const floor = index + 1;
+    return { floor, locked: floor > enterableMax.value };
+  }),
+);
 
 async function loadDungeonOptions() {
   loading.value = true;
@@ -34,6 +44,7 @@ async function loadDungeonOptions() {
     const data = await api('/dungeon', { method: 'GET' });
     unlockedFloor.value = data.unlocked_floor ?? 1;
     playableFloor.value = data.playable_floor ?? 1;
+    maxFloor.value = data.max_floor ?? Math.max(unlockedFloor.value, playableFloor.value);
     allFloorsCleared.value = data.all_floors_cleared === true;
     riftReached.value = data.rift_reached === true;
   } catch (e) {
@@ -44,6 +55,8 @@ async function loadDungeonOptions() {
 }
 
 async function enterDungeon(floor) {
+  // まだ潜れない層は、押しても何も起きない（ボタンも押せない状態にしてあるが、念のため）
+  if (floor > enterableMax.value) return;
   enteringFloor.value = floor;
   error.value = '';
   try {
@@ -106,11 +119,13 @@ onMounted(() => loadDungeonOptions());
       <p v-else-if="error" class="hub-screen-error">{{ error }}</p>
       <div v-else class="floor-actions">
         <button
-          v-for="floor in enterableFloors"
+          v-for="{ floor, locked } in floorButtons"
           :key="floor"
           type="button"
           class="floor-enter-btn"
-          :disabled="enteringFloor !== null"
+          :class="{ locked }"
+          :disabled="locked || enteringFloor !== null"
+          :aria-disabled="locked ? 'true' : null"
           @click="enterDungeon(floor)"
         >
           {{ enteringFloor === floor ? '入場中…' : `${floor}層に潜る` }}
@@ -224,6 +239,15 @@ onMounted(() => loadDungeonOptions());
 .floor-enter-btn:disabled {
   opacity: 0.55;
   cursor: default;
+}
+/* まだ潜れない層（前の層のボスを倒していない）: グレーアウト。押しても反応しない */
+.floor-enter-btn.locked:disabled {
+  opacity: 1;
+  border-color: rgba(160, 160, 170, 0.35);
+  background: rgba(60, 60, 68, 0.55);
+  color: rgba(190, 190, 200, 0.5);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 .all-cleared {
   display: flex;

@@ -46,13 +46,13 @@ class FamiliarSupportTest extends TestCase
     public static function rates(): array
     {
         return [
-            'Lv1' => [1, 20],
-            'Lv2' => [2, 20],
-            'Lv3' => [3, 30],
-            'Lv6' => [6, 30],
-            'Lv7' => [7, 40],
-            'Lv9' => [9, 40],
-            'Lv10' => [10, 50],
+            'Lv1' => [1, 35],
+            'Lv2' => [2, 35],
+            'Lv3' => [3, 45],
+            'Lv6' => [6, 45],
+            'Lv7' => [7, 55],
+            'Lv9' => [9, 55],
+            'Lv10' => [10, 65],
         ];
     }
 

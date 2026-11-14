@@ -195,7 +195,7 @@ class RiftBossTest extends TestCase
         $this->assertFalse($hit['state']['units']['enemy_4']['life_ward']);
     }
 
-    public function test_the_legend_mage_starts_the_evil_spell_on_turn_4_and_fires_on_turn_6(): void
+    public function test_the_legend_mage_opens_with_black_hole_then_starts_the_evil_spell_on_turn_4_and_fires_on_turn_6(): void
     {
         $engine = $this->engine();
         $state = $this->realState();
@@ -207,7 +207,9 @@ class RiftBossTest extends TestCase
         ));
         $normal = ['伝説の魔法使いは大爆発を唱えた！', '伝説の魔法使いはラグオンビートを唱えた！', '伝説の魔法使いはブラックホールを唱えた！'];
 
-        foreach ([1, 2, 3, 7, 8, 9] as $round) {
+        // 1 ターン目は、必ずブラックホール（2026-11-14 から）
+        $this->assertSame('伝説の魔法使いはブラックホールを唱えた！', $legend(1)[0]['text'], '1 ターン目は必ずブラックホール');
+        foreach ([2, 3, 7, 8, 9] as $round) {
             $this->assertContains($legend($round)[0]['text'], $normal, "{$round} ターン目は通常の魔法");
         }
         $this->assertSame('伝説の魔法使いはおぞましい魔法を唱えようとしている……。', $legend(4)[0]['text']);

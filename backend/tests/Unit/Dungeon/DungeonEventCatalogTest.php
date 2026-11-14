@@ -52,26 +52,28 @@ class DungeonEventCatalogTest extends TestCase
         $this->assertNotContains('maj_umai_leaf', $unique);
     }
 
-    public function test_mysterious_presence_weight_doubles_after_every_floor_is_cleared(): void
+    public function test_mysterious_presence_weight_is_16_after_every_floor_is_cleared(): void
     {
         $catalog = new DungeonEventCatalog;
 
+        // 踏破前の重み（dungeon_events.csv）は、1・2 層が 9、3 層が 8。全層を踏破したあとは、全層で 16
+        $before = [1 => 9, 2 => 9, 3 => 8];
         foreach ([1, 2, 3] as $floor) {
-            $before = $catalog->mechanicalEventWeights($floor);
-            $after = $catalog->mechanicalEventWeights($floor, true);
+            $weightsBefore = $catalog->mechanicalEventWeights($floor);
+            $weightsAfter = $catalog->mechanicalEventWeights($floor, true);
 
-            $this->assertSame(8, $before['mysterious_presence'], "{$floor}層 踏破前");
-            $this->assertSame(16, $after['mysterious_presence'], "{$floor}層 全層踏破後");
+            $this->assertSame($before[$floor], $weightsBefore['mysterious_presence'], "{$floor}層 踏破前");
+            $this->assertSame(16, $weightsAfter['mysterious_presence'], "{$floor}層 全層踏破後");
             // ほかのイベントの重みは変わらない
             $this->assertSame(
-                array_diff_key($before, ['mysterious_presence' => 1]),
-                array_diff_key($after, ['mysterious_presence' => 1]),
+                array_diff_key($weightsBefore, ['mysterious_presence' => 1]),
+                array_diff_key($weightsAfter, ['mysterious_presence' => 1]),
             );
         }
 
-        // 重みの合計は、1 層が 94 → 102（探索イベントの 8/94 → 16/102）。2・3 層は「ステラ登場」（重み 5）が加わって 99 → 107
-        $this->assertSame([94, 99, 99], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f)), [1, 2, 3]));
-        $this->assertSame([102, 107, 107], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f, true)), [1, 2, 3]));
+        // 重みの合計: 1 層は 94 → 101（謎の気配 9 → 16）。2 層は「ステラ登場」（重み 10）が加わって 104 → 111、3 層は謎の気配が 8・あやしい回復の泉が 9 で 104 → 112
+        $this->assertSame([94, 104, 104], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f)), [1, 2, 3]));
+        $this->assertSame([101, 111, 112], array_map(fn (int $f) => array_sum($catalog->mechanicalEventWeights($f, true)), [1, 2, 3]));
     }
 
     public function test_pick_random_dialogue_event_code_uses_dialogue_events_only(): void

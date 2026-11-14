@@ -50,7 +50,7 @@ class DungeonStellaEventTest extends TestCase
             $event = DungeonEventMaster::query()->where('floor', $floor)->where('code', self::EVENT)->firstOrFail();
             $this->assertSame('ステラ登場', $event->name);
             $this->assertTrue($event->once_per_run);
-            $this->assertSame(5, (int) $event->weight);
+            $this->assertSame(10, (int) $event->weight);
             $this->assertFalse($event->skip_epilogue);
         }
         $this->assertFalse(DungeonEventMaster::query()->where('floor', 1)->where('code', self::EVENT)->exists(), '1 層には出ない');

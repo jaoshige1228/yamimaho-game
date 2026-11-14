@@ -136,12 +136,18 @@ class DungeonEventFloorOverridesTest extends TestCase
         $this->assertSame($dialogue(2), $dialogue(3));
         $this->assertNotEmpty($dialogue(3));
 
-        // 3 層の重みは、謎の気配も含めて 2 層と同じ
+        // 3 層の重みは、2 層と同じ。ただし、謎の気配（2 層 9・3 層 8）とあやしい回復の泉（2 層 8・3 層 9）だけは入れ替えてある（合計は同じ）
+        $differentOnFloorThree = ['mysterious_presence', 'suspicious_spring'];
         foreach (DungeonEventMaster::query()->where('floor', 3)->get() as $event) {
+            if (in_array($event->code, $differentOnFloorThree, true)) {
+                continue;
+            }
             $weightOnFloorTwo = (int) DungeonEventMaster::query()->where('floor', 2)->where('code', $event->code)->value('weight');
             $this->assertSame($weightOnFloorTwo, (int) $event->weight, "3層 {$event->code} の重み");
         }
-        $this->assertSame(8, (int) DungeonEventMaster::query()->where('floor', 3)->where('code', 'mysterious_presence')->value('weight'));
+        $weight = fn (int $floor, string $code): int => (int) DungeonEventMaster::query()->where('floor', $floor)->where('code', $code)->value('weight');
+        $this->assertSame([9, 8], [$weight(2, 'mysterious_presence'), $weight(3, 'mysterious_presence')]);
+        $this->assertSame([8, 9], [$weight(2, 'suspicious_spring'), $weight(3, 'suspicious_spring')]);
     }
 
     public function test_floor_three_sets_its_own_value_for_every_check_damage_and_gold(): void

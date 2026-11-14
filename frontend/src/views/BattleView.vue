@@ -734,12 +734,9 @@ async function playEvents(events) {
       victoryRewards.value.push(`${ev.name}が Lv${ev.level} になった！`);
     }
     if (ev.type === 'spells_learned') {
-      // 「覚えた」の行を先に並べ、そのあとに「忘れた」の行（強化版に置き換わった魔法）を並べる
+      // 「覚えた」の行だけを出す。強化版に置き換わって忘れた魔法（events の forgotten）は、「〇〇を忘れた…」とは出さない
       const characters = ev.characters ?? [];
-      learnedSpellMessages.value = [
-        ...characters.map((c) => `${c.name}は新しい魔法を覚えた！`),
-        ...characters.flatMap((c) => (c.forgotten ?? []).map((s) => `${c.name}は${s.label}を忘れた…`)),
-      ];
+      learnedSpellMessages.value = characters.map((c) => `${c.name}は新しい魔法を覚えた！`);
     }
     if (ev.type === 'dungeon_floor_cleared') {
       dungeonCleared.value = true;
