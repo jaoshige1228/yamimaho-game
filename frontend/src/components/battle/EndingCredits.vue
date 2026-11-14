@@ -9,9 +9,9 @@ import { ENDING_CREDITS } from '../../utils/endingCredits.js';
 const emit = defineEmits(['finished']);
 
 /** 流れる速さ（画面上の px / 秒）。 */
-const SPEED_PX_PER_SEC = 100;
+const SPEED_PX_PER_SEC = 70;
 /** 流れ始める前に、暗い画面だけを見せる時間（ms） */
-const START_DELAY_MS = 800;
+const START_DELAY_MS = 1000;
 /** 最後の文字が上に消えてから、待機画面へ戻るまでの間（ms） */
 const END_HOLD_MS = 500;
 
@@ -82,20 +82,25 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/*
+ * 見た目は、デザインの画像（2026-11-14）に合わせている。長さは、文字の大きさ（em）に対する比で決めている:
+ * 見出しは太字、そのほかは細い字。見出しとその下の行の間は 1.5 行ぶん。見出しと見出しの間（前のまとまりの最後の行から次の見出しまで）は 9.9 行ぶんで、大きく空く。
+ * キャストは、役の名前（右揃え）と演じた人（左揃え）の境目が画面の真ん中で、見出しとの間は 1.9 行ぶん。
+ */
 .credits {
   /* 画面いっぱい（上の「戦闘」のバーや、ほかの画面の飾りも隠す。窓が広いときも、背景は全面に広がる） */
   position: fixed;
   inset: 0;
   z-index: 1000;
   overflow: hidden;
-  background: #020621;
-  color: #c8cdeb;
+  background: #030620;
+  color: #c8cced;
   font-family: 'Hiragino Sans', system-ui, sans-serif;
-  font-weight: 700;
-  /* 役の名前（いちばん長い「サフィリア=フォン=ラグナブルー」）が、左の列（文字の幅 430px の 56%）に 1 行で収まる大きさ。
-     狭い画面では画面の幅に合わせて小さくし、広い窓でも 14.2px より大きくしない（文字の幅が 430px までなので） */
-  font-size: clamp(11px, 3.3vw, 14.2px);
-  line-height: 1.5;
+  font-weight: 400;
+  /* 役の名前（いちばん長い「サフィリア=フォン=ラグナブルー」）が、左の列（文字の幅 430px の半分）に 1 行で収まる大きさ。
+     狭い画面では画面の幅に合わせて小さくし、広い窓でも 13.3px より大きくしない（文字の幅が 430px までなので） */
+  font-size: clamp(9px, 3.1vw, 13.3px);
+  line-height: 1.31;
   user-select: none;
 }
 .credits-scroll {
@@ -110,39 +115,39 @@ onBeforeUnmount(() => {
   transform: translateY(100vh);
   will-change: transform;
 }
-/* 見出しの前は 3 行ぶんくらい空ける */
+/* 見出しの前は、大きく空ける（前の最後の行の中心から、見出しの中心まで 9.9 行ぶん） */
 .credits-section + .credits-section {
-  margin-top: 4em;
+  margin-top: 8.57em;
 }
 .credits-heading {
-  margin: 0;
+  margin: 0 0 0.18em;
   font-size: 1em;
-  font-weight: inherit;
+  font-weight: 700;
   text-align: center;
 }
 .credits-line {
   margin: 0;
   text-align: center;
 }
-/* 見出しとキャストの間は 1 行空ける */
+/* 見出しとキャストの間は 1.9 行ぶん（上下の余白は、大きいほうだけが効く。見出しの下の 0.18em ではなく、この 0.59em） */
 .credits-cast {
-  margin-top: 1.5em;
+  margin-top: 0.59em;
 }
-/* まとまりの間も 1 行空ける */
+/* まとまりが複数あるときは、間を 1 行空ける */
 .credits-group + .credits-group {
-  margin-top: 1.5em;
+  margin-top: 1.31em;
 }
-/* 役の名前は右揃え、演じた人は左揃え。2 つの列の境目は、画面の真ん中よりやや右 */
+/* 役の名前は右揃え、演じた人は左揃え。2 つの列の境目は、画面の真ん中 */
 .credits-row {
   display: grid;
-  grid-template-columns: 56% 1fr;
+  grid-template-columns: 1fr 1fr;
 }
 .credits-name {
-  padding-right: 0.75em;
+  padding-right: 0.19em;
   text-align: right;
 }
 .credits-actor {
-  padding-left: 0.75em;
+  padding-left: 1.33em;
   text-align: left;
 }
 </style>

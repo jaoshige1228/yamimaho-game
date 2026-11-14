@@ -31,15 +31,6 @@ const spellGroups = computed(() => {
   })).filter((group) => group.spells.length > 0);
 });
 
-/**
- * 今は唱えられない魔法（MP が足りない・回復する相手がいない・蘇生する相手がいない・魔力集中の条件を満たさない、など）。
- * 押せなくはしない。戦闘中は、魔法を選ばないと、どんな魔法なのか（説明）が分からないため、いつでも選べる。
- * 唱えられないときは、選んだあとの画面に理由が出て、対象を選ぶ・唱えることだけができない。ここでは、薄く表示して知らせるだけ。
- */
-function isSpellUnusable(spell) {
-  return !spell.affordable || spell.usable === false;
-}
-
 function onChoose(event, payload) {
   unlock();
   playSe('cursor');
@@ -73,7 +64,6 @@ function onChoose(event, payload) {
                 :key="spell.id"
                 type="button"
                 class="cmd spell"
-                :class="{ unusable: isSpellUnusable(spell) }"
                 @click="onChoose('spell', spell)"
               >
                 <span class="label">{{ spell.label }}</span>
@@ -185,10 +175,6 @@ function onChoose(event, payload) {
 .cmd:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-/* 今は唱えられない魔法。押せる（説明を見られる）が、薄く出して知らせる */
-.cmd.spell.unusable {
-  opacity: 0.55;
 }
 .cmd.spell {
   display: flex;

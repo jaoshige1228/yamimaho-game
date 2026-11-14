@@ -256,16 +256,18 @@ class RiftBossTest extends TestCase
 
     public function test_the_evil_spell_is_heavy_but_never_lethal_for_a_full_hp_level_35_party(): void
     {
-        // 満タンのレベル35・フル装備のパーティーに、悪魔級殲滅魔法を撃つ。対策なしでも致命傷にならない（魔力 ×0.9・威力 ×1.2 の調整後は、HP の約 3〜4 割が残る）
+        // 満タンのレベル35・フル装備のパーティーに、悪魔級殲滅魔法を撃つ。対策なしでも致命傷にならない（魔力 ×0.9・威力 ×1.2 の調整後は、HP の約 3〜4 割が残った。
+        // 2026-11-14 に 4 人の攻撃力〔魔力〕を ×1.03 にしたあとは、HP の約 2.8〜3.3 割が残る）
         foreach ($this->evilSpellRemainingRatios(defenseStage: 0) as $id => $ratio) {
-            $this->assertGreaterThanOrEqual(0.25, $ratio, "{$id} は耐える（致命傷にならない）");
+            $this->assertGreaterThanOrEqual(0.2, $ratio, "{$id} は耐える（致命傷にならない）");
             $this->assertLessThanOrEqual(0.45, $ratio, "{$id} は HP の 5 割以上を失う（超特大ダメージ）");
         }
 
-        // 実際の戦闘では、奏楽の怨恨の旋律（防御-2段階）が効いている。さらにラグオンビート（-3段階）が重なっても、ぎりぎり耐える（HP の約 1〜2 割が残る）
+        // 実際の戦闘では、奏楽の怨恨の旋律（防御-2段階）が効いている。さらにラグオンビート（-3段階）が重なっても、ぎりぎり耐える
+        // （攻撃力 ×1.03 のあとは、防御-2段階で HP の約 15〜20%、-3段階で約 9〜15% が残る）
         foreach ([-2, -3] as $stage) {
             foreach ($this->evilSpellRemainingRatios(defenseStage: $stage) as $id => $ratio) {
-                $this->assertGreaterThanOrEqual(0.08, $ratio, "{$id}: 防御{$stage}段階でも耐える");
+                $this->assertGreaterThanOrEqual(0.05, $ratio, "{$id}: 防御{$stage}段階でも耐える");
                 $this->assertLessThanOrEqual(0.3, $ratio, "{$id}: 防御{$stage}段階では HP の 7 割以上を失う");
             }
         }

@@ -230,8 +230,9 @@ const turnLabel = computed(() => {
   return `${actor.name} のターン`;
 });
 
+/** 相手を選ばず、「唱える」ボタンで発動する魔法（全体魔法と、自分に使う魔法） */
 const isAllTarget = computed(
-  () => targetMode.value === 'enemy_all' || targetMode.value === 'ally_all',
+  () => targetMode.value === 'enemy_all' || targetMode.value === 'ally_all' || targetMode.value === 'self',
 );
 
 function onBattleViewClick(event) {
@@ -911,12 +912,8 @@ function onKick() {
 
 function onSpell(spell) {
   showCommandModal.value = false;
-  // 自分に使う魔法（魔力集中）は、相手を選ばず、すぐ唱える。ただし、今は唱えられないときは、すぐには唱えず、
-  // 説明と理由を出す画面にする（ほかの唱えられない魔法と同じ。「やめる」だけができる）
-  if (spell.target_type === 'self' && !spell.unusable_reason) {
-    doAction({ action: 'spell', spell_id: spell.id });
-    return;
-  }
+  // どの魔法も、選んだら、まず説明の画面（TargetOverlay）を出す。自分に使う魔法（魔力集中）も、すぐには唱えず、
+  // ほかの全体魔法と同じく、この画面で「唱える」を押したら発動する（唱えられないときは「唱える」を押せず、理由が出る）
   pendingAction.value = { action: 'spell', spell_id: spell.id, spell };
   targetMode.value = spell.target_type;
 }
