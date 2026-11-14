@@ -11,7 +11,7 @@ const emit = defineEmits(['finished']);
 /** 流れる速さ（画面上の px / 秒）。 */
 const SPEED_PX_PER_SEC = 70;
 /** 流れ始める前に、暗い画面だけを見せる時間（ms） */
-const START_DELAY_MS = 1000;
+const START_DELAY_MS = 700;
 /** 最後の文字が上に消えてから、待機画面へ戻るまでの間（ms） */
 const END_HOLD_MS = 500;
 

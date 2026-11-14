@@ -37,6 +37,8 @@ const storyActive = ref(false);
 const storyLines = ref([]);
 const storyPerLinePartySync = ref(false);
 const explorationSessionId = ref('');
+/** 探索の「続き」を送れなかった（通信エラーなど）。探索は途中のまま残っているので、「もう一度」を出す */
+const continueFailed = ref(false);
 const choiceActive = ref(false);
 const choicePrompt = ref('');
 const choiceOptions = ref([]);
@@ -101,7 +103,19 @@ const canHeal = computed(
     !explorationBusy.value,
 );
 
-const canRetreat = computed(() => canHeal.value);
+/** 「続き」を送れずに止まっている（探索は途中のまま）。「もう一度」を出し、撤退もできるようにする */
+const continueRetryable = computed(
+  () =>
+    continueFailed.value &&
+    !!explorationSessionId.value &&
+    !loading.value &&
+    !storyActive.value &&
+    !choiceActive.value &&
+    !advancing.value &&
+    !explorationBusy.value,
+);
+
+const canRetreat = computed(() => canHeal.value || continueRetryable.value);
 
 function onHealUpdated(data) {
   if (Array.isArray(data?.party)) {
@@ -223,6 +237,7 @@ async function continueExploration() {
   }
 
   explorationBusy.value = true;
+  continueFailed.value = false;
   error.value = '';
   try {
     const data = await api('/dungeon/exploration/continue', {
@@ -231,10 +246,46 @@ async function continueExploration() {
     });
     await handleExplorationPayload(data);
   } catch (e) {
-    error.value = e.message;
+    await recoverFromContinueError(e);
   } finally {
     explorationBusy.value = false;
   }
+}
+
+/**
+ * 探索の「続き」を送れなかったとき。探索がもう無いのか（セッション切れ・すでに終わっている）、通信が切れただけなのかを、
+ * いまの状態を取り直して確かめる。何もしないと、「進む」も「撤退」も押せなくなって、先に進めなくなる。
+ * - 探索がもう無い … ダンジョンの外なら待機画面へ。中なら「進む」が出る
+ * - 探索が途中のまま … 「もう一度」で続きを送り直せる。撤退もできる
+ */
+async function recoverFromContinueError(e) {
+  error.value = e.message;
+  try {
+    const data = await api('/dungeon', { method: 'GET' });
+    applyDungeonStatus(data);
+    explorationSessionId.value = data.exploration_session_id ?? '';
+    if (explorationSessionId.value === '') {
+      error.value = '';
+      await loadParty();
+      if (data.in_dungeon === false) {
+        await player.fetchNavigation();
+        router.push('/hub');
+      }
+      return;
+    }
+  } catch {
+    // 通信できていない。探索は残っているはずなので、「もう一度」で続きを送り直す
+  }
+  continueFailed.value = explorationSessionId.value !== '';
+}
+
+async function retryContinue() {
+  if (explorationBusy.value) {
+    return;
+  }
+  unlock();
+  playSe('cursor');
+  await continueExploration();
 }
 
 async function onStoryComplete() {
@@ -301,6 +352,10 @@ async function loadParty() {
 }
 
 async function confirmRetreat() {
+  // 「はい」の二重押しで、撤退（所持金のペナルティ）が 2 回行われないようにする
+  if (retreating.value) {
+    return;
+  }
   retreating.value = true;
   error.value = '';
   try {
@@ -340,6 +395,7 @@ async function advance() {
   advancing.value = true;
   error.value = '';
   explorationSessionId.value = '';
+  continueFailed.value = false;
   choiceActive.value = false;
   unlock();
   playSe('cursor');
@@ -426,6 +482,15 @@ onMounted(async () => {
           {{ advancing || explorationBusy ? '進行中…' : '進む' }}
         </button>
 
+        <button
+          v-if="continueRetryable"
+          type="button"
+          class="scene-overlay-advance"
+          @click="retryContinue"
+        >
+          もう一度
+        </button>
+
         <p v-if="error" class="scene-error">{{ error }}</p>
       </ScenePanel>
     </div>
@@ -451,6 +516,7 @@ onMounted(async () => {
     />
     <RetreatConfirmModal
       :visible="retreatModalOpen"
+      :busy="retreating"
       @cancel="retreatModalOpen = false"
       @confirm="confirmRetreat"
     />

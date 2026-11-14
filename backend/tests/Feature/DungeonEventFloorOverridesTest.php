@@ -613,7 +613,9 @@ class DungeonEventFloorOverridesTest extends TestCase
             }
 
             $kind = $response->json('segment.kind');
-            if ($kind === 'complete') {
+            // 全滅（game_over）も終わり方の 1 つ。ダメージで全員が戦闘不能になったイベントは、ここで終わる
+            // （レベル 1 のパーティーに 3 層のダメージが入ると、そうなる）。ダメージの文面は、その手前の行に出ている
+            if (in_array($kind, ['complete', 'game_over'], true)) {
                 return $texts;
             }
 

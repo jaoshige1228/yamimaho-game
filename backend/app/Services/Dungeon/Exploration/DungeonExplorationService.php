@@ -119,6 +119,19 @@ class DungeonExplorationService
         $floor = (int) $session->floor_at_start;
         $step = (int) $session->step_at_start;
 
+        // すでに選んだあと（応答が届かずに押し直した・古い画面や別のタブから押した）。選び直しはせず、探索の状態には
+        // 触れずに、空の場面を返す。画面は空の場面を受けると「続き」を送るので、今いる場面から正しく進める
+        if (! $this->engine->isAtChoiceNode($session)) {
+            return $this->withProgress([
+                'event' => 'exploration',
+                'floor' => $floor,
+                'step' => $step,
+                'session_id' => $session->id,
+                'segment' => ['kind' => 'story', 'lines' => []],
+                'party' => $this->partyPayload($user),
+            ], $user);
+        }
+
         $this->engine->applyChoice($session, $user, $slotId);
         $session->refresh();
 

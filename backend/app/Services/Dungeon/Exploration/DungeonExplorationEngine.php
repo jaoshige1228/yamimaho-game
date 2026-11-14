@@ -19,6 +19,12 @@ class DungeonExplorationEngine
 {
     private const EPILOGUE_TEXT = '一行は先に進むことにした';
 
+    /** 探索中のダメージでパーティーが全滅したときの最後の一行（game_over ノードと同じ文言） */
+    private const PARTY_WIPED_TEXT = '全滅した……';
+
+    /** 選択肢を出すノード（ここで止まって、プレイヤーの選択を待つ） */
+    private const CHOICE_NODE_TYPES = ['party_choice', 'party_choice_skip', 'binary_choice'];
+
     /** {damage_amount} / {gold_amount} の展開で、後続の効果ノードを探す最大ノード数 */
     private const EFFECT_AMOUNT_LOOKAHEAD = 8;
 
@@ -131,6 +137,9 @@ class DungeonExplorationEngine
                 $lines = array_merge($lines, $this->buildStatCheckEachAllyLines($user, $node, $context, $floor));
                 $session->context = $context;
                 $nodeKey = (string) $node->next_default;
+                if ($this->damage->isPartyWiped($user)) {
+                    return $this->resolvePartyWipe($session, $user, $lines, $context);
+                }
                 continue;
             }
 
@@ -142,6 +151,12 @@ class DungeonExplorationEngine
                 $nodeKey = $this->commitEffectNode($user, $node, $context, $nodeKey);
                 $session->context = $context;
                 $session->save();
+                if (
+                    in_array($node->node_type, ['apply_damage', 'apply_damage_chosen', 'apply_damage_party'], true)
+                    && $this->damage->isPartyWiped($user)
+                ) {
+                    return $this->resolvePartyWipe($session, $user, $lines, $context);
+                }
                 continue;
             }
 
@@ -210,14 +225,7 @@ class DungeonExplorationEngine
             }
 
             if ($node->node_type === 'game_over') {
-                $this->progress->reset($user);
-                $this->characters->restorePartyToFull($user);
-
-                return [
-                    'segment' => ['kind' => 'game_over', 'text' => '全滅した……'],
-                    'next_node' => null,
-                    'complete' => true,
-                ];
+                return $this->gameOverResult($user);
             }
 
             if ($node->node_type === 'chance_branch') {
@@ -304,12 +312,25 @@ class DungeonExplorationEngine
      */
     public function continueSession(DungeonExplorationSession $session, User $user): array
     {
+        // ダメージで全滅した場面を見せ終えたあと。全滅の終わり方（深さ・層のリセットと全回復）に進む
+        if ((bool) (($session->context ?? [])['party_wiped'] ?? false)) {
+            return ['segment' => $this->gameOverResult($user)['segment'], 'complete' => true];
+        }
+
         $nodeKey = $session->current_node_key;
         if ($nodeKey === null || $nodeKey === '') {
             return ['segment' => ['kind' => 'complete'], 'complete' => true];
         }
 
         $node = $this->catalog->findNode($session->event_code, $nodeKey, (int) $session->floor_at_start);
+
+        if (in_array($node->node_type, self::CHOICE_NODE_TYPES, true)) {
+            // 選択肢を出している最中の「続き」（画面の再読込・古い画面からの再送）。選択肢を飛ばして
+            // イベントを消してしまわず、同じ選択肢をもう一度出す
+            $run = $this->runUntilSegment($session, $user);
+
+            return ['segment' => $run['segment'], 'complete' => false];
+        }
 
         if ($node->node_type === 'end') {
             $context = $session->context ?? [];
@@ -952,14 +973,38 @@ class DungeonExplorationEngine
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * 今、選択肢を出している場面か（party_choice / party_choice_skip / binary_choice のノードで止まっているか）。
+     * 選んだあとの再送・古い画面からの選択は、ここで見分けて受け流す（DungeonExplorationService::choose）。
+     */
+    public function isAtChoiceNode(DungeonExplorationSession $session): bool
+    {
+        $nodeKey = (string) $session->current_node_key;
+        if ($nodeKey === '') {
+            return false;
+        }
+
+        $node = $this->catalog->findNode($session->event_code, $nodeKey, (int) $session->floor_at_start);
+
+        return in_array($node->node_type, self::CHOICE_NODE_TYPES, true);
+    }
+
+    /**
+     * 選択肢で選んだ内容を反映して、次のノードへ進める。選択肢の場面でないとき・出していない選択肢（存在しない・
+     * 戦闘不能の味方・場面に無い「スキップ」）は受け付けない（探索の状態を壊さない）。
      */
     public function applyChoice(DungeonExplorationSession $session, User $user, string $choiceId): void
     {
         $node = $this->catalog->findNode($session->event_code, (string) $session->current_node_key, (int) $session->floor_at_start);
         $context = $session->context ?? [];
 
+        if (! in_array($node->node_type, self::CHOICE_NODE_TYPES, true)) {
+            throw new \InvalidArgumentException('いまは選べる場面ではありません。');
+        }
+
         if ($node->node_type === 'binary_choice') {
+            if (! in_array($choiceId, ['yes', 'no'], true)) {
+                throw new \InvalidArgumentException('選択肢が正しくありません。');
+            }
             $next = $choiceId === 'yes'
                 ? ($node->next_on_success ?: null)
                 : ($node->next_on_fail ?: null);
@@ -968,18 +1013,21 @@ class DungeonExplorationEngine
             }
             $session->current_node_key = $next;
         } elseif ($choiceId === 'skip') {
+            if ($node->node_type !== 'party_choice_skip') {
+                throw new \InvalidArgumentException('選択肢が正しくありません。');
+            }
             $next = $node->next_on_fail ?: $node->next_default;
             if ($next === null || $next === '') {
                 throw new \InvalidArgumentException('スキップ先ノードが未定義です。');
             }
             $session->current_node_key = $next;
         } else {
-            $context['chosen_slot'] = $choiceId;
-            if ($node->node_type === 'party_choice_skip') {
-                $next = $node->next_on_success ?: $node->next_default;
-            } else {
-                $next = $node->next_on_success ?: $node->next_default ?: 'force_open';
+            // 選択肢に出すのは、戦闘不能でない味方だけ（choiceSegment）。それ以外のスロットは受け付けない
+            if (! in_array($choiceId, $this->damage->aliveSlotIds($user), true)) {
+                throw new \InvalidArgumentException('選択肢が正しくありません。');
             }
+            $context['chosen_slot'] = $choiceId;
+            $next = $node->next_on_success ?: $node->next_default;
             if ($next === null || $next === '') {
                 throw new \InvalidArgumentException('選択先ノードが未定義です。');
             }
@@ -988,6 +1036,50 @@ class DungeonExplorationEngine
 
         $session->context = $context;
         $session->save();
+    }
+
+    /**
+     * ダメージでパーティー全員が戦闘不能になった。ここまでの場面（ダメージの描写）を見せたあと、全滅の終わり方に進む。
+     * 見せる場面がなければ、すぐに全滅の終わり方にする。
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array<string, mixed>  $context
+     * @return array{segment: array<string, mixed>, next_node: ?string, complete: bool}
+     */
+    private function resolvePartyWipe(DungeonExplorationSession $session, User $user, array $lines, array $context): array
+    {
+        if ($lines === []) {
+            return $this->gameOverResult($user);
+        }
+
+        $lines[] = ['type' => 'narration', 'text' => self::PARTY_WIPED_TEXT, 'sfx' => null];
+        $context['party_wiped'] = true;
+        $session->context = $context;
+        $session->save();
+
+        return [
+            'segment' => ['kind' => 'story', 'lines' => $lines],
+            'next_node' => null,
+            'complete' => false,
+        ];
+    }
+
+    /**
+     * 全滅の終わり方（game_over ノードと同じ）: 深さ・層をリセットしてダンジョンの外に出て、パーティーを全回復する。
+     * 探索セッションは、呼び出し側（DungeonExplorationService::resolveTerminalSegment）が破棄する。
+     *
+     * @return array{segment: array<string, mixed>, next_node: ?string, complete: bool}
+     */
+    private function gameOverResult(User $user): array
+    {
+        $this->progress->reset($user);
+        $this->characters->restorePartyToFull($user);
+
+        return [
+            'segment' => ['kind' => 'game_over', 'text' => self::PARTY_WIPED_TEXT],
+            'next_node' => null,
+            'complete' => true,
+        ];
     }
 
     /**

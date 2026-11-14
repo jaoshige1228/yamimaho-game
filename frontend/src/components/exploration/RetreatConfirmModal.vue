@@ -1,6 +1,8 @@
 <script setup>
 defineProps({
   visible: { type: Boolean, default: false },
+  /** 撤退の処理中（応答を待っている間）。「はい」を押し直せないようにする（所持金のペナルティが 2 回かからないように） */
+  busy: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['cancel', 'confirm']);
@@ -8,16 +10,26 @@ const emit = defineEmits(['cancel', 'confirm']);
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="retreat-modal-backdrop" @click.self="emit('cancel')">
+    <div v-if="visible" class="retreat-modal-backdrop" @click.self="!busy && emit('cancel')">
       <div class="retreat-modal" role="dialog" aria-modal="true" aria-labelledby="retreat-title">
         <p id="retreat-title" class="retreat-modal__message">
           撤退すると所持金を少し失います。よろしいですか？
         </p>
         <div class="retreat-modal__actions">
-          <button type="button" class="retreat-modal__btn retreat-modal__btn--ghost" @click="emit('cancel')">
+          <button
+            type="button"
+            class="retreat-modal__btn retreat-modal__btn--ghost"
+            :disabled="busy"
+            @click="emit('cancel')"
+          >
             いいえ
           </button>
-          <button type="button" class="retreat-modal__btn retreat-modal__btn--primary" @click="emit('confirm')">
+          <button
+            type="button"
+            class="retreat-modal__btn retreat-modal__btn--primary"
+            :disabled="busy"
+            @click="emit('confirm')"
+          >
             はい
           </button>
         </div>
@@ -68,6 +80,10 @@ const emit = defineEmits(['cancel', 'confirm']);
   font-family: 'Hiragino Sans', system-ui, sans-serif;
   cursor: pointer;
   touch-action: manipulation;
+}
+.retreat-modal__btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 .retreat-modal__btn--ghost {
   border: 1px solid rgba(255, 255, 255, 0.35);

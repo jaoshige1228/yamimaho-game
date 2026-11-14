@@ -804,6 +804,16 @@ async function initBattle() {
     if (props.id) {
       if (battle.battleId !== props.id) {
         await battle.load(props.id);
+        if (battle.state?.status !== 'active') {
+          // もう終わっている戦闘（結果の画面でのリロード・アプリの再読み込み・「戻る」で戻ってきたとき）。
+          // 結果の画面は戦闘が終わった瞬間にしか出せず、ここには操作できるものが何も無いので、いま居るべき画面へ移す
+          // （ダンジョンの中なら探索の画面、外なら待機画面。移動先は、ルーターのガードが決める）
+          battle.battleId = null;
+          battle.state = null;
+          battle.pendingEvents = [];
+          await router.replace('/hub');
+          return;
+        }
         syncFledDisplay();
         partyPhase.value = 'ready';
       } else {

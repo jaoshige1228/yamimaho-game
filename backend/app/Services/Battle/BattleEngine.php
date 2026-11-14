@@ -1193,7 +1193,10 @@ class BattleEngine
             // 戦闘不能になったら、バフ・デバフはすべて消える。詠唱の途中で倒れたら、詠唱も中断される
             // （蘇生しても、どちらも戻らない。蘇生後は何も付いていない状態から始まる）
             $this->clearEffectsOnDown($target);
-            if (($target['side'] ?? '') === 'enemy') {
+            // 倒した敵の経験値・ゴールドは、1 体につき 1 回だけ数える。蘇生した敵を倒し直したり、倒れた敵にもう一度
+            // 攻撃を当てたりしても、2 回目以降は増えない（印は、数えたときに敵のユニットに付ける）
+            if (($target['side'] ?? '') === 'enemy' && ! ($target['reward_counted'] ?? false)) {
+                $target['reward_counted'] = true;
                 if (! isset($state['meta'])) {
                     $state['meta'] = [];
                 }
@@ -1553,15 +1556,48 @@ class BattleEngine
      */
     private function resolveSpellTargets(array $spell, ?string $targetId, array $units, string $actorSide): array
     {
-        if ($spell['effect'] === 'revive_chance') {
-            if ($targetId === null || ! isset($units[$targetId])) {
-                throw new InvalidArgumentException('ターゲットを指定してください。');
-            }
+        $effect = (string) ($spell['effect'] ?? '');
+        $targetType = (string) ($spell['target_type'] ?? '');
 
+        if ($effect === 'revive_chance' || in_array($targetType, ['enemy_single', 'ally_single'], true)) {
+            $this->assertSingleSpellTarget($effect, $targetType, $targetId, $units, $actorSide);
+        }
+
+        if ($effect === 'revive_chance') {
             return [$targetId];
         }
 
         return $this->resolveTargets($spell['target_type'], $targetId, $units, $actorSide);
+    }
+
+    /**
+     * 単体を狙う魔法の相手を確かめる。存在しない相手・陣営の違う相手（攻撃魔法を味方へ、回復や強化を敵へ）・
+     * 戦闘不能の相手（回復と蘇生は、それぞれ専用の確認がある）は受け付けない。
+     * 画面は不正な相手を選ばせないので、通常のプレイでは起きない（手作りのリクエストへの備え）。
+     *
+     * @param  array<string, array<string, mixed>>  $units
+     */
+    private function assertSingleSpellTarget(string $effect, string $targetType, ?string $targetId, array $units, string $actorSide): void
+    {
+        if ($targetId === null || $targetId === '') {
+            throw new InvalidArgumentException('ターゲットを指定してください。');
+        }
+
+        if (! isset($units[$targetId])) {
+            throw new InvalidArgumentException('有効なターゲットを指定してください。');
+        }
+
+        $target = $units[$targetId];
+        $wantsOpponent = $targetType === 'enemy_single';
+        $isOpponent = ($target['side'] ?? '') !== $actorSide;
+        if ($wantsOpponent !== $isOpponent) {
+            throw new InvalidArgumentException('有効なターゲットを指定してください。');
+        }
+
+        $handlesFallenItself = in_array($effect, self::HEAL_EFFECTS, true) || in_array($effect, self::REVIVE_EFFECTS, true);
+        if (! $handlesFallenItself && ! ($target['alive'] ?? false)) {
+            throw new InvalidArgumentException('有効なターゲットを指定してください。');
+        }
     }
 
     /**

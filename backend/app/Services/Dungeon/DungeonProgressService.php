@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserDungeonProgress;
 use App\Services\Player\PartyGoldService;
 use App\Services\Player\UserCharacterService;
+use Illuminate\Support\Facades\DB;
 
 class DungeonProgressService
 {
@@ -100,18 +101,30 @@ class DungeonProgressService
      */
     public function retreat(User $user): array
     {
-        DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
-        $user->refresh();
-        $this->gold->applyRetreatPenalty($user);
-        $this->characters->restorePartyToFull($user);
-        $record = $this->findOrCreate($user);
-        $record->step = 0;
-        $record->in_dungeon = false;
-        $record->once_event_codes = [];
-        $record->save();
-        $user->refresh();
+        // 「はい」の二重押し・通信のやり直し・古い画面からの再送で、所持金のペナルティが 2 回かからないように、
+        // 進行の行をロックして、撤退する先（ダンジョンの中・深さ・探索の途中）がまだあるかを確かめてから行う。
+        return DB::transaction(function () use ($user): array {
+            $this->findOrCreate($user);
+            $record = UserDungeonProgress::query()->where('user_id', $user->id)->lockForUpdate()->firstOrFail();
+            $hasSession = DungeonExplorationSession::query()->where('user_id', $user->id)->exists();
 
-        return $this->statusPayload($user->fresh());
+            if (! $record->in_dungeon && (int) $record->step === 0 && ! $hasSession) {
+                // もうダンジョンの外（撤退の済んだあと）。ペナルティも回復も、もう一度は行わない
+                return $this->statusPayload($user->fresh());
+            }
+
+            DungeonExplorationSession::query()->where('user_id', $user->id)->delete();
+            $user->refresh();
+            $this->gold->applyRetreatPenalty($user);
+            $this->characters->restorePartyToFull($user);
+            $record->step = 0;
+            $record->in_dungeon = false;
+            $record->once_event_codes = [];
+            $record->save();
+            $user->refresh();
+
+            return $this->statusPayload($user->fresh());
+        });
     }
 
     public function enterFloor(User $user, int $floor): void
