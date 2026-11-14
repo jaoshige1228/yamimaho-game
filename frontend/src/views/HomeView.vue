@@ -5,32 +5,15 @@ import { api } from '../api';
 import { useAppAudio } from '../composables/useAppAudio';
 import { useBattleStore } from '../stores/battle';
 
-/** タイトル画面で流す BGM（useBattleAudio.js の BGM_TRACKS のキー。useRouteBgm.js の 'home' ルートと同じ） */
-const TITLE_BGM_TRACK = 'last_boss';
-
 const router = useRouter();
 const battle = useBattleStore();
-const { settings, unlock, unlockAndPlay, isBgmPaused } = useAppAudio();
+const { unlock } = useAppAudio();
 const resetting = ref(false);
-const leaving = ref(false);
 const message = ref('');
 const error = ref('');
 
-/**
- * 画面のどこかをタップしたとき、BGM が止まっていたら（ブラウザは、タップされるまで音を鳴らさせない）、タイトルの BGM を鳴らす。
- * 「ゲームを始める」を押したときは、待機画面の BGM に切り替わるので、鳴らさない。
- */
-function onUserGesture() {
-  if (leaving.value) return;
-  if (settings.value.bgmEnabled && isBgmPaused()) {
-    unlockAndPlay(TITLE_BGM_TRACK);
-  } else {
-    unlock();
-  }
-}
-
 function startGame() {
-  leaving.value = true;
+  // 待機画面の BGM を鳴らせるように、音のロックを解く（タイトル画面そのものは無音）
   unlock();
   router.push('/hub');
 }
@@ -58,7 +41,7 @@ async function resetData() {
 </script>
 
 <template>
-  <div class="home" @click="onUserGesture">
+  <div class="home">
     <h1 class="title">Yamimaho another</h1>
     <div class="menu">
       <button type="button" class="btn-start" :disabled="resetting" @click="startGame">ゲームを始める</button>

@@ -17,10 +17,7 @@ function battleTrackFor(route, battleState) {
 
 function resolveBgmTrack(route, battleState, player) {
   const name = route.name;
-  // タイトル画面（'/'）の BGM。空間の裂け目のボス戦と同じ曲
-  if (name === 'home') {
-    return 'last_boss';
-  }
+  // タイトル画面（'/'、route name 'home'）は BGM なし（無音）。ここで null を返すと、流れていた BGM はフェードアウトして止まる
   if (name === 'hub' || name === 'shop' || name === 'equip' || name === 'items' || name === 'familiar' || name === 'dungeon-enter') {
     return 'home';
   }
