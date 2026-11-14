@@ -87,9 +87,11 @@ async function resetData() {
 }
 .title {
   margin: 0;
-  font-size: 2.1rem;
+  /* 1 行に収まる大きさ（狭い画面では画面の幅に合わせて小さくなる） */
+  font-size: clamp(1.25rem, 6vw, 1.8rem);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .menu {
   width: 100%;

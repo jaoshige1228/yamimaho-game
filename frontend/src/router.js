@@ -20,7 +20,8 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
-      meta: { title: 'やみまほ' },
+      // タイトル画面は、上のバーに画面の名前を出さない（画面の真ん中にゲームのタイトルがあるので）
+      meta: { title: '' },
     },
     {
       path: '/hub',

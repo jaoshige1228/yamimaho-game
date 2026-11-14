@@ -9,7 +9,8 @@ import { useRouteBgm } from './composables/useRouteBgm';
 
 const route = useRoute();
 useRouteBgm();
-const showFooter = computed(() => route.name !== 'battle');
+// 戦闘中とタイトル画面には、下のメニュー（ホーム・ステータス）を出さない
+const showFooter = computed(() => route.name !== 'battle' && route.name !== 'home');
 const showGameHud = computed(() => route.name === 'hub' || route.name === 'dungeon');
 
 provide(APP_AUDIO_KEY, createAppAudio());
