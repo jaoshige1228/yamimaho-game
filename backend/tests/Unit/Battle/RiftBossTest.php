@@ -237,6 +237,66 @@ class RiftBossTest extends TestCase
         }
     }
 
+    public function test_the_legend_mage_casts_the_evil_spell_again_on_turns_10_and_16(): void
+    {
+        $engine = $this->engine();
+        $rounds = $this->playRounds($engine, $this->realState(), 18);
+
+        $legend = fn (int $round) => array_values(array_filter(
+            $rounds[$round]['events'],
+            fn (array $e) => ($e['actor'] ?? null) === 'enemy_2' && $e['type'] === 'announce',
+        ));
+        $normal = ['伝説の魔法使いは大爆発を唱えた！', '伝説の魔法使いはラグオンビートを唱えた！', '伝説の魔法使いはブラックホールを唱えた！'];
+
+        // 4・10・16 ターン目に唱え始め、その次の行動で詠唱し、そのまた次の行動で唱え終える（3 回とも同じ流れ）
+        foreach ([4, 10, 16] as $start) {
+            $this->assertSame('伝説の魔法使いはおぞましい魔法を唱えようとしている……。', $legend($start)[0]['text'], "{$start} ターン目");
+            $this->assertSame('伝説の魔法使いはおぞましい魔法を詠唱し始めた！', $legend($start + 1)[0]['text'], ($start + 1).' ターン目');
+            $this->assertSame('伝説の魔法使いは悪魔級殲滅魔法（イーヴィルインフィニティ）を唱え終えた！', $legend($start + 2)[0]['text'], ($start + 2).' ターン目');
+            // 唱え終えた行動で、生きている味方全員にダメージ。詠唱のあいだは、ダメージなし
+            $this->assertSame([], $this->eventsBy($rounds[$start]['events'], 'enemy_2', 'damage'));
+            $this->assertSame([], $this->eventsBy($rounds[$start + 1]['events'], 'enemy_2', 'damage'));
+            $this->assertEqualsCanonicalizing(['pc1', 'pc2', 'pc3', 'pc4'], array_column($this->eventsBy($rounds[$start + 2]['events'], 'enemy_2', 'damage'), 'target'));
+        }
+        // それ以外のターンは、通常の魔法（1 ターン目はブラックホール）
+        foreach ([1, 2, 3, 7, 8, 9, 13, 14, 15] as $round) {
+            $this->assertContains($legend($round)[0]['text'], $normal, "{$round} ターン目は通常の魔法");
+        }
+        $this->assertSame(3, $rounds[18]['state']['units']['enemy_2']['charged_fires']['rift_evil_infinity'], '唱え終えた回数');
+    }
+
+    public function test_every_cast_of_the_evil_spell_is_1_2_times_stronger_than_the_one_before(): void
+    {
+        // 唱え終えるたびに威力が 1.2 倍になる: 1 回目を 1 とすると、2 回目は 1.2、3 回目は 1.44（ダメージの数字で確かめる）
+        $engine = $this->engine();
+        $state = $this->realState();
+        $fire = new \ReflectionMethod(BattleEngine::class, 'continueEnemyCharge');
+        $fire->setAccessible(true);
+
+        $this->assertSame(1.2, config('battle.charged_skills.rift_evil_infinity.power_growth'));
+        $this->assertArrayNotHasKey('charged_fires', $state['units']['enemy_2'], '最初は 0 回');
+
+        $damage = [];
+        foreach ([1, 2, 3] as $cast) {
+            // 詠唱の 2 回目の行動（唱え終える）の状態にして、唱え終えさせる。味方の防御の段階は、毎回なしにそろえる
+            foreach (['pc1', 'pc2', 'pc3', 'pc4'] as $id) {
+                $state['units'][$id]['stages'] = [];
+                $state['units'][$id]['buffs'] = [];
+            }
+            $state['units']['enemy_2']['charge'] = ['skill' => 'rift_evil_infinity', 'phase' => 2];
+            $args = [&$state, 'enemy_2'];
+            $events = $fire->invokeArgs($engine, $args);
+            $damage[$cast] = collect($events)->where('type', 'damage')->pluck('value', 'target')->all();
+            $this->assertSame($cast, $state['units']['enemy_2']['charged_fires']['rift_evil_infinity'], "{$cast} 回目のあと");
+            $this->assertArrayNotHasKey('charge', $state['units']['enemy_2'], '唱え終えたら詠唱の状態は残らない');
+        }
+
+        foreach (['pc1', 'pc2', 'pc3', 'pc4'] as $id) {
+            $this->assertEqualsWithDelta(1.2, $damage[2][$id] / $damage[1][$id], 0.005, "{$id}: 2 回目は 1.2 倍");
+            $this->assertEqualsWithDelta(1.44, $damage[3][$id] / $damage[1][$id], 0.005, "{$id}: 3 回目は 1.44 倍");
+        }
+    }
+
     public function test_the_evil_spell_is_cancelled_when_the_legend_mage_is_defeated_while_chanting(): void
     {
         $texts = $this->announceTextsWhenLegendIsDefeatedAfterRound(4, allowRevive: false);

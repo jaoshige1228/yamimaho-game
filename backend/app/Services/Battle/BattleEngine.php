@@ -399,6 +399,11 @@ class BattleEngine
 
         unset($state['units'][$actorId]['charge']);
         $spell = $this->factory->findSpell($skillCode);
+        // 唱え終えるたびに威力が上がる（config の power_growth。1 回目は ×1、2 回目は ×growth、3 回目は ×growth²…）
+        $fired = (int) ($state['units'][$actorId]['charged_fires'][$skillCode] ?? 0);
+        $growth = (float) config("battle.charged_skills.{$skillCode}.power_growth", 1.0);
+        $spell['coefficient'] = (float) ($spell['coefficient'] ?? 1.0) * ($growth ** $fired);
+        $state['units'][$actorId]['charged_fires'][$skillCode] = $fired + 1;
         $text = $this->chargeMessage($skillCode, 'fire', $name);
         $state['log'][] = $text;
         $events = [$this->announceEvent($actorId, $text, $spell['element'] ?? null, $spell['effect'] ?? null, enemySkill: true)];
