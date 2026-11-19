@@ -26,11 +26,16 @@ return [
         ],
     ],
 
-    /** 味方 Lv10 以降のこぶし・キック倍率（全キャラ共通） */
+    /**
+     * 味方 Lv10 以降のこぶし・キック倍率（全キャラ共通）。
+     * さらに Lv51 以降は、その倍率に veteran_multiplier（×1.1）が掛かる（こぶし 1.5 → 1.65、キック 3.0 → 3.3）。
+     */
     'physical_mastery' => [
         'min_level' => 10,
         'punch_coefficient' => 1.5,
         'kick_coefficient' => 3.0,
+        'veteran_min_level' => 51,
+        'veteran_multiplier' => 1.1,
     ],
 
     /** デモ戦闘の味方スロット → マスターコード */

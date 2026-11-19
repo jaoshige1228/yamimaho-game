@@ -247,6 +247,101 @@ class LevelGrowthServiceTest extends TestCase
         $this->assertSame($lv20['know'] + 30, $lv30['know']);
     }
 
+    public function test_the_level_cap_is_200_and_every_level_up_after_50_needs_the_same_exp_as_level_49_to_50(): void
+    {
+        $levels = new LevelTableProvider;
+
+        $this->assertSame(200, $levels->maxLevel());
+        // Lv50 までは、これまでと同じ
+        $this->assertSame(236000, $levels->cumulativeExpForLevel(49));
+        $this->assertSame(248650, $levels->cumulativeExpForLevel(50));
+
+        // Lv49 → Lv50 に必要な量（12,650）が、Lv50 → Lv51 から Lv199 → Lv200 まで、すべて同じ
+        $gapTo = fn (int $level): int => $levels->cumulativeExpForLevel($level) - $levels->cumulativeExpForLevel($level - 1);
+        $this->assertSame(12650, $gapTo(50));
+        for ($level = 51; $level <= 200; $level++) {
+            $this->assertSame(12650, $gapTo($level), "Lv".($level - 1)."→Lv{$level}");
+        }
+        $this->assertSame(261300, $levels->cumulativeExpForLevel(51));
+        $this->assertSame(248650 + 50 * 12650, $levels->cumulativeExpForLevel(100));
+        $this->assertSame(881150, $levels->cumulativeExpForLevel(100));
+        $this->assertSame(248650 + 150 * 12650, $levels->cumulativeExpForLevel(200));
+        $this->assertSame(2146150, $levels->cumulativeExpForLevel(200));
+    }
+
+    public function test_level_ups_after_level_50_give_plus_4_to_the_other_stats_and_nothing_else_changes(): void
+    {
+        $this->seed(\Database\Seeders\MasterDataSeeder::class);
+
+        $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
+        $growth = new LevelGrowthService;
+        // Lv21 以降に上がるとき: HP+40 MP+8 魔力+6 防御+6 その他+3（Lv50 に上がるところまで）
+        $veteran = ['hp' => 40, 'mp' => 8, 'mag' => 6, 'def' => 6, 'str' => 3, 'spd' => 3, 'know' => 3, 'spirit' => 3, 'vit' => 3];
+        // Lv50 以降のレベルアップ（Lv51 に上がるところから）: その他だけ +4
+        $master4 = ['hp' => 40, 'mp' => 8, 'mag' => 6, 'def' => 6, 'str' => 4, 'spd' => 4, 'know' => 4, 'spirit' => 4, 'vit' => 4];
+
+        $gained = function (int $from, int $to) use ($growth, $master): array {
+            $before = $growth->statsForLevel($master, $from);
+            $after = $growth->statsForLevel($master, $to);
+
+            return array_map(fn (string $stat) => $after[$stat] - $before[$stat], array_combine(array_keys($before), array_keys($before)));
+        };
+        $this->assertEquals($veteran, $gained(48, 49));
+        $this->assertEquals($veteran, $gained(49, 50), 'Lv50 に上がるところは、まだ +3');
+        $this->assertEquals($master4, $gained(50, 51), 'Lv50 から先のレベルアップは +4');
+        $this->assertEquals($master4, $gained(99, 100));
+        $this->assertEquals($master4, $gained(199, 200));
+        $this->assertEquals(array_map(fn (int $v) => $v * 150, $master4), $gained(50, 200));
+
+        // Lv200 より上は、Lv200 のまま（上限）
+        $this->assertSame($growth->statsForLevel($master, 200), $growth->statsForLevel($master, 250));
+    }
+
+    public function test_grant_exp_levels_a_level_50_character_up_to_200_and_stops_there(): void
+    {
+        $this->seed(\Database\Seeders\MasterDataSeeder::class);
+
+        $user = User::factory()->create();
+        $master = CharacterMaster::query()->where('code', 'pc1')->firstOrFail();
+        $growth = new LevelGrowthService;
+        $stats = $growth->statsForLevel($master, 50);
+
+        $character = UserCharacter::query()->create([
+            'user_id' => $user->id,
+            'character_master_id' => $master->id,
+            'level' => 50,
+            'exp' => $growth->cumulativeExpForLevel(50),
+            'hp' => $stats['hp'],
+            'mp' => $stats['mp'],
+            'str' => $stats['str'],
+            'mag' => $stats['mag'],
+            'def' => $stats['def'],
+            'spd' => $stats['spd'],
+            'know' => $stats['know'],
+            'spirit' => $stats['spirit'],
+        ]);
+        $character->setRelation('characterMaster', $master);
+
+        // 12,650 ちょうどで Lv51（1 つ手前の 12,649 では上がらない）
+        $this->assertCount(0, $growth->grantExp($character, 12649));
+        $this->assertSame(50, $character->level);
+        $events = $growth->grantExp($character, 1);
+        $this->assertSame(51, $character->level);
+        $this->assertCount(1, $events);
+        $this->assertSame(51, $events[0]['level']);
+
+        // 一気に Lv200 まで。Lv200 を超えては上がらない（余った経験値は、そのまま経験値に積まれる）
+        $events = $growth->grantExp($character, 12650 * 149 + 100000);
+        $this->assertSame(200, $character->level);
+        $this->assertCount(149, $events);
+        $this->assertSame(200, $events[148]['level']);
+        $after = $growth->statsForLevel($master, 200);
+        $this->assertSame($after['mag'], (int) $character->mag);
+        $this->assertSame($after['def'], (int) $character->def);
+        // そのほかは、Lv50 → Lv200 で +4 ずつ（Lv50 のぶんに 150 × 4）
+        $this->assertSame($growth->statsForLevel($master, 50)['str'] + 150 * 4, (int) $character->str);
+    }
+
     public function test_grant_exp_levels_up_character(): void
     {
         $this->seed(\Database\Seeders\MasterDataSeeder::class);

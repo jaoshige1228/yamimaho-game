@@ -76,6 +76,43 @@ class BattleEngineKickTest extends TestCase
         $this->assertSame(33, $damage['value']);
     }
 
+    public function test_from_level_51_punch_and_kick_coefficients_are_multiplied_by_1_1(): void
+    {
+        $engine = new BattleEngine(
+            factory: new BattleFactory,
+            damageRoll: static fn (): float => 1.0,
+            hitRoll: static fn (): int => 1,
+            critRoll: static fn (): int => 100,
+        );
+
+        // コマンドに出る倍率: Lv10〜50 はこぶし 1.5・キック 3.0。Lv51 以降は、さらに ×1.1（1.65・3.3）
+        foreach ([[10, 1.5, 3.0], [50, 1.5, 3.0], [51, 1.65, 3.3], [75, 1.65, 3.3], [100, 1.65, 3.3]] as [$level, $punch, $kick]) {
+            $state = $this->battleState();
+            $state['units']['pc1']['level'] = $level;
+            foreach ($state['units'] as $id => $unit) {
+                $state['units'][$id] += ['sprite' => 'test']; // publicState が画面用に読む項目（この手組みの状態には無い）
+            }
+            $commands = $engine->publicState($state)['commands'];
+            $this->assertEqualsWithDelta($punch, $commands['punch']['coefficient'], 0.0000001, "Lv{$level} のこぶし");
+            $this->assertEqualsWithDelta($kick, $commands['kick']['coefficient'], 0.0000001, "Lv{$level} のキック");
+        }
+
+        // 実際のダメージ（筋力 14・敵の防御 6 → 14 - 3 = 11 に倍率）: Lv50 は こぶし 16 / キック 33、Lv51 は こぶし 18 / キック 36
+        $damageOf = function (int $level, string $action) use ($engine): int {
+            $state = $this->battleState();
+            $state['units']['pc1']['level'] = $level;
+            $state['units']['pc1']['str'] = 14;
+            $state['units']['enemy_1']['def'] = 6;
+            $result = $engine->applyPlayerAction($state, 'pc1', $action, null, 'enemy_1');
+
+            return (int) collect($result['events'])->firstWhere('type', 'damage')['value'];
+        };
+        $this->assertSame(16, $damageOf(50, 'punch'));
+        $this->assertSame(33, $damageOf(50, 'kick'));
+        $this->assertSame(18, $damageOf(51, 'punch'));
+        $this->assertSame(36, $damageOf(51, 'kick'));
+    }
+
     /**
      * @return array<string, mixed>
      */

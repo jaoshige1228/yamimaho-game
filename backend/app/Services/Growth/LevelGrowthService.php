@@ -28,6 +28,15 @@ class LevelGrowthService
 
     private const VETERAN_GROWTH = ['hp' => 40, 'mp' => 8, 'mag' => 6, 'def' => 6, 'flat' => 3];
 
+    /**
+     * Lv50 以降のレベルアップ（= Lv51 以上に上がるとき）は、VETERAN_GROWTH の代わりにこの上昇値を使う。
+     * VETERAN_GROWTH との違いは、そのほか（筋力・素早さ・知力・精神力・体力）が +3 ではなく +4 なことだけ（2026-11-19 から）。
+     * （GROWTH_BY_REACHED_LEVEL に指定のあるレベルを除く）
+     */
+    private const MASTER_GROWTH_FROM_LEVEL = 51;
+
+    private const MASTER_GROWTH = ['hp' => 40, 'mp' => 8, 'mag' => 6, 'def' => 6, 'flat' => 4];
+
     /** @var list<string> */
     private const FLAT_STATS = ['str', 'spd', 'know', 'spirit', 'vit'];
 
@@ -106,6 +115,10 @@ class LevelGrowthService
         // レベル個別の指定を最優先（Lv12 以降でも Lv18 だけ別の値、など）
         if (isset(self::GROWTH_BY_REACHED_LEVEL[$reachedLevel])) {
             return self::GROWTH_BY_REACHED_LEVEL[$reachedLevel];
+        }
+
+        if ($reachedLevel >= self::MASTER_GROWTH_FROM_LEVEL) {
+            return self::MASTER_GROWTH;
         }
 
         if ($reachedLevel >= self::VETERAN_GROWTH_FROM_LEVEL) {

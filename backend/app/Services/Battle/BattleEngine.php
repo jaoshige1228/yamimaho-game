@@ -1272,7 +1272,7 @@ class BattleEngine
     }
 
     /**
-     * 味方 Lv10 以降はこぶし 1.5 / キック 3.0。敵の物理技は従来どおり。
+     * 味方 Lv10 以降はこぶし 1.5 / キック 3.0。Lv51 以降は、さらに ×1.1（1.65 / 3.3）。敵の物理技は従来どおり。
      *
      * @param  array<string, mixed>  $actor
      */
@@ -1293,8 +1293,14 @@ class BattleEngine
         }
 
         $key = $action === 'kick' ? 'kick_coefficient' : 'punch_coefficient';
+        $coefficient = (float) config("battle.physical_mastery.{$key}", $base);
 
-        return (float) config("battle.physical_mastery.{$key}", $base);
+        // Lv51 以降は、さらに倍率が掛かる
+        if ($level >= (int) config('battle.physical_mastery.veteran_min_level', 51)) {
+            $coefficient *= (float) config('battle.physical_mastery.veteran_multiplier', 1.0);
+        }
+
+        return $coefficient;
     }
 
     /**
